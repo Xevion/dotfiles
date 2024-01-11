@@ -1,0 +1,5 @@
+alias copy='zsel -ib'
+alias cdp='cd $(xsel -b)'
+alias vim='nvim'
+alias nano='micro'
+alias ch='chezmoi'
