@@ -1,0 +1,16 @@
+[commit]
+	gpgsign = true
+[user]
+	signingkey = C217005CF3C00672
+	name = Xevion
+	email = xevion@xevion.dev
+[credential "https://github.com"]
+	helper = 
+	helper = !/home/linuxbrew/.linuxbrew/Cellar/gh/2.35.0/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/home/linuxbrew/.linuxbrew/Cellar/gh/2.35.0/bin/gh auth git-credential
+[core]
+	editor = micro
+[init]
+	defaultBranch = master
