@@ -1,9 +1,9 @@
-[commit]
-	gpgsign = true
 [user]
-	signingkey = C217005CF3C00672
 	name = Xevion
 	email = xevion@xevion.dev
+	# signingkey = C217005CF3C00672
+# [commit]
+	# gpgsign = true
 [credential "https://github.com"]
 	helper = 
 	helper = !/usr/bin/gh auth git-credential
