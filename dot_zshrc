@@ -140,3 +140,7 @@ if [ -d $HOME/.jenv/bin ]; then
 		eval "$(jenv init -)"
 	fi
 fi
+
+# Hishtory Config:
+export PATH="$PATH:/home/xevion/.hishtory"
+source /home/xevion/.hishtory/config.zsh
