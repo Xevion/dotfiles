@@ -24,9 +24,6 @@
 {{-   $cpuThreads = (output "powershell.exe" "-NoProfile" "-NonInteractive" "-Command" "(Get-CimInstance -ClassName 'Win32_Processor').NumberOfLogicalProcessors") | trim | atoi }}
 {{- end -}}
 
-[edit]
-	command = "micro"
-
 [data]
 	chassis = "{{ $chassisType }}"
 
