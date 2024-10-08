@@ -1,4 +1,5 @@
 # Controlled by chezmoi
+alias cha='chezmoi apply --interactive'
 alias nano='micro'
 alias ch='chezmoi'
 alias copy='xsel -ib'
