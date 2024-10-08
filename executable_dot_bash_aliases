@@ -1,3 +1,4 @@
+# Controlled by chezmoi
 alias nano='micro'
 alias ch='chezmoi'
 alias copy='xsel -ib'
@@ -7,8 +8,8 @@ alias lg='lazygit'
 alias vim='nvim'
 alias gitalias='alias | grep "git "'
 alias mousefix='sudo udevadm trigger'
-alias ll='ls -alF'
-alias la='ls -A'
+alias ll='ls -AlFh'
+alias la='ls -Ah'
 alias l='ls -CF'
 
 # https://docs.gitignore.io/install/command-line
