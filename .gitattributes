@@ -1,0 +1,8 @@
+dot_*rc linguist-language=sh
+dot_profile linguist-language=sh
+*.sh.tmpl linguist-language=sh
+*.md linguist-detectable
+dot_gitconfig linguist-language=toml linguist-detectable
+*.toml linguist-detectable
+*.toml.tmpl linguist-language=toml linguist-detectable
+*.cfg.tmpl linguist-language=ini linguist-detectable
