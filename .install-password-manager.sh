@@ -24,7 +24,9 @@ install_rbw() {
     cargo binstall rbw --no-confirm
 
     # Test again
-    command -v rbw >/dev/null 2>&1
+    command -v rbw >/dev/null 2>&1 && return
+    echo "Failed to install rbw"
+    exit 1
 }
 
 install_cargo_binstall
