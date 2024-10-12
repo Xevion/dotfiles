@@ -1,4 +1,6 @@
 # Controlled by chezmoi
+alias copilot='gh copilot'
+alias suggest='gh copilot suggest -t shell'
 alias cha='chezmoi apply --interactive'
 alias nano='micro'
 alias ch='chezmoi'
