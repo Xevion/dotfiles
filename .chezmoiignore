@@ -1,3 +1,5 @@
 README.md
 FAQ.md
 .gitattributes
+.gitignore
+.vscode
