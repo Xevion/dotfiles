@@ -1,0 +1,17 @@
+
+{
+    "files.associations": {
+        "dot_*rc": "shellscript",
+        "dot_*rc.tmpl": "shellscript",
+        "*.sh.tmpl": "shellscript",
+        ".chezmoiignore": "ignore",
+        "*.nu.tmpl": "nushell",
+        "*.json.tmpl": "json",
+        "*.toml.tmpl": "toml",
+        "*.yaml.tmpl": "yaml",
+        "*.cfg.tmpl": "ini",
+        "*bash_aliases*": "shellscript",
+        "*dot_profile*": "shellscript",
+        "*dot_gitconfig*": "ini",
+    }
+}
