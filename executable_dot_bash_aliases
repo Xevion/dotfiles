@@ -13,6 +13,17 @@ alias ll='ls -AlFh'
 alias la='ls -Ah'
 alias l='ls -CF'
 
+# fast chmod execute alias
+function chfix() {
+    last_command=$(history | tail -n 1 | awk '{$1=""; sub(/^ /, ""); print $0}')
+    
+    if [[ -f $last_command ]]; then
+        chmod +x $last_command
+    else
+        echo "Error: $last_command is not a valid file"
+    fi
+}
+
 # https://docs.gitignore.io/install/command-line
 function gi() { curl -sL https://www.toptal.com/developers/gitignore/api/$@ ;}
 
@@ -47,6 +58,16 @@ alias budsOn="bluetoothctl unblock $budsAddress && bluetoothctl connect $budsAdd
 maestroAddress="AC:BF:71:66:FE:B2"
 alias maestroOff="bluetoothctl block $maestroAddress"
 alias maestroOn="bluetoothctl unblock $maestroAddress && bluetoothctl connect $maestroAddress"
+
+function lastRuns () {
+    # default to 10 runs
+    if [ -z "$1" ]; then
+        RUNS=10
+    else
+        RUNS=$1
+    fi
+    gh run list -L $RUNS --json name,url | jq -c '.[] | [.name, .url] | join(" ")' -r  
+}
 
 # Touches a file while also creating the parent directory (and any other necessary directories) in order to do so.
 function mktouch() {
@@ -98,3 +119,5 @@ alias gsts='git stash save'
 # ----------------------
 # Git log find by commit message
 function glf() { git log --all --grep="$1"; }
+
+alias romanlog="ssh roman 'tail -F /var/log/syslog'"
