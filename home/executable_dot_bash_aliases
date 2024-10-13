@@ -1,4 +1,5 @@
 # Controlled by chezmoi
+alias gpt='chatgpt'
 alias copilot='gh copilot'
 alias suggest='gh copilot suggest -t shell'
 alias cha='chezmoi apply --interactive'
