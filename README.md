@@ -53,6 +53,9 @@ chezmoi unmanaged ~/ -t -p absolute
 
 ## Intended Goals
 
+- Lock rbw automatically
+  - 8 hour session by default
+  - Lock when computer sleeps, idle, screen saver
 - Encrypted configurations for private details
 - Bootstrapping for any Ubuntu-based system
     - WSL-support
