@@ -40,8 +40,8 @@ args = [
 
 encryption = "age"
 [age]
-    identity = "/home/xevion/key.txt"
+    identity = "{{ .chezmoi.homeDir }}/key.txt"
     recipient = "age1s3ctpj9lafl6qwyvd89sn448us7gdzd53d8yyhsc7zny78c0k4sqerrkze"
 
 [hooks.read-source-state.pre]
-    command = ".local/share/chezmoi/home/.install-password-manager.sh"
+    command = "{{ .chezmoi.sourceDir }}/.install-password-manager.sh"
