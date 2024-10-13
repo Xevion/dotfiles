@@ -87,15 +87,6 @@ fi
 # colored GCC warnings and errors
 #export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'
 
-# some more ls aliases
-alias ll='ls -alF'
-alias la='ls -A'
-alias l='ls -CF'
-
-# Add an "alert" alias for long running commands.  Use like so:
-#   sleep 10; alert
-alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
-
 # Alias definitions.
 # You may want to put all your additions into a separate file like
 # ~/.bash_aliases, instead of adding them here directly.
@@ -116,39 +107,4 @@ if ! shopt -oq posix; then
   fi
 fi
 
-# PATH Additions
-PATH=$PATH:~/.local/bin
-
-export HISHTORY_SERVER=https://hsh.***REMOVED***
-
-# Hishtory Config:
-export PATH="$PATH:/home/xevion/.hishtory"
-source /home/xevion/.hishtory/config.sh
-
-# SSH Agent should be running, once
-# ps -ef | grep "ssh-agent"
-# eval `ssh-agent -s`
-# runcount=$(ps -ef | grep "ssh-agent" | grep -v "grep" | wc -l)
-# if [ $runcount -eq 0 ]; then
-    # echo Starting SSH Agent
-    # eval $(ssh-agent -s)
-# fi
-
-# Ensure at least one key is added, timeout 1 day
-# ssh-add -l &>/dev/null
-# if ! [ "$?" == 0 ]; then
-     # echo Adding keys...
-     # ssh-add -t 1d
-# fi
-
-. "/home/xevion/.deno/env"
-
-# go lang
-export PATH=$PATH:/usr/local/go/bin
-# rust lang
-. "$HOME/.cargo/env"
-
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-
-# Set default chezmoi editor
-export EDITOR="micro"
+{{ template "scripts/commonrc.sh.tmpl" "bash" }}
