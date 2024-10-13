@@ -7,15 +7,15 @@ export MICRO_TRUECOLOR=1
 export TERM=xterm-256color  # fixes terminal colors when ssh'ing into laptop
 
 # hishtory
-export HISHTORY_SERVER=https://hsh.***REMOVED***
+export HISHTORY_SERVER="https://hsh.***REMOVED***"
 export PATH="$PATH:$HOME/.hishtory"
-{{- if eq . "zsh" -}}
+{{ if eq . "zsh" -}}
 source $HOME/.hishtory/config.zsh
-{{- else if eq . "bash" -}}
+{{ else if eq . "bash" -}}
 source $HOME/.hishtory/config.sh
 {{- else -}}
 {{ fail "Unexpected shell." }}
-{{- end -}}
+{{- end }}
 
 export PATH=$PATH:~/.local/bin
 export PATH=$PATH:/usr/local/go/bin  # Go
