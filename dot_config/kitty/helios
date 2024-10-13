@@ -1,0 +1,6 @@
+cd ./services/backend/
+launch --hold --title "backend" go run .
+
+new_tab frontend
+cd ./services/frontend/
+launch --hold yarn dev
