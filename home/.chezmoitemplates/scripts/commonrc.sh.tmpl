@@ -6,6 +6,9 @@ export GPG_TTY=$(tty)
 export MICRO_TRUECOLOR=1
 export TERM=xterm-256color  # fixes terminal colors when ssh'ing into laptop
 
+# authentication
+export OPENAI_API_KEY="{{ (rbw "OpenAI - chatgpt-cli Key").data.password }}"
+
 # hishtory
 export HISHTORY_SERVER="https://hsh.***REMOVED***"
 export PATH="$PATH:$HOME/.hishtory"
@@ -26,6 +29,7 @@ export PATH="$HOME/.local/share/bob/nvim-bin:$PATH"  # Bob, the Neovim package m
 . "$HOME/.cargo/env"  # Rustup + Cargo + Cargo-installed tools
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"  # Brew
 command -v rbenv &> /dev/null && eval "$(rbenv init -)"  # rbenv for Ruby
+. <(chatgpt --set-completions {{ . -}}) # chatgpt completions
 
 # pyenv, python version manager
 export PYENV_ROOT="$HOME/.pyenv"
