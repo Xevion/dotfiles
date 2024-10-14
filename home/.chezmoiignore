@@ -3,3 +3,4 @@ FAQ.md
 .gitattributes
 .gitignore
 .vscode
+.ignored_keys
