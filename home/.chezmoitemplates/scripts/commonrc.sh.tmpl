@@ -10,7 +10,7 @@ export TERM=xterm-256color  # fixes terminal colors when ssh'ing into laptop
 export OPENAI_API_KEY="{{ (rbw "OpenAI - chatgpt-cli Key").data.password }}"
 
 # hishtory
-export HISHTORY_SERVER="https://hsh.***REMOVED***"
+export HISHTORY_SERVER="https://hsh.{{ template "keys.tmpl" "privateDomain" }}"
 export PATH="$PATH:$HOME/.hishtory"
 {{ if eq . "zsh" -}}
 source $HOME/.hishtory/config.zsh
