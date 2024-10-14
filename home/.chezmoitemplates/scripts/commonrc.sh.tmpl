@@ -29,14 +29,18 @@ export PATH="$HOME/.local/share/bob/nvim-bin:$PATH"  # Bob, the Neovim package m
 . "$HOME/.cargo/env"  # Rustup + Cargo + Cargo-installed tools
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"  # Brew
 command -v rbenv &> /dev/null && eval "$(rbenv init -)"  # rbenv for Ruby
-. <(chatgpt --set-completions {{ . -}}) # chatgpt completions
+command -v chatgpt &> /dev/null && . <(chatgpt --set-completions {{ . -}}) # chatgpt completions
 
 # pyenv, python version manager
 export PYENV_ROOT="$HOME/.pyenv"
-[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init -)"
-# pyenv virtual-env
-eval "$(pyenv virtualenv-init -)"
+if [[ -d $PYENV_ROOT/bin ]]; then
+  export PATH="$PYENV_ROOT/bin:$PATH"
+  if command -v pyenv &> /dev/null; then
+    eval "$(pyenv init -)"
+    # pyenv virtual-env
+    eval "$(pyenv virtualenv-init -)"
+  fi
+fi
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
