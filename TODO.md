@@ -1,0 +1,5 @@
+- age executable is not installed on init
+- rbw executable needs better configuration
+- rbw config not tracked
+- hishtory executable not available on init
+- add GPG key to bw
