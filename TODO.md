@@ -3,3 +3,4 @@
 - rbw config not tracked
 - hishtory executable not available on init
 - add GPG key to bw
+- dracula theme tracking, kitty/micro
