@@ -1,3 +1,5 @@
+# Detect chassis type (likely: laptop | desktop | container)
+# https://www.freedesktop.org/software/systemd/man/latest/hostnamectl.html#chassis%20%5BTYPE%5D
 {{- $chassisType := "desktop" }}
 {{- if eq .chezmoi.os "darwin" }}
 {{-   if contains "MacBook" (output "sysctl" "-n" "hw.model") }}
@@ -11,6 +13,7 @@
 {{-   $chassisType = (output "powershell.exe" "-NoProfile" "-NonInteractive" "-Command" "if ((Get-CimInstance -Class Win32_Battery | Measure-Object).Count -gt 0) { Write-Output 'laptop' } else { Write-Output 'desktop' }") | trim }}
 {{- end }}
 
+# Detect number of CPU cores and threads
 {{- $cpuCores := 1 }}
 {{- $cpuThreads := 1 }}
 {{- if eq .chezmoi.os "darwin" }}
@@ -24,15 +27,22 @@
 {{-   $cpuThreads = (output "powershell.exe" "-NoProfile" "-NonInteractive" "-Command" "(Get-CimInstance -ClassName 'Win32_Processor').NumberOfLogicalProcessors") | trim | atoi }}
 {{- end -}}
 
+# Detect if running in WSL
+{{- $wsl := true -}}
+{{- if eq .chezmoi.os "linux" -}}
+{{-   $wsl = (.chezmoi.kernel.osrelease | lower | contains "microsoft") -}}
+{{- end -}}
+
 [merge]
 command = "bash"
 args = [
-    "-c",
-    "cp {{ "{{" }} .Target {{ "}}" }} {{ "{{" }} .Target {{ "}}" }}.base && code --new-window --wait --merge {{ "{{" }} .Destination {{ "}}" }} {{ "{{" }} .Target {{ "}}" }} {{ "{{" }} .Target {{ "}}" }}.base {{ "{{" }} .Source {{ "}}" }}",
+	"-c",
+	"cp {{ "{{" }} .Target {{ "}}" }} {{ "{{" }} .Target {{ "}}" }}.base && code --new-window --wait --merge {{ "{{" }} .Destination {{ "}}" }} {{ "{{" }} .Target {{ "}}" }} {{ "{{" }} .Target {{ "}}" }}.base {{ "{{" }} .Source {{ "}}" }}",
 ]
 
 [data]
 	chassis = "{{ $chassisType }}"
+	wsl = {{ $wsl }}
 
 [data.cpu]
 	cores = {{ $cpuCores }}
@@ -40,8 +50,8 @@ args = [
 
 encryption = "age"
 [age]
-    identity = "{{ .chezmoi.homeDir }}/key.txt"
-    recipient = "age1s3ctpj9lafl6qwyvd89sn448us7gdzd53d8yyhsc7zny78c0k4sqerrkze"
+	identity = "{{ .chezmoi.homeDir }}/key.txt"
+	recipient = "age1s3ctpj9lafl6qwyvd89sn448us7gdzd53d8yyhsc7zny78c0k4sqerrkze"
 
 [hooks.read-source-state.pre]
-    command = "{{ .chezmoi.sourceDir }}/.install-password-manager.sh"
+	command = "{{ .chezmoi.sourceDir }}/.install-password-manager.sh"
