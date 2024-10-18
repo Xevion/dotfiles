@@ -98,5 +98,5 @@ if ! shopt -oq posix; then
   fi
 fi
 
-{{ template "scripts/commonrc.sh.tmpl" "bash" }}
+{{ template "scripts/commonrc.sh.tmpl" dict "data" . "shell" "bash" }}
 {{ completion "bash" }}

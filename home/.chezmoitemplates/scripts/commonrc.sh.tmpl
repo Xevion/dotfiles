@@ -12,9 +12,9 @@ export OPENAI_API_KEY="{{ (rbw "OpenAI - chatgpt-cli Key").data.password }}"
 # hishtory
 export HISHTORY_SERVER="https://hsh.{{ template "keys.tmpl" "privateDomain" }}"
 export PATH="$PATH:$HOME/.hishtory"
-{{ if eq . "zsh" -}}
+{{ if eq .shell "zsh" -}}
 source $HOME/.hishtory/config.zsh
-{{ else if eq . "bash" -}}
+{{ else if eq .shell "bash" -}}
 source $HOME/.hishtory/config.sh
 {{- else -}}
 {{ fail "Unexpected shell." }}
@@ -29,7 +29,11 @@ export PATH="$HOME/.local/share/bob/nvim-bin:$PATH"  # Bob, the Neovim package m
 . "$HOME/.cargo/env"  # Rustup + Cargo + Cargo-installed tools
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"  # Brew
 command -v rbenv &> /dev/null && eval "$(rbenv init -)"  # rbenv for Ruby
-command -v chatgpt &> /dev/null && . <(chatgpt --set-completions {{ . -}}) # chatgpt completions
+command -v chatgpt &> /dev/null && . <(chatgpt --set-completions {{ .shell -}}) # chatgpt completions
+{{ if eq .shell "bash" -}}
+. "$HOME/.asdf/asdf.sh"
+. "$HOME/.asdf/completions/asdf.bash"
+{{- end }}
 
 # pyenv, python version manager
 export PYENV_ROOT="$HOME/.pyenv"
@@ -89,3 +93,8 @@ fi
 # else
 #   export EDITOR='nvim'
 # fi
+
+# If WSL, add SSH key on startup (once per WSL start)
+{{- if .data.wsl }}
+eval `keychain --quiet --eval --agents ssh ~/.ssh/id_rsa`
+{{ end }}
