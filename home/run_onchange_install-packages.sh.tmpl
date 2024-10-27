@@ -1,6 +1,8 @@
 {{ if eq .chezmoi.os "linux" -}}
 #!/bin/sh
-sudo apt install micro iperf3 ripgrep unzip p7zip-full
+# libpq-dev libssh-dev libsqlite3-dev
+echo "chezmoi: Installing packages"
+sudo apt install micro iperf3 ripgrep unzip p7zip-full zsh fish nmap curl git reptyr sqlite
 {{- else if eq .chezmoi.os "darwin" -}}
 #!/bin/sh
 brew install ripgrep
