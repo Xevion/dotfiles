@@ -32,7 +32,7 @@ function gi() { curl -sL https://www.toptal.com/developers/gitignore/api/$@ ;}
 
 function chcode() {
 	EDITOR="code --wait"
-	chezmoi edit $1
+	chezmoi edit $@
 }
 
 # Add an "alert" alias for long running commands.  Use like so:
