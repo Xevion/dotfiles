@@ -60,6 +60,16 @@ if [ -d $HOME/.jenv/bin ]; then
 	fi
 fi
 
+export HASS_SERVER={{ (index (rbw "HAS-CLI-CODE Token").data.uris 0).uri }}
+export HASS_TOKEN={{ (rbw "HAS-CLI-CODE Token").data.password }}
+{{ if eq .shell "bash" -}}
+source <(_HASS_CLI_COMPLETE=bash_source hass-cli)
+{{ else if eq .shell "zsh" -}}
+source <(_HASS_CLI_COMPLETE=zsh_source hass-cli)
+{{ else if eq .shell "fish" -}}
+eval (_HASS_CLI_COMPLETE=fish_source hass-cli)
+{{ end }}
+
 # pnpm
 export PNPM_HOME="$HOME/.local/share/pnpm"
 case ":$PATH:" in
