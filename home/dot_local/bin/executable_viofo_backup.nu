@@ -15,6 +15,7 @@ let letter = $mountable | input list
 let drive_letter = $"($letter):"
 
 # Mount the drive
+# TODO: Check if the drive is already mounted
 sudo mkdir --parents /mnt/($letter)
 sudo mount -t drvfs ($drive_letter) /mnt/($letter) -o uid=(id -u $env.USER),gid=(id -g $env.USER),metadata
 
@@ -35,6 +36,9 @@ for folder_suffix in $expected_folders {
         print $"Error: Expected folder ($path) does not exist."
         exit 1
     }
+
+    # TODO: Test folder permissions (READ, EXECUTE required)
+    # TODO: Test file permissions (all RO/Photo need READ/WRITE)
 }
 
 # Invoke rsync to copy the files
@@ -62,6 +66,8 @@ print "Sync complete."
 print "Unmounting drive..."
 sudo umount /mnt/($letter)
 sudo rmdir /mnt/($letter)
+
+# TODO: Check if duplicate mounts exist
 
 print "All backed up."
     
