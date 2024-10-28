@@ -32,7 +32,21 @@ function gi() { curl -sL https://www.toptal.com/developers/gitignore/api/$@ ;}
 
 function chcode() {
 	EDITOR="code --wait"
+    # If no arguments are provided, the chezmoi directory is opened
+    if [[ "$@" == *"--watch"* ]]; then
+        for arg in "$@"; do
+            if [[ ! $arg == -* ]]; then
+            chezmoi edit $@
+            return
+            fi
+        done
+        echo "--watch requires a file to be provided, directories aren't supported with watch mode"
+    fi
 	chezmoi edit $@
+}
+
+function chlg() {
+    lazygit --path ~/.local/share/chezmoi
 }
 
 # Add an "alert" alias for long running commands.  Use like so:
