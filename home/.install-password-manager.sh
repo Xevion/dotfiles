@@ -2,6 +2,14 @@
 
 type rbw >/dev/null 2>&1 && exit
 
+install_age() {
+    # Test if age is installed
+    command -v age >/dev/null 2>&1 && return
+
+    # Install age
+    sudo apt install age
+}
+
 install_cargo_binstall() {
     # Test if cargo binstall is installed
     cargo binstall --help
@@ -29,5 +37,6 @@ install_rbw() {
     exit 1
 }
 
+install_age
 install_cargo_binstall
 install_rbw
