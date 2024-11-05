@@ -2,11 +2,28 @@
 
 type rbw >/dev/null 2>&1 && exit
 
+apt_update() {
+    # Only run apt update once
+    if [ -f /tmp/.apt-updated ]; then
+        return
+    fi
+
+    sudo apt update
+
+    if [ $? -ne 0 ]; then
+        echo "Failed to update apt"
+        exit 1
+    else 
+        touch /tmp/.apt-updated
+    fi
+}
+
 install_age() {
     # Test if age is installed
     command -v age >/dev/null 2>&1 && return
 
     # Install age
+    apt_update
     sudo apt install age
 }
 
