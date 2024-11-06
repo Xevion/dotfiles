@@ -57,3 +57,5 @@ install_rbw() {
 install_age
 install_cargo_binstall
 install_rbw
+rbw login
+rbw sync
