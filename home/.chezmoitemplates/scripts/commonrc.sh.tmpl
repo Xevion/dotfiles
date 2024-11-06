@@ -25,7 +25,9 @@ export PATH=$PATH:~/.local/bin
 export PATH=$PATH:/usr/local/go/bin  # Go
 export PATH="$HOME/go/bin/:$PATH"  # Go-installed tools
 export PATH="$HOME/.local/share/bob/nvim-bin:$PATH"  # Bob, the Neovim package manager
-. "$HOME/.deno/env"  # Deno
+if [ -d "$HOME/.deno" ]; then
+  . "$HOME/.deno/env"  # Deno
+fi
 . "$HOME/.cargo/env"  # Rustup + Cargo + Cargo-installed tools
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"  # Brew
 command -v rbenv &> /dev/null && eval "$(rbenv init -)"  # rbenv for Ruby
@@ -60,15 +62,17 @@ if [ -d $HOME/.jenv/bin ]; then
 	fi
 fi
 
-export HASS_SERVER={{ (index (rbw "HAS-CLI-CODE Token").data.uris 0).uri }}
-export HASS_TOKEN={{ (rbw "HAS-CLI-CODE Token").data.password }}
-{{ if eq .shell "bash" -}}
-source <(_HASS_CLI_COMPLETE=bash_source hass-cli)
-{{ else if eq .shell "zsh" -}}
-source <(_HASS_CLI_COMPLETE=zsh_source hass-cli)
-{{ else if eq .shell "fish" -}}
-eval (_HASS_CLI_COMPLETE=fish_source hass-cli)
-{{ end }}
+if command -v hass-cli &> /dev/null; then
+  export HASS_SERVER={{ (index (rbw "HAS-CLI-CODE Token").data.uris 0).uri }}
+  export HASS_TOKEN={{ (rbw "HAS-CLI-CODE Token").data.password }}
+  {{ if eq .shell "bash" -}}
+  source <(_HASS_CLI_COMPLETE=bash_source hass-cli)
+  {{ else if eq .shell "zsh" -}}
+  source <(_HASS_CLI_COMPLETE=zsh_source hass-cli)
+  {{ else if eq .shell "fish" -}}
+  eval (_HASS_CLI_COMPLETE=fish_source hass-cli)
+  {{ end }}
+fi
 
 # pnpm
 export PNPM_HOME="$HOME/.local/share/pnpm"
