@@ -98,5 +98,8 @@ if ! shopt -oq posix; then
   fi
 fi
 
+{{/* Common shared aliases, scripts, & shell setup details. */ -}}
 {{ template "scripts/commonrc.sh.tmpl" dict "data" . "shell" "bash" }}
+
+{{/* Chezmoi's shell completion */ -}}
 {{ completion "bash" }}

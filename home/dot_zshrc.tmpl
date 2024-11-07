@@ -32,6 +32,8 @@ if type -P bw; then
   eval "$(bw completion --shell zsh); compdef _bw bw;"
 fi
 
+{{/* Common shared aliases, scripts, & shell setup details. */ -}}
 {{ template "scripts/commonrc.sh.tmpl" dict "data" . "shell" "zsh" }}
 
+{{/* Chezmoi's shell completion */ -}}
 {{ completion "zsh" }}
