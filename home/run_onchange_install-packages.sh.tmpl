@@ -1,6 +1,6 @@
 {{ if eq .chezmoi.os "linux" -}}
 #!/bin/bash
-set -eu
+set -xeu
 
 # This script is intended to be idempotent and should be safe to run multiple times.
 # No custom packages should be expected to be installed by default.
@@ -19,8 +19,12 @@ if ! type -P zsh; then
 fi
 
 # Install micro (+ register as text editor)
-curl https://getmic.ro/r | sudo sh && sudo mv ./micro /usr/bin
-sudo apt remove -y micro
+if ! type -P micro; then
+    echo "chezmoi: Installing micro"
+    sudo apt remove -y micro
+    curl https://getmic.ro/r | sudo sh
+    sudo mv ./micro /usr/bin/micro
+fi
 
 # libpq-dev libssh-dev libsqlite3-dev
 echo "chezmoi: Installing apt packages"
