@@ -1,25 +1,41 @@
 # Controlled by chezmoi
-alias gpt='chatgpt'
-alias copilot='gh copilot'
-alias suggest='gh copilot suggest -t shell'
-alias cha='chezmoi apply --interactive'
-alias nano='micro'
-alias ch='chezmoi'
-alias copy='xsel -ib'
-alias cdp='cd $(xsel -b)'
-alias spt='spotify_player'
-alias lg='lazygit'
-alias vim='nvim'
-alias gitalias='alias | grep "git "'
-alias mousefix='sudo udevadm trigger'
+
+# Core aliases
 alias ll='ls -AlFh'
 alias la='ls -Ah'
 alias l='ls -CF'
+alias nano='micro'
+alias lg='lazygit'
+alias vim='nvim'
+alias chlg='lazygit --path ~/.local/share/chezmoi'
+
+# Chezmoi
+alias cha='chezmoi apply --interactive'
+alias ch='chezmoi'
+
+# Other aliases
+alias gpt='chatgpt'
+alias copilot='gh copilot'
+alias suggest='gh copilot suggest -t shell'
+alias spt='spotify_player'
+alias gitalias='alias | grep "git "'
+alias mousefix='sudo udevadm trigger' # helped with mouse issues on laptop
+
+# Clipboard aliases
+{{ if not .wsl -}}
+alias copy='xsel -ib'
+alias paste='xsel -b'
+alias cdp='cd $(xsel -b)'
+{{- else -}}
+alias copy='clip.exe'
+alias paste='powershell.exe -noprofile Get-Clipboard'
+alias cdp='cd $(xsel -b)'
+{{- end }}
 
 # fast chmod execute alias
 function chfix() {
     last_command=$(history | tail -n 1 | awk '{$1=""; sub(/^ /, ""); print $0}')
-    
+
     if [[ -f $last_command ]]; then
         chmod +x $last_command
     else
@@ -28,25 +44,21 @@ function chfix() {
 }
 
 # https://docs.gitignore.io/install/command-line
-function gi() { curl -sL https://www.toptal.com/developers/gitignore/api/$@ ;}
+function gi() { curl -sL https://www.toptal.com/developers/gitignore/api/$@; }
 
 function chcode() {
-	EDITOR="code --wait"
+    EDITOR="code --wait"
     # If no arguments are provided, the chezmoi directory is opened
     if [[ "$@" == *"--watch"* ]]; then
         for arg in "$@"; do
             if [[ ! $arg == -* ]]; then
-            chezmoi edit $@
-            return
+                chezmoi edit $@
+                return
             fi
         done
         echo "--watch requires a file to be provided, directories aren't supported with watch mode"
     fi
-	chezmoi edit $@
-}
-
-function chlg() {
-    lazygit --path ~/.local/share/chezmoi
+    chezmoi edit $@
 }
 
 # Add an "alert" alias for long running commands.  Use like so:
@@ -76,19 +88,19 @@ maestroAddress="AC:BF:71:66:FE:B2"
 alias maestroOff="bluetoothctl block $maestroAddress"
 alias maestroOn="bluetoothctl unblock $maestroAddress && bluetoothctl connect $maestroAddress"
 
-function lastRuns () {
+function lastRuns() {
     # default to 10 runs
     if [ -z "$1" ]; then
         RUNS=10
     else
         RUNS=$1
     fi
-    gh run list -L $RUNS --json name,url | jq -c '.[] | [.name, .url] | join(" ")' -r  
+    gh run list -L $RUNS --json name,url | jq -c '.[] | [.name, .url] | join(" ")' -r
 }
 
 # Touches a file while also creating the parent directory (and any other necessary directories) in order to do so.
 function mktouch() {
-    mkdir -p $(dirname $1) && touch $1;
+    mkdir -p $(dirname $1) && touch $1
 }
 
 # When in the appropriate KiTTy terminal, use the SSH kitten
