@@ -1,6 +1,5 @@
 #!/bin/sh
-
-type rbw >/dev/null 2>&1 && exit
+set -eu
 
 apt_update() {
     # Only run apt update once
@@ -8,12 +7,12 @@ apt_update() {
         return
     fi
 
-    sudo apt update
+    sudo apt update >/dev/null
 
     if [ $? -ne 0 ]; then
         echo "Failed to update apt"
         exit 1
-    else 
+    else
         touch /tmp/.apt-updated
     fi
 }
@@ -29,7 +28,7 @@ install_age() {
 
 install_cargo_binstall() {
     # Test if cargo binstall is installed
-    cargo binstall --help
+    cargo binstall --help >/dev/null 2>&1
     if [ $? -eq 0 ]; then
         return
     fi
@@ -54,6 +53,15 @@ install_rbw() {
     exit 1
 }
 
+install_inotify() {
+    if ! dpkg -l inotify-tools >/dev/null 2>&1; then
+        echo "Installing inotify-tools"
+        apt_update
+        sudo apt install inotify-tools
+    fi
+}
+
+install_inotify
 install_age
 install_cargo_binstall
 install_rbw
