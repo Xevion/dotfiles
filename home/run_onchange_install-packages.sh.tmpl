@@ -3,6 +3,16 @@
 # libpq-dev libssh-dev libsqlite3-dev
 echo "chezmoi: Installing packages"
 sudo apt install micro iperf3 ripgrep unzip p7zip-full zsh fish nmap curl git reptyr sqlite
+
+echo "chezmoi: Installing hishtory"
+export HISHTORY_SERVER="https://hsh.{{ template "keys.tmpl" "privateDomain" }}"
+export HISHTORY_SKIP_INIT_IMPORT='true'
+curl https://hishtory.dev/install.py | python3 - --offline --skip-config-modification
+echo "chezmoi: This may take some time while the hishtory database is populated."
+hishtory init {{ (rbw "hishtory-user_secret").data.password }} --force 
+hishtory syncing enable
+
+
 {{- else if eq .chezmoi.os "darwin" -}}
 #!/bin/sh
 brew install ripgrep
