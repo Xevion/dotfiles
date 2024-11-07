@@ -4,3 +4,5 @@
 - hishtory executable not available on init
 - add GPG key to bw
 - dracula theme tracking, kitty/micro
+- lazygit fix difftool
+- testing in github codespaces
