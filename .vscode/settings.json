@@ -1,17 +1,20 @@
-
 {
-    "files.associations": {
-        "dot_*rc": "shellscript",
-        "dot_*rc.tmpl": "shellscript",
-        "*.sh.tmpl": "shellscript",
-        ".chezmoiignore": "ignore",
-        "*.nu.tmpl": "nushell",
-        "*.json.tmpl": "json",
-        "*.toml.tmpl": "toml",
-        "*.yaml.tmpl": "yaml",
-        "*.cfg.tmpl": "ini",
-        "*bash_aliases*": "shellscript",
-        "*dot_profile*": "shellscript",
-        "*dot_gitconfig*": "ini",
-    }
+  // .tmpl files are Go templates (see text/template pkg)
+  "files.associations": {
+    "dot_*rc": "shellscript",
+    "dot_*rc.tmpl": "shellscript",
+    "*.sh.tmpl": "shellscript",
+    ".chezmoiignore": "ignore",
+    "*.nu.tmpl": "nushell",
+    "*.json.tmpl": "json",
+    "*.toml.tmpl": "toml",
+    "*.yaml.tmpl": "yaml",
+    "*.cfg.tmpl": "ini",
+    "*bash_aliases*": "shellscript",
+    "*dot_profile*": "shellscript",
+    "*dot_gitconfig*": "ini"
+  },
+  // Since we're using the Go template syntax, we don't want formatters to mess with it (https://github.com/microsoft/vscode/issues/35350)
+  "editor.formatOnSave": false,
+  "editor.formatOnPaste": false
 }
