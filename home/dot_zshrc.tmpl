@@ -28,5 +28,10 @@ plugins=(git asdf yarn golang sudo zoxide bun node npm zsh-autosuggestions brew 
 source $ZSH/oh-my-zsh.sh
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh  # configure with `p10k configure`
 
+if type -P bw; then
+  eval "$(bw completion --shell zsh); compdef _bw bw;"
+fi
+
 {{ template "scripts/commonrc.sh.tmpl" dict "data" . "shell" "zsh" }}
+
 {{ completion "zsh" }}
