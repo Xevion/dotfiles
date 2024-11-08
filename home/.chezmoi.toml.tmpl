@@ -45,7 +45,10 @@ args = [
 [data]
 	privateDomain = {{ $privateDomain | quote }}
 	chassis = {{ $chassisType | quote }}
-	wsl = {{ $wsl | quote }}
+	wsl = {{ $wsl }}
+
+[diff]
+	scriptContents = false
 
 [data.cpu]
 	cores = {{ $cpuCores }}
