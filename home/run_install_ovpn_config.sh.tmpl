@@ -3,7 +3,7 @@ set -eu
 {{/* This script pulls down the OpenVPN-Config.ovpn file. It will do so once per week. */ -}}
 
 FILE=~/.config/ovpn/Local.ovpn
-ONE_WEEK=45
+ONE_WEEK=604800
 
 function displaytime {
     local T=$1
