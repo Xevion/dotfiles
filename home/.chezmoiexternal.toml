@@ -3,14 +3,19 @@
     url = "https://github.com/ohmyzsh/ohmyzsh/archive/master.tar.gz"
     exact = true
     stripComponents = 1
-    refreshPeriod = "168h"
+    refreshPeriod = "72h"
+    exclude = [
+        "*/.*",
+        "*/templates",
+        "*/themes",
+    ]
 
 [".oh-my-zsh/custom/themes/powerlevel10k"]
     type = "archive"
-    url = "https://github.com/romkatv/powerlevel10k/archive/v1.15.0.tar.gz"
+    url = "https://github.com/romkatv/powerlevel10k/archive/{{ (gitHubLatestRelease "romkatv/powerlevel10k").TagName }}.tar.gz"
     exact = true
     stripComponents = 1
-    refreshPeriod = "168h"
+    refreshPeriod = "72h"
 
 [".oh-my-zsh/custom/plugins/zsh-autosuggestions"]
     type = "archive"
@@ -22,6 +27,13 @@
 [".oh-my-zsh/custom/plugins/F-Sy-H"]
     type = "archive"
     url = "https://github.com/z-shell/F-Sy-H/archive/master.tar.gz"
+    exact = true
+    stripComponents = 1
+    refreshPeriod = "168h"
+
+[".oh-my-zsh/custom/plugins/zoxide"]
+    type = "archive"
+    url = "https://github.com/ajeetdsouza/zoxide/archive/master.tar.gz"
     exact = true
     stripComponents = 1
     refreshPeriod = "168h"
