@@ -1,0 +1,58 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Shellcheck",
+            "type": "shell",
+            "isBackground": true,
+            "command": "${workspaceFolder}/.vscode/shellchecker.sh ${workspaceFolder}",
+            "problemMatcher": [
+
+                {
+                    "source": "shellcheck",
+                    "owner": "bash",
+                    "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                    "pattern": {
+                        // info/style joined into 'note'
+                        "regexp": "^(.*):(\\d+):(\\d+):\\s*(error|warning|note):\\s*(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    },
+                    "background": {
+                        "activeOnStart": true,
+                        "beginsPattern": "^inotify watcher started$",
+                        "endsPattern": "^inotify watcher stopped$"
+                    }
+                },
+                {
+                    "source": "chezmoi",
+                    "owner": "chezmoi",
+                    "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                    "pattern": {
+                        "regexp": "^chezmoi: template: (.*):(\\d+):(\\d+): executing \"stdin\" at <.*>: (.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "message": 4
+                    }
+                }
+            ],
+            "runOptions": {
+                "runOn": "folderOpen"
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "revealProblems": "never",
+                "focus": false,
+                "panel": "dedicated",
+                "clear": false
+            },
+        }
+    ]
+}
