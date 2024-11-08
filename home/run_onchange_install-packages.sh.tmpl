@@ -32,7 +32,7 @@ echo "chezmoi: Installing apt packages"
 PACKAGES='git fzf zsh fish sqlite curl ripgrep jq' # Install and/or update
 sudo apt install -y $PACKAGES
 
-INSTALL_ONLY_PACKAGES='iperf3 unzip p7zip-full nmap reptyr' # Install only if missing
+INSTALL_ONLY_PACKAGES='iperf3 unzip p7zip-full nmap reptyr btop' # Install only if missing
 MISSING_PACKAGES=""
 for pkg in $INSTALL_ONLY_PACKAGES; do
     if ! dpkg -l $pkg >/dev/null 2>&1; then
