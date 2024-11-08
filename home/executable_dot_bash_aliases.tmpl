@@ -17,6 +17,9 @@ chshow() {
     cat $target | chezmoi execute-template
 }
 
+# Remote Management
+alias romanlog="ssh roman 'tail -F /var/log/syslog'"
+
 # Other aliases
 alias gpt='chatgpt'
 alias copilot='gh copilot'
@@ -24,6 +27,7 @@ alias suggest='gh copilot suggest -t shell'
 alias spt='spotify_player'
 alias gitalias='alias | grep "git "'
 alias mousefix='sudo udevadm trigger' # helped with mouse issues on laptop
+alias bw_login='export BW_SESSION=$(bw unlock --raw)'
 
 # Clipboard aliases
 {{ if not .wsl -}}
@@ -65,10 +69,6 @@ function chcode() {
     chezmoi edit $@
 }
 
-# Add an "alert" alias for long running commands.  Use like so:
-#   sleep 10; alert
-alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
-
 # Creates a temporary file with the given
 function tempCode() {
     if [ -z "$1" ]; then
@@ -93,19 +93,12 @@ alias maestroOff="bluetoothctl block $maestroAddress"
 alias maestroOn="bluetoothctl unblock $maestroAddress && bluetoothctl connect $maestroAddress"
 
 function lastRuns() {
-    # default to 10 runs
-    if [ -z "$1" ]; then
-        RUNS=10
-    else
-        RUNS=$1
-    fi
+    if [ -z "$1" ]; then RUNS=10; else RUNS=$1; fi
     gh run list -L $RUNS --json name,url | jq -c '.[] | [.name, .url] | join(" ")' -r
 }
 
 # Touches a file while also creating the parent directory (and any other necessary directories) in order to do so.
-function mktouch() {
-    mkdir -p $(dirname $1) && touch $1
-}
+mktouch() { mkdir -p $(dirname $1) && touch $1; }
 
 # When in the appropriate KiTTy terminal, use the SSH kitten
 [ "$TERM" = "xterm-kitty" ] && alias ssh="kitty +kitten ssh"
@@ -152,5 +145,3 @@ alias gsts='git stash save'
 # ----------------------
 # Git log find by commit message
 function glf() { git log --all --grep="$1"; }
-
-alias romanlog="ssh roman 'tail -F /var/log/syslog'"
