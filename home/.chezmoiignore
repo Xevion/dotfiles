@@ -6,6 +6,12 @@ hooks
 .oh-my-zsh/plugins/**
 .oh-my-zsh/templates/**
 .oh-my-zsh/custom/themes/powerlevel10k/**/*.zwc
+.asdf/downloads/**
+.asdf/installs/**
+.asdf/plugins/**
+.asdf/shims/**
+.asdf/tmp/**
+.asdf/repository/**
 
 {{ if eq .chezmoi.os "windows" }}
 Documents
