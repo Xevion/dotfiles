@@ -41,6 +41,7 @@ args = [
 ]
 
 [data]
+	privateDomain = "{{ promptString "Enter the private domain" }}"
 	chassis = "{{ $chassisType }}"
 	wsl = {{ $wsl }}
 
