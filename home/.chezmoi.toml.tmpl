@@ -56,5 +56,9 @@ encryption = "age"
 	identity = "{{ .chezmoi.homeDir }}/key.txt"
 	recipient = "age1s3ctpj9lafl6qwyvd89sn448us7gdzd53d8yyhsc7zny78c0k4sqerrkze"
 
+[hooks.init.pre]
+	command = "{{ .chezmoi.sourceDir }}/hooks/.init_pre.sh"
+[hooks.update.pre]
+	command = "{{ .chezmoi.sourceDir }}/hooks/.update_pre.sh"
 [hooks.read-source-state.pre]
-	command = "{{ .chezmoi.sourceDir }}/.before-source-state.sh"
+	command = "{{ .chezmoi.sourceDir }}/hooks/.read-source-state_pre.sh"
