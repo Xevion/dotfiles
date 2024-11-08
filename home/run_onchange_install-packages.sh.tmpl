@@ -28,7 +28,7 @@ fi
 
 {{/* libpq-dev libssh-dev libsqlite3-dev */ -}}
 echo "chezmoi: Installing apt packages"
-PACKAGES='git fzf zsh fish sqlite curl ripgrep' # Install and/or update
+PACKAGES='git fzf zsh fish sqlite curl ripgrep jq' # Install and/or update
 sudo apt install -y $PACKAGES
 
 INSTALL_ONLY_PACKAGES='iperf3 unzip p7zip-full nmap reptyr' # Install only if missing
