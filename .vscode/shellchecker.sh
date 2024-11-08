@@ -10,9 +10,12 @@ invoke_checker() {
 
     # If the file is a .tmpl file, use chezmoi execute-template
     if [[ $filepath == *.tmpl ]]; then
-        RENDERED_TEMPLATE=$(chezmoi execute-template <$filepath)
-        if [ $? -eq 0 ]; then
+        # TODO: This still doesn't work, for some reason 'sed' just refuses to replace the 'stdin' placeholder with execute-template
+        if ! RENDERED_TEMPLATE=$(cat $filepath | chezmoi execute-template | sed -E "s|stdin|$filepath|"); then
+            # since stdin is used for this, the filepath appears as '-', and thus must be replaced
             echo "$RENDERED_TEMPLATE" | shellcheck - $SHELLCHECK_OPTIONS | sed "s|^-|$filepath|"
+        else
+            echo $filepath
         fi
     else
         # Otherwise, use shellcheck directly
@@ -28,8 +31,8 @@ while IFS= read -rd $'\0' file; do
 done < <(find "$ROOT" \( -name "*.sh" -o -name "*.sh.tmpl" \) -type f -print0)
 
 echo "inotifywait invoking"
-inotifywait -mr --quiet --timefmt '%d/%m/%y %H:%M:%S' --format '%T %w %f' -e modify $1 |
-    while read -r date time dir file; do
+inotifywait -mr --quiet --format ' %w %f' -e modify $1 |
+    while read -r dir file; do
         absolute_path=${dir}${file}
 
         # Check if the changed file ends with .sh or .sh.tmpl
