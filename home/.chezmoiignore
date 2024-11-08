@@ -1,4 +1,5 @@
 hooks
+.tool-versions
 
 {{/* generated files, cached files, anything that might change unnecessarily */}}
 .oh-my-zsh/cache/**
