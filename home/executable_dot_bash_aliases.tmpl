@@ -12,6 +12,10 @@ alias chlg='lazygit --path ~/.local/share/chezmoi'
 # Chezmoi
 alias cha='chezmoi apply --interactive'
 alias ch='chezmoi'
+chshow() {
+    target=$(find {{ .chezmoi.sourceDir | quote }} -name "*.tmpl" -type f | fzf)
+    cat $target | chezmoi execute-template
+}
 
 # Other aliases
 alias gpt='chatgpt'
