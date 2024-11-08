@@ -33,7 +33,6 @@ if [ -f "$FILE" ]; then
     FILE_ABSOLUTE=$(realpath "$FILE")
     RELATIVE_SECONDS=$(expr $EPOCHSECONDS - $(stat -c %Y -- "$FILE_ABSOLUTE"))
 
-    echo "File exists, last downloaded $(displaytime $RELATIVE_SECONDS) ago"
     if ! test "$RELATIVE_SECONDS" -lt $ONE_WEEK; then
         echo "File is older than a week, redownloading (last downloaded $(displaytime $RELATIVE_SECONDS) ago)"
         download
