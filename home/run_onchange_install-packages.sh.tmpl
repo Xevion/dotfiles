@@ -2,8 +2,8 @@
 #!/bin/bash
 set -xeu
 
-# This script is intended to be idempotent and should be safe to run multiple times.
-# No custom packages should be expected to be installed by default.
+{{/* This script is intended to be idempotent and should be safe to run multiple times. */ -}}
+{{/* No custom packages should be expected to be installed by default. */ -}}
 
 {{ if .wsl }}
 # WSL-specific commands
@@ -12,7 +12,7 @@ set -xeu
 sudo apt install -y xclip xsel
 {{ end }}
 
-# TODO: Add basic yes/no prompts before installing packages
+{{/* TODO: Add basic yes/no prompts before installing packages */ -}}
 if ! type -P zsh; then
     echo "chezmoi: Installing zsh"
     sudo apt install zsh
@@ -26,9 +26,23 @@ if ! type -P micro; then
     sudo mv ./micro /usr/bin/micro
 fi
 
-# libpq-dev libssh-dev libsqlite3-dev
+{{/* libpq-dev libssh-dev libsqlite3-dev */ -}}
 echo "chezmoi: Installing apt packages"
-sudo apt install -y iperf3 ripgrep unzip p7zip-full zsh fish nmap curl git reptyr sqlite
+PACKAGES='git zsh fish sqlite curl ripgrep' # Install and/or update
+sudo apt install -y $PACKAGES
+
+INSTALL_ONLY_PACKAGES='iperf3 unzip p7zip-full nmap reptyr' # Install only if missing
+MISSING_PACKAGES=""
+for pkg in $INSTALL_ONLY_PACKAGES; do
+    if ! dpkg -l $pkg >/dev/null 2>&1; then
+        MISSING_PACKAGES="$MISSING_PACKAGES $pkg"
+    fi
+done
+
+if [ -n "$MISSING_PACKAGES" ]; then
+    echo "chezmoi: The following packages are missing and will be installed: $MISSING_PACKAGES"
+    sudo apt install -y $MISSING_PACKAGES
+fi
 
 # Install hishtory
 if ! type -P hishtory; then
