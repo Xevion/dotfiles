@@ -34,7 +34,7 @@
                     "owner": "chezmoi",
                     "fileLocation": ["autoDetect", "${workspaceFolder}"],
                     "pattern": {
-                        "regexp": "^chezmoi: template: (.*):(\\d+):(\\d+): executing \"stdin\" at <.*>: (.*)$",
+                        "regexp": "^chezmoi: template: (.*):(\\d+):(\\d+): executing \".+\" (at .*)$",
                         "file": 1,
                         "line": 2,
                         "column": 3,
