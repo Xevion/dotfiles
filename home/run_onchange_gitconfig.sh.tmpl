@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# We just need to have access to the Git repository
+cd {{ .chezmoi.sourceDir }}
+# The path is relative to the .git/config file
+git config --local include.path ../.gitconfig

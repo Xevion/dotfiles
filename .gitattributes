@@ -8,3 +8,4 @@ dot_gitconfig linguist-language=TOML linguist-detectable
 *.toml linguist-detectable
 *.toml.tmpl linguist-language=TOML linguist-detectable
 *.cfg.tmpl linguist-language=INI linguist-detectable
+*.age diff=age
