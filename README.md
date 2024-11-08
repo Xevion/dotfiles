@@ -1,6 +1,8 @@
 # dotfiles
 
-A [chezmoi][chezmoi]-activated dotfiles repository containing all settings related to any number of activities for me: Xevion.
+[![wakatime](https://wakatime.com/badge/user/f362871f-b27f-44c8-88eb-c2108ff82eb2/project/018cf683-de72-49c0-98d1-7af6dd2b0b63.svg)](https://wakatime.com/badge/user/f362871f-b27f-44c8-88eb-c2108ff82eb2/project/018cf683-de72-49c0-98d1-7af6dd2b0b63)
+
+A [chezmoi][chezmoi]-activated dotfiles repository containing all settings related to any number of activities for me: [**Xevion**](https://xevion.dev).
 
 This repository is not intended for others, but is kept public in the spirit of Open Source, as well as a test of my ability to build an encrypted config in the open.
 
