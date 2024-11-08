@@ -10,6 +10,8 @@ hooks
 {{ if eq .chezmoi.os "windows" }}
 Documents
 {{ else }}
+.oh-my-zsh
+{{/* this may be pretty broad, will need to be adjusted */}}
 .config
 .scripts
 *.zsh
