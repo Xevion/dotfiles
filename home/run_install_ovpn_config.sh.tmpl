@@ -22,6 +22,7 @@ download() {
     echo "Downloading OpenVPN-Config.ovpn"
     TEMP_FILE=$(mktemp)
     if bw get attachment 'OpenVPN-Config.ovpn' --itemid eca96b94-ee35-4aa8-a58f-b21e016c94a3 --output "$TEMP_FILE"; then
+        mkdir -p "$(dirname "$FILE")"
         mv "$TEMP_FILE" "$FILE"
     else
         echo "Failed to download OpenVPN-Config.ovpn"
