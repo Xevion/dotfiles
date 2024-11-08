@@ -1,0 +1,43 @@
+#!/bin/bash
+set -eu
+{{/* This script pulls down the OpenVPN-Config.ovpn file. It will do so once per week. */ -}}
+
+FILE=~/.config/ovpn/Local.ovpn
+ONE_WEEK=45
+
+function displaytime {
+    local T=$1
+    local D=$((T / 60 / 60 / 24))
+    local H=$((T / 60 / 60 % 24))
+    local M=$((T / 60 % 60))
+    local S=$((T % 60))
+    (($D > 0)) && printf '%d days ' $D
+    (($H > 0)) && printf '%d hours ' $H
+    (($M > 0)) && printf '%d minutes ' $M
+    (($D > 0 || $H > 0 || $M > 0)) && printf 'and '
+    printf '%d seconds\n' $S
+}
+
+download() {
+    echo "Downloading OpenVPN-Config.ovpn"
+    TEMP_FILE=$(mktemp)
+    if bw get attachment 'OpenVPN-Config.ovpn' --itemid eca96b94-ee35-4aa8-a58f-b21e016c94a3 --output "$TEMP_FILE"; then
+        mv "$TEMP_FILE" "$FILE"
+    else
+        echo "Failed to download OpenVPN-Config.ovpn"
+    fi
+}
+
+# Check if file exists
+if [ -f "$FILE" ]; then
+    FILE_ABSOLUTE=$(realpath "$FILE")
+    RELATIVE_SECONDS=$(expr $EPOCHSECONDS - $(stat -c %Y -- "$FILE_ABSOLUTE"))
+
+    echo "File exists, last downloaded $(displaytime $RELATIVE_SECONDS) ago"
+    if ! test "$RELATIVE_SECONDS" -lt $ONE_WEEK; then
+        echo "File is older than a week, redownloading (last downloaded $(displaytime $RELATIVE_SECONDS) ago)"
+        download
+    fi
+else
+    download
+fi
