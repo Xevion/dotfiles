@@ -61,9 +61,18 @@ install_inotify() {
     fi
 }
 
+# While key.txt is managed by Chezmoi, it's required for encrypted operations and needed to bootstrap other operations.
+provide_key_txt() {
+    if [ ! -f "~/key.txt" ]; then
+        rbw get "key.txt (age)" --field notes >~/key.txt
+        rbw get "key.txt (age)" --field password >~/key.txt
+    fi
+}
+
 install_inotify
 install_age
 install_cargo_binstall
 install_rbw
 rbw login
 rbw sync
+provide_key_txt
