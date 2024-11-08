@@ -33,6 +33,8 @@
 {{-   $wsl = (.chezmoi.kernel.osrelease | lower | contains "microsoft") -}}
 {{- end -}}
 
+{{ $privateDomain := promptStringOnce . "privateDomain" "What is the private domain" }}
+
 [merge]
 command = "bash"
 args = [
@@ -41,9 +43,9 @@ args = [
 ]
 
 [data]
-	privateDomain = "{{ promptString "Enter the private domain" }}"
-	chassis = "{{ $chassisType }}"
-	wsl = {{ $wsl }}
+	privateDomain = {{ $privateDomain | quote }}
+	chassis = {{ $chassisType | quote }}
+	wsl = {{ $wsl | quote }}
 
 [data.cpu]
 	cores = {{ $cpuCores }}
