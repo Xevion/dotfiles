@@ -23,14 +23,20 @@ invoke_checker() {
     fi
 }
 
-echo "inotify watcher started"
+# chek that 'shellcheck' is available
+if ! command -v shellcheck &> /dev/null; then
+    echo "shellcheck could not be found"
+    exit 1
+fi
+
+echo "initial shellcheck started"
 
 # Run an initial scan of all shell scripts
 while IFS= read -rd $'\0' file; do
     invoke_checker "$file"
 done < <(find "$ROOT" \( -name "*.sh" -o -name "*.sh.tmpl" \) -type f -print0)
 
-echo "inotifywait invoking"
+echo "inotifywait started"
 inotifywait -mr --quiet --format ' %w %f' -e modify $1 |
     while read -r dir file; do
         absolute_path=${dir}${file}
