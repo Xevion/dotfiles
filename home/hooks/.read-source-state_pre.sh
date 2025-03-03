@@ -60,7 +60,7 @@ install_doppler() {
         echo "https://docs.doppler.com/docs/cli#installation"
 
         DOPPLER_UNAVAILABLE=true
-        INSTALLATION_FAILED=true
+        LATE_FAIL_EXIT=true
     fi
 }
 
@@ -84,4 +84,9 @@ install_age
 # install_cargo_binstall
 if [ $DOPPLER_UNAVAILABLE = false ]; then
     install_doppler
+fi
+
+if [ $LATE_FAIL_EXIT = true ]; then
+    echo "chezmoi: Some installation(s) failed. Please fix the issues detailed before trying again."
+    exit 1
 fi
