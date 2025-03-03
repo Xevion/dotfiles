@@ -64,6 +64,6 @@ install_inotify() {
 install_inotify
 install_age
 install_cargo_binstall
-install_rbw
-rbw login
-rbw sync
+# install_rbw
+# rbw login
+# rbw sync
