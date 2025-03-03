@@ -64,7 +64,7 @@ encryption = "age"
 	config = "production"
 
 [hooks.init.pre]
-	command = "{{ .chezmoi.sourceDir }}/hooks/.init_pre.sh"
+	command = "{{ .chezmoi.sourceDir }}/hooks/.init_pre.ts"
 [hooks.update.pre]
 	command = "{{ .chezmoi.sourceDir }}/hooks/.update_pre.sh"
 [hooks.read-source-state.pre]
