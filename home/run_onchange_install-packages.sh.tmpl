@@ -55,10 +55,12 @@ fi
 
 # Hishtory initialization
 if type -P hishtory; then
-    if ! hishtory status | grep -q "$(rbw get 'hishtory-user_secret')"; then
+
+
+    if ! hishtory status | grep -q "$(doppler secrets get HISHTORY_USER_SECRET --plain)"; then
         echo "chezmoi: expected user secret not found, initializing hishtory"
 
-        hishtory init "$(rbw get 'hishtory-user_secret')" --force
+        hishtory init "$(doppler secrets get HISHTORY_USER_SECRET --plain)" --force
         hishtory syncing enable
     fi
 else

@@ -7,7 +7,8 @@ export MICRO_TRUECOLOR=1
 export TERM=xterm-256color  # fixes terminal colors when ssh'ing into laptop
 
 # authentication
-export OPENAI_API_KEY="{{ (rbw "OpenAI - chatgpt-cli Key").data.password }}"
+
+export OPENAI_API_KEY="{{ dopplerProjectJson.OPENAI_CHATGPT_CLI }}"
 
 # hishtory
 export HISHTORY_SERVER="https://hsh.{{ .data.privateDomain }}"
@@ -63,8 +64,9 @@ if [ -d $HOME/.jenv/bin ]; then
 fi
 
 if command -v hass-cli &> /dev/null; then
-  export HASS_SERVER={{ (index (rbw "HAS-CLI-CODE Token").data.uris 0).uri }}
-  export HASS_TOKEN={{ (rbw "HAS-CLI-CODE Token").data.password }}
+  export HASS_SERVER={{ dopplerProjectJson.HASS_SERVER_URL }}
+  export HASS_TOKEN={{ dopplerProjectJson.HASS_SERVER_TOKEN }}
+  
   {{ if eq .shell "bash" -}}
   source <(_HASS_CLI_COMPLETE=bash_source hass-cli)
   {{ else if eq .shell "zsh" -}}
