@@ -95,6 +95,14 @@ fi
 
 . $HOME/.bash_aliases
 
+# disable screen blanking
+# source $(brew --prefix)/share/zsh/site-functions/_todoist_peco
+# xset s off && xset -dpms
+
+# Always use `micro` as the preferred editor when connected via SSH
+if [[ -n $SSH_CONNECTION ]]; then
+  export EDITOR='micro'
+fi
 
 {{- /* WSL-specific settings */ -}}
 {{- if .data.wsl }}
@@ -118,10 +126,17 @@ wt() {
         wt.exe -w 0 "$@" wsl --cd "$(pwd)"
     fi
 }
-{{- end }}
+
+eval `keychain --quiet --eval --agents ssh ~/.ssh/id_rsa`
+{{ end }}
 
 # dotnet
 if [ -d "$HOME/.dotnet" ]; then
   export DOTNET_ROOT="$HOME/.dotnet"
   export PATH="$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools"
+fi
+
+# atuin
+if [ -d "$HOME/.atuin" ]; then
+  . "$HOME/.atuin/bin/env"
 fi
