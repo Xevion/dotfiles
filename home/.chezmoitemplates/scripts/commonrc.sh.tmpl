@@ -97,6 +97,11 @@ if [ -d "$HOME/.spicetify" ]; then
     export PATH=$PATH:$HOME/.spicetify
 fi
 
+# pulumi
+if [ -d "$HOME/.pulumi" ]; then
+    export PATH=$PATH:$HOME/.pulumi
+fi
+
 # load aliases (note: omz aliases are supposed to be placed in ZSH_CUSTOM?)
 . $HOME/.bash_aliases
 
