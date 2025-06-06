@@ -8,9 +8,6 @@ export ZSH_COMPDUMP=$ZSH/cache/.zcompdump-$HOST
 
 export ZSH="$HOME/.oh-my-zsh"
 
-# See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
-ZSH_THEME="powerlevel10k/powerlevel10k"
-
 # zstyle ':omz:update' mode auto      # update automatically without asking
 # zstyle ':omz:update' frequency 7
 
@@ -26,10 +23,25 @@ DISABLE_AUTO_UPDATE="true"  # required for chezmoi external management
 # DISABLE_UNTRACKED_FILES_DIRTY="true"
 # HIST_STAMPS="mm/dd/yyyy"
 
-plugins=(git asdf yarn golang sudo zoxide bun node npm brew zsh-autosuggestions F-Sy-H thefuck)
+# Set Oh My Zsh theme conditionally
+if [[ "$TERM_PROGRAM" == "vscode" ]]; then
+  ZSH_THEME=""  # Disable Powerlevel10k for Cursor
+else
+  # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
+  ZSH_THEME="powerlevel10k/powerlevel10k"
+  
+  plugins=(git asdf yarn golang sudo zoxide bun node npm brew zsh-autosuggestions F-Sy-H thefuck)
+fi
 
 source $ZSH/oh-my-zsh.sh
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh  # configure with `p10k configure`
+
+# Use a minimal prompt in Cursor to avoid command detection issues
+if [[ "$TERM_PROGRAM" == "vscode" ]]; then
+  PROMPT='%n@%m:%~%# '
+  RPROMPT=''
+else
+  [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh  # configure with `p10k configure`
+fi
 
 # {{ if lookPath "bw" -}} eval "$(bw completion --shell zsh); compdef _bw bw;" {{ end }}
 
