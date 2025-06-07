@@ -11,11 +11,9 @@ let host = "roman"  # The host to backup to. This is defined in the ~/.ssh/confi
 let host_path = "/mnt/user/media/backup/dashcam"  # The path on the remote host to backup to.
 
 # Global state tracking
-mut mounted = false  # Track if we've mounted a drive
-mut letter = ""  # Track the drive letter we're using
 
 try {
-    # Check for required commands
+    # Pre-check for required commands
     let required_commands = ["rsync", "sudo", "mount", "umount", "cmd.exe", "ssh"]
     for cmd in $required_commands {
         if (which $cmd | length) == 0 {
@@ -27,7 +25,7 @@ try {
     # Acquire the actual hostname of the defined host
     let host_name: string = (ssh -G $host | lines | find -r "^hostname\\s+" | str trim | split column " " | get column2).0
 
-    # Check network connectivity to backup target
+    # Pre-check network connectivity to backup target
     log debug "Checking network connectivity to backup server..."
     let ping_check = ping -c 1 $host_name | complete
     if $ping_check.exit_code != 0 {
@@ -36,7 +34,7 @@ try {
         exit 1
     }
 
-    # Check if backup destination exists and is writable
+    # Pre-check if backup destination exists and is writable
     log debug "Checking backup destination..."
     try {
         ssh $host "test -d $host_path && test -w $host_path"
@@ -45,7 +43,7 @@ try {
         exit 1
     }
 
-    # Check available space on backup destination
+    # Pre-check available space on backup destination
     log debug "Checking available space on backup destination..."
     let required_space = 10GB  # 10GB in bytes
     try {
@@ -66,7 +64,7 @@ try {
     let mountable = (cd /mnt/c; cmd.exe /C "wmic logicaldisk where DriveType=2 get DeviceID,Name /format:csv" | from csv)
     log info "Pick a USB device to mount for Viofo backup:"
 
-    # Check that at least one drive is available
+    # Assert that at least one drive is available
     if ($mountable | length) == 0 {
         log error "No USB drives found"
         exit 1
@@ -74,25 +72,44 @@ try {
 
     # Have the user choose a drive
     let selected_drive = $mountable | input list -d "DeviceID" "Select a drive to mount for backup"
-    $letter = $selected_drive.DeviceId | str replace --regex ":$" "" | str downcase
-    let win_drive_path = $"($letter | str upcase):"
+    let letter = $selected_drive.DeviceId | str replace --regex ":$" "" | str downcase  # e.g. 'C:' -> 'c'
+    let win_drive_path = $"($letter | str upcase):"  # e.g. 'c' -> 'C:'
 
     # Check if already mounted
     log info "Checking if drive is already mounted..."
     let findmnt_check = findmnt -J --mountpoint /mnt/($letter) | complete
+    mut skip_mount = false
+
+    # Handle the case where the drive is already mounted
     if $findmnt_check.exit_code == 0 {
         log debug "Drive is already mounted"
-        $mounted = true
         
         # Check was successful, meaning something must be mounted there
-        let mounts = $findmnt_check.stdout | from json
+        mut mounts = $findmnt_check.stdout | from json
         log debug "Mount JSON acquired"
         
         # If multiple mounts are found, print them, then exit
         if ($mounts.filesystems | length) > 1 {
-            log error ("Multiple mounts found, cannot continue \n" + ($mounts | to json --indent 2))
-            exit 1
+            log debug $"Multiple mounts \(($mounts.filesystems | length)\) found"
+
+            # Check if all mounts have identical properties
+            let first_mount = $mounts.filesystems.0
+            let all_same = ($mounts.filesystems | each {|mount| 
+                $mount.source == $first_mount.source
+                $mount.target == $first_mount.target
+                $mount.fstype == $first_mount.fstype
+                $mount.options == $first_mount.options
+            } | all {|x| $x})
+
+            if $all_same {
+                log debug "Multiple identical mounts found, treating as single mount"
+                $mounts.filesystems = [$first_mount]
+            } else {
+                log error ("Multiple mounts found, cannot continue \n" + ($mounts | to json --indent 2))
+                exit 1
+            }
         }
+        
         log debug $"($mounts.filesystems | length) mounts found"
 
         let current_mount = $mounts.filesystems.0
@@ -110,6 +127,8 @@ try {
         }
 
         log info $"Mount Details: ($current_mount.options)"
+
+        # Ask the user if they want to continue
         while true {
             let continue = input "Continue anyways? [y/n]"
             if $continue == "y" {
@@ -119,37 +138,41 @@ try {
                 exit 1
             }
         }
+
+        # Set the flag to skip the mount
+        $skip_mount = true
     }
 
     try {
-        # Mount the drive
-        log info "Mounting drive (requires sudo)..."
+        if $skip_mount == false {
+            # Mount the drive
+            log info "Mounting drive (requires sudo)..."
 
-        try {
-            log debug "Preparing mount point folder..."
-            sudo mkdir --parents /mnt/($letter)
-        } catch { |err|
-            log error $"Error: Could not prepare mount point folder: ($err.msg)"
-            exit 1
-        }
+            try {
+                log debug "Preparing mount point folder..."
+                sudo mkdir --parents /mnt/($letter)
+            } catch { |err|
+                log error $"Error: Could not prepare mount point folder: ($err.msg)"
+                exit 1
+            }
 
-        try {
-            log debug "Mounting drive..."
-            sudo mount -t drvfs ($win_drive_path) /mnt/($letter) -o uid=(id -u $env.USER),gid=(id -g $env.USER),metadata
-            $mounted = true
-        } catch { |err|
-            log error $"Error: Could not mount drive: ($err.msg)"
-            exit 1
-        }
+            try {
+                log debug "Mounting drive..."
+                sudo mount -t drvfs ($win_drive_path) /mnt/($letter) -o uid=(id -u $env.USER),gid=(id -g $env.USER),metadata
+            } catch { |err|
+                log error $"Error: Could not mount drive: ($err.msg)"
+                exit 1
+            }
 
-        log debug "Drive mounted"
+            log debug "Drive mounted"
 
-        # Verify mount was created
-        log debug "Verifying mount was successful..."
-        let mount_check = findmnt -J --mountpoint /mnt/($letter) | complete
-        if $mount_check.exit_code != 0 {
-            log error $mount_check.stderr
-            error "Failed to mount drive"
+            # Verify mount was created
+            log debug "Verifying mount was successful..."
+            let mount_check = findmnt -J --mountpoint /mnt/($letter) | complete
+            if $mount_check.exit_code != 0 {
+                log error $mount_check.stderr
+                error "Failed to mount drive"
+            }
         }
 
         try { 
@@ -213,9 +236,25 @@ try {
         # Unmount the drive
         log info "Unmounting drive..."
         try {
-            sudo umount /mnt/($letter)
-            sudo rmdir /mnt/($letter)
-            $mounted = false
+            # Acquire # of mounts at location (duplicate mounts)
+            let mounts = findmnt -J --mountpoint /mnt/($letter) | from json
+            let mount_count = $mounts.filesystems | length
+            
+            if $mount_count == 0 {
+                log error "No mounts found..."
+            } else {
+                if $mount_count > 1 {
+                    log warning $"Unmounting multiple mounts ($mount_count)"
+                }
+
+                # Unmount all mounts
+                for i in (1..$mount_count) {
+                    log debug $"Unmounting mount ($i)"
+                    sudo umount /mnt/($letter)
+                }
+                sudo rmdir /mnt/($letter)
+            }
+            
         } catch { |err|
             log error $"Could not unmount drive: ($err.msg)"
             exit 999
