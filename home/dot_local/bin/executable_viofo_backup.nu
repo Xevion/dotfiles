@@ -5,6 +5,57 @@ use std
 # It is intended to be ran semi-rarely (every month or two), and is also a limited test of the Fish shell/scripting language.
 # It is intended to be cross-platform, but targets Ubuntu 22.04 LTS (with WSL2 support).
 
+# Configuration details
+let host = "roman"  # The host to backup to. This is defined in the ~/.ssh/config file.
+let host_path = "/mnt/user/media/backup/dashcam"  # The path on the remote host to backup to.
+
+# Check for required commands
+let required_commands = ["rsync", "sudo", "mount", "umount", "cmd.exe", "ssh"]
+for cmd in $required_commands {
+    if (which $cmd | length) == 0 {
+        print $"Error: Required command ($cmd) not found."
+        exit 1
+    }
+}
+
+# Acquire the actual hostname of the defined host
+let host_name: string = (ssh -G $host | lines | find -r "^hostname\\s+" | str trim | split column " " | get column2).0
+
+# Check network connectivity to backup target
+print "Checking network connectivity to backup server..."
+try {
+    ping -c 1 $host_name
+} catch {
+    print $"Error: Cannot reach backup server '($host_name)'"
+    exit 1
+}
+
+# Check if backup destination exists and is writable
+print "Checking backup destination..."
+try {
+    ssh $host "test -d $host_path && test -w $host_path"
+} catch {
+    print "Error: Backup destination is not accessible or writable"
+    exit 1
+}
+
+# Check available space on backup destination
+print "Checking available space on backup destination..."
+let required_space = 10GB  # 10GB in bytes
+try {
+    let available_space = ssh $host $"df --output=avail /mnt/user" | lines | skip 1 | str trim | get 0 | append "KB" | str join " " | into filesize
+    if $available_space < $required_space {
+        print $"Error: Insufficient space on backup destination"
+        print $"Required: ($required_space), Available: ($available_space)"
+        exit 1
+    }
+
+    print $"Available space: ($available_space)"
+} catch { |err|
+    print $"Error: Could not check available space on backup destination: ($err.msg)"
+    exit 1
+}
+
 # Acquire a list of potential mountable drive letters
 let irrelevant = mount | grep drvfs | split column " " | get column1 | split column ":" | get column1
 mut mountable = cmd.exe /C "wmic logicaldisk get name" e> (std null-device) | split row "\n" | skip 1 | split column ":" | get column1 | filter {|x| ($irrelevant | find $x | length) == 0}
@@ -45,7 +96,7 @@ for folder_suffix in $expected_folders {
 print "Copying video files..."
 try {
     let source = $"/mnt/($letter)/DCIM/Movie/RO"
-    let target = "roman:/mnt/user/media/dashcam/video"
+    let target = $"($host):($host_path)/video"
     do -c { rsync -avh --progress --remove-source-files ($source) ($target) }
 } catch {
     print $env.LAST_EXIT_CODE
@@ -54,7 +105,7 @@ try {
 print "Copying photo files..."
 try {
     let source = $"/mnt/($letter)/DCIM/Photo"
-    let target = "roman:/mnt/user/media/dashcam/photo"
+    let target = $"($host):($host_path)/photo"
     do -c { rsync -avh --progress --remove-source-files ($source) ($target) }
 } catch {
     print $env.LAST_EXIT_CODE
