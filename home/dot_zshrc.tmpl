@@ -23,34 +23,20 @@ DISABLE_AUTO_UPDATE="true"  # required for chezmoi external management
 # DISABLE_UNTRACKED_FILES_DIRTY="true"
 # HIST_STAMPS="mm/dd/yyyy"
 
-# Set Oh My Zsh theme conditionally
-if [[ "$TERM_PROGRAM" == "vscode" ]]; then
-  ZSH_THEME=""  # Disable Powerlevel10k for Cursor
-
-  # Plugins limited as they're mostly just aliases, not useful to the Cursor agent
-  plugins=(asdf)
-else
-  # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
-  ZSH_THEME="powerlevel10k/powerlevel10k"
+# See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
+ZSH_THEME="powerlevel10k/powerlevel10k"
   
-  # TODO: Switch from 'asdf' to 'mise'
-  plugins=(
-    git gh fzf docker-compose docker deno chezmoi asdf yarn golang sudo zoxide bun npm brew zsh-autosuggestions F-Sy-H thefuck
-    {{- if .wsl -}}
-    {{ " kitty" }}
-    {{- end}}
-  )
-fi
+# TODO: Switch from 'asdf' to 'mise'
+plugins=(
+  git gh fzf docker-compose docker deno chezmoi asdf yarn golang sudo zoxide bun npm brew zsh-autosuggestions F-Sy-H thefuck
+  {{- if .wsl -}}
+  {{ " kitty" }}
+  {{- end}}
+)
 
 source $ZSH/oh-my-zsh.sh
 
-# Use a minimal prompt in Cursor to avoid command detection issues
-if [[ "$TERM_PROGRAM" == "vscode" ]]; then
-  PROMPT='%n@%m:%~%# '
-  RPROMPT=''
-else
-  [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh  # configure with `p10k configure`
-fi
+[[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh  # configure with `p10k configure`
 
 # {{ if lookPath "bw" -}} eval "$(bw completion --shell zsh); compdef _bw bw;" {{ end }}
 
@@ -59,3 +45,5 @@ fi
 
 {{/* Chezmoi's shell completion */ -}}
 {{ completion "zsh" }}
+
+[[ "$TERM_PROGRAM" == "vscode" ]] && . "$(code --locate-shell-integration-path zsh)"

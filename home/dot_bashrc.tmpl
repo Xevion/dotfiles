@@ -102,6 +102,8 @@ if command -v thefuck &> /dev/null; then
     eval $(thefuck --alias)
 fi
 
+[[ "$TERM_PROGRAM" == "vscode" ]] && . "$(code --locate-shell-integration-path bash)"
+
 {{/* Common shared aliases, scripts, & shell setup details. */ -}}
 {{ template "scripts/commonrc.sh.tmpl" dict "data" . "shell" "bash" }}
 
