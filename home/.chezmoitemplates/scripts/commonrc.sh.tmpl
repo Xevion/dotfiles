@@ -105,6 +105,14 @@ fi
 # load aliases (note: omz aliases are supposed to be placed in ZSH_CUSTOM?)
 . $HOME/.bash_aliases
 
+
+{{- /* WSL-specific settings */ -}}
+{{- if .data.wsl }}
+
+## Ensures CLI apps open URLs in the default Windows browser (Chrome/Firefox/etc) instead of a CLI browser
+export BROWSER='powershell.exe /c start'
+{{- end }}
+
 # disable screen blanking
 # source $(brew --prefix)/share/zsh/site-functions/_todoist_peco
 # xset s off && xset -dpms
