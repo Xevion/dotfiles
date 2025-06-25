@@ -1,5 +1,10 @@
 # Controlled by chezmoi
 
+# System
+alias sctl='systemctl'
+alias sctlu='systemctl --user'
+alias jctl='journalctl'
+
 # Core aliases
 alias ll='ls -AlFh'
 alias la='ls -Ah'
@@ -8,6 +13,7 @@ alias nano='micro'
 alias lg='lazygit'
 alias vim='nvim'
 alias chlg='lazygit --path ~/.local/share/chezmoi'
+alias es='exec $SHELL'
 
 # Chezmoi
 alias cha='chezmoi apply --interactive'
