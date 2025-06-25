@@ -113,6 +113,12 @@ fi
 export BROWSER='powershell.exe /c start'
 {{- end }}
 
+# dotnet
+if [ -d "$HOME/.dotnet" ]; then
+  export DOTNET_ROOT="$HOME/.dotnet"
+  export PATH="$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools"
+fi
+
 # disable screen blanking
 # source $(brew --prefix)/share/zsh/site-functions/_todoist_peco
 # xset s off && xset -dpms
