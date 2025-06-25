@@ -109,3 +109,8 @@ fi
 
 {{/* Chezmoi's shell completion */ -}}
 {{ completion "bash" }}
+
+# If WSL, add SSH key on startup (once per WSL start)
+{{- if .wsl }}
+eval `keychain --quiet --eval --agents ssh ~/.ssh/id_rsa`
+{{ end }}
