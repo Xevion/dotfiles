@@ -14,21 +14,27 @@ tool-versions
 .asdf/repository/**
 
 {{ if eq .chezmoi.os "windows" }}
+{{/* Ignore Linux/Unix-only files on Windows */}}
 
+# Shell configs (Linux-only)
 .oh-my-zsh
 .scripts
 *.zsh
 .zshrc
 .bashrc
+.profile
+.bash_aliases
 key.txt
 .passwd-s3fs.age
-.profile
 .tmux.conf
-{{/* this may be pretty broad, will need to be adjusted */}}
-.config
+
+# Linux-only config directories
+.config/kitty
 
 {{ else }}
+{{/* Ignore Windows-only files on Linux/macOS */}}
 
-Documents
+# Windows-only
+Documents/PowerShell
 
 {{ end }}

@@ -1,0 +1,56 @@
+# Git Configuration - Platform-aware
+# Managed by chezmoi
+
+{{ if eq .chezmoi.os "windows" }}
+# Windows Configuration
+[user]
+	name = Ryan Walters
+	email = ryan@walters.to
+	signingkey = 39538EC79ACF2597
+
+[commit]
+	gpgsign = true
+
+[gpg]
+	program = C:\\Users\\Xevion\\scoop\\apps\\gpg4win\\current\\GnuPG\\bin\\gpg.exe
+
+[credential "https://github.com"]
+	helper =
+	helper = !'C:\\Program Files\\GitHub CLI\\gh.exe' auth git-credential
+
+[credential "https://gist.github.com"]
+	helper =
+	helper = !'C:\\Program Files\\GitHub CLI\\gh.exe' auth git-credential
+
+{{ else }}
+# Linux/macOS Configuration
+[user]
+	name = Xevion
+	email = xevion@xevion.dev
+	signingkey = C217005CF3C00672
+
+[commit]
+	gpgsign = true
+
+[credential "https://github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+
+{{ end }}
+
+# Common configuration for all platforms
+[core]
+	editor = micro
+
+[init]
+	defaultBranch = master
+
+[filter.lfs]
+	required = true
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process

@@ -1,0 +1,13 @@
+# Ryan Walters identity override
+# Use this for work/professional repositories
+#
+# To use in a repository, run:
+#   git config --local include.path ~/.config/git/config-ryan
+
+[user]
+	name = Ryan Walters
+	email = ryan@walters.to
+	signingkey = 39538EC79ACF2597
+{{ if eq .chezmoi.os "windows" }}
+{{ else }}
+{{ end }}

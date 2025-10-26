@@ -54,18 +54,19 @@ args = [
 	cores = {{ $cpuCores }}
 	threads = {{ $cpuThreads }}
 
-encryption = "age"
 [age]
 	identity = "{{ .chezmoi.homeDir }}/key.txt"
 	recipient = "age1s3ctpj9lafl6qwyvd89sn448us7gdzd53d8yyhsc7zny78c0k4sqerrkze"
+
+encryption = "age"
 
 [doppler]
 	project = "dotfiles"
 	config = "production"
 
 [hooks.init.pre]
-	command = "{{ .chezmoi.sourceDir }}/hooks/.init_pre.ts"
+	command = "bun"
+	args = ["{{ .chezmoi.sourceDir }}/hooks/.init_pre.ts"]
 [hooks.update.pre]
-	command = "{{ .chezmoi.sourceDir }}/hooks/.update_pre.sh"
-[hooks.read-source-state.pre]
-	command = "{{ .chezmoi.sourceDir }}/hooks/.read-source-state_pre.sh"
+	command = "bun"
+	args = ["{{ .chezmoi.sourceDir }}/hooks/.update_pre.ts"]

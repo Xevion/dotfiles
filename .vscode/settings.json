@@ -19,5 +19,6 @@
   "editor.formatOnPaste": false,
   "editor.formatOnType": false,
   "notebook.formatOnSave.enabled": false,
-  "deno.enable": true
+  "deno.enable": false,
+  "files.simpleDialog.enable": true
 }

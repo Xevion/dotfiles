@@ -128,8 +128,3 @@ fi
 # else
 #   export EDITOR='nvim'
 # fi
-
-# If WSL, add SSH key on startup (once per WSL start)
-{{- if .data.wsl }}
-eval `keychain --quiet --eval --agents ssh ~/.ssh/id_rsa`
-{{ end }}

@@ -1,0 +1,13 @@
+# Xevion identity override
+# Use this for personal/open-source repositories
+#
+# To use in a repository, run:
+#   git config --local include.path ~/.config/git/config-xevion
+
+[user]
+	name = Xevion
+	email = xevion@xevion.dev
+	signingkey = C217005CF3C00672
+{{ if eq .chezmoi.os "windows" }}
+{{ else }}
+{{ end }}

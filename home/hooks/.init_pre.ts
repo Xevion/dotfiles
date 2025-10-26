@@ -1,28 +1,27 @@
-#!/usr/bin/env -S deno run -A
+#!/usr/bin/env bun
+console.log("init_pre.ts");
 
-import { resolve } from "https://deno.land/std/path/mod.ts";
-import { exists } from "jsr:@std/fs";
+import { exists } from "node:fs/promises";
 import { join } from "node:path";
-import { $, os } from "npm:zx@8.3.2";
+import { homedir } from "node:os";
+import { $ } from "bun";
 
-const { exit } = Deno;
-const filePath = join(os.homedir(), "key.txt");
+const filePath = join(homedir(), "key.txt");
 
-
-if (await exists(resolve(filePath))) {
+if (await exists(filePath)) {
   console.log("key.txt already exists");
-  Deno.exit(0);
+  process.exit(0);
 }
 
 // Acquire the secret from Doppler
-const result = await $`doppler secrets get KEY_TXT --plain`;
+const result = await $`doppler secrets get KEY_TXT --plain`.quiet();
 
 // Check if the command was successful
 if (result.exitCode !== 0) {
   console.error("Failed to get secret KEY_TXT");
-  exit(1);
+  process.exit(1);
 }
 
 // Write the secret to a file
-await Deno.writeTextFile(resolve(filePath), result.stdout);
+await Bun.write(filePath, result.stdout);
 console.log("key.txt bootstrapped");

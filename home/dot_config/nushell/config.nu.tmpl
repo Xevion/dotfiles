@@ -897,3 +897,19 @@ $env.config = {
         }
     ]
 }
+
+# mise - polyglot tool version manager
+# Activates mise if installed (provides tools like vault, node, python, etc.)
+# This adds mise-managed tool paths to $env.PATH dynamically based on the current directory
+if (which mise | is-not-empty) {
+    $env.MISE_SHELL = "nu"
+
+    # Create the mise activation directory if it doesn't exist
+    let mise_cache = $"($nu.data-dir)/mise"
+    mkdir $mise_cache
+
+    # Run mise hook to setup environment for current directory
+    $env.PATH = ($env.PATH | split row (char esep))
+    mise hook-env -s nu | save --force $"($mise_cache)/hook-env.nu"
+    source $"($mise_cache)/hook-env.nu"
+}

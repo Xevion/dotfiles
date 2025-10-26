@@ -1,0 +1,134 @@
+# {{ template "banner.tmpl" .}}
+# PowerShell Profile for Windows
+# Managed by chezmoi
+
+# Disable PowerShell update notifications
+$env:POWERSHELL_UPDATE_CHECK = "Off"
+
+# Editor configuration
+$env:EDITOR = "micro"
+$env:MICRO_TRUECOLOR = 1
+
+# OpenAI API Key
+$env:OPENAI_API_KEY = "{{ dopplerProjectJson.OPENAI_CHATGPT_CLI }}"
+
+# PATH additions - Windows style
+# User local bin
+$env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
+
+# Go
+if (Test-Path "$env:USERPROFILE\go") {
+    $env:PATH = "$env:USERPROFILE\go\bin;$env:PATH"
+}
+if (Test-Path "C:\Program Files\Go") {
+    $env:PATH = "C:\Program Files\Go\bin;$env:PATH"
+}
+
+# Rust/Cargo
+if (Test-Path "$env:USERPROFILE\.cargo") {
+    $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+}
+
+# Deno
+if (Test-Path "$env:USERPROFILE\.deno") {
+    $env:DENO_INSTALL = "$env:USERPROFILE\.deno"
+    $env:PATH = "$env:DENO_INSTALL\bin;$env:PATH"
+}
+
+# Node/pnpm
+if (Test-Path "$env:LOCALAPPDATA\pnpm") {
+    $env:PNPM_HOME = "$env:LOCALAPPDATA\pnpm"
+    $env:PATH = "$env:PNPM_HOME;$env:PATH"
+}
+
+# Bun
+if (Test-Path "$env:USERPROFILE\.bun") {
+    $env:BUN_INSTALL = "$env:USERPROFILE\.bun"
+    $env:PATH = "$env:BUN_INSTALL\bin;$env:PATH"
+}
+
+# Python/pyenv (Windows)
+if (Test-Path "$env:USERPROFILE\.pyenv\pyenv-win") {
+    $env:PYENV = "$env:USERPROFILE\.pyenv\pyenv-win"
+    $env:PYENV_ROOT = "$env:PYENV"
+    $env:PYENV_HOME = "$env:PYENV"
+    $env:PATH = "$env:PYENV\bin;$env:PYENV\shims;$env:PATH"
+}
+
+# .NET
+if (Test-Path "$env:USERPROFILE\.dotnet") {
+    $env:DOTNET_ROOT = "$env:USERPROFILE\.dotnet"
+    $env:PATH = "$env:DOTNET_ROOT;$env:DOTNET_ROOT\tools;$env:PATH"
+}
+
+# Java/jenv (if using jenv-for-windows or similar)
+if (Test-Path "$env:USERPROFILE\.jenv") {
+    $env:PATH = "$env:USERPROFILE\.jenv\bin;$env:PATH"
+}
+
+# Bob (Neovim version manager)
+if (Test-Path "$env:LOCALAPPDATA\bob\nvim-bin") {
+    $env:PATH = "$env:LOCALAPPDATA\bob\nvim-bin;$env:PATH"
+}
+
+# Spicetify
+if (Test-Path "$env:USERPROFILE\.spicetify") {
+    $env:PATH = "$env:USERPROFILE\.spicetify;$env:PATH"
+}
+
+# Pulumi
+if (Test-Path "$env:USERPROFILE\.pulumi\bin") {
+    $env:PATH = "$env:USERPROFILE\.pulumi\bin;$env:PATH"
+}
+
+# Scoop (if installed)
+if (Test-Path "$env:USERPROFILE\scoop\shims") {
+    $env:PATH = "$env:USERPROFILE\scoop\shims;$env:PATH"
+}
+
+# Chocolatey profile (if exists)
+$ChocolateyProfile = "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+if (Test-Path $ChocolateyProfile) {
+    Import-Module $ChocolateyProfile
+}
+
+# mise - polyglot tool version manager
+# Activates mise if installed (provides tools like vault, node, python, etc.)
+if (Get-Command mise -ErrorAction SilentlyContinue) {
+    Invoke-Expression (& mise activate pwsh | Out-String)
+}
+
+# Aliases - PowerShell equivalents of bash aliases
+Set-Alias -Name nano -Value micro
+Set-Alias -Name vim -Value nvim
+Set-Alias -Name lg -Value lazygit
+
+# Functions
+function ll { Get-ChildItem -Force | Format-Table -AutoSize }
+function la { Get-ChildItem -Force }
+function es { & $PROFILE }  # Reload profile
+
+# Chezmoi aliases
+function cha { chezmoi apply --interactive }
+Set-Alias -Name ch -Value chezmoi
+
+# Git aliases
+function ga { git add $args }
+function gaa { git add . }
+function gc { git commit $args }
+function gcm { git commit -m $args }
+function gco { git checkout $args }
+function gd { git diff $args }
+function gs { git status $args }
+function gp { git pull $args }
+function gst { git stash $args }
+
+# Initialize completions if available
+if (Get-Command chezmoi -ErrorAction SilentlyContinue) {
+    # Chezmoi completion can be set up if needed
+}
+
+# VSCode integration
+if ($env:TERM_PROGRAM -eq "vscode") {
+    # VSCode shell integration
+}
