@@ -33,7 +33,7 @@
 {{-   $wsl = (.chezmoi.kernel.osrelease | lower | contains "microsoft") -}}
 {{- end -}}
 
-{{ $privateDomain := promptStringOnce . "privateDomain" "What is the private domain" }}
+encryption = "age"
 
 [merge]
 command = "bash"
@@ -43,7 +43,6 @@ args = [
 ]
 
 [data]
-	privateDomain = {{ $privateDomain | quote }}
 	chassis = {{ $chassisType | quote }}
 	wsl = {{ $wsl }}
 
@@ -58,8 +57,6 @@ args = [
 	identity = "{{ .chezmoi.homeDir }}/key.txt"
 	recipient = "age1s3ctpj9lafl6qwyvd89sn448us7gdzd53d8yyhsc7zny78c0k4sqerrkze"
 
-encryption = "age"
-
 [doppler]
 	project = "dotfiles"
 	config = "production"
@@ -70,3 +67,11 @@ encryption = "age"
 [hooks.update.pre]
 	command = "bun"
 	args = ["{{ .chezmoi.sourceDir }}/hooks/.update_pre.ts"]
+
+{{ if eq .chezmoi.os "windows" }}
+[cd]
+	command = "nu"
+{{ else }}
+[cd]
+	command = "bash"
+{{ end }}

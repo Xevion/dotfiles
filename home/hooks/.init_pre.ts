@@ -1,15 +1,19 @@
 #!/usr/bin/env bun
-console.log("init_pre.ts");
 
 import { exists } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { $ } from "bun";
 
+// Type-safe wrapper around console.log that prepends [init_pre]
+const log = (...args: any[]): void => {
+  console.log("[init_pre]", ...args);
+};
+
 const filePath = join(homedir(), "key.txt");
 
 if (await exists(filePath)) {
-  console.log("key.txt already exists");
+  log("key.txt already exists");
   process.exit(0);
 }
 
@@ -24,4 +28,4 @@ if (result.exitCode !== 0) {
 
 // Write the secret to a file
 await Bun.write(filePath, result.stdout);
-console.log("key.txt bootstrapped");
+log("key.txt bootstrapped");

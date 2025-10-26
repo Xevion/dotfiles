@@ -48,7 +48,7 @@ fi
 # Install hishtory
 if ! type -P hishtory; then
     echo "chezmoi: Installing hishtory"
-    export HISHTORY_SERVER="https://hsh.{{ .privateDomain }}"
+    export HISHTORY_SERVER="https://hsh.{{ joinPath .chezmoi.sourceDir ".domain.age" | include | decrypt }}"
     export HISHTORY_SKIP_INIT_IMPORT='true'
     curl https://hishtory.dev/install.py | python3 - --offline --skip-config-modification
 fi
