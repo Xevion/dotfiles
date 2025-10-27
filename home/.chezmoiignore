@@ -25,7 +25,6 @@ tool-versions
 .profile
 .bash_aliases
 key.txt
-.passwd-s3fs.age
 .tmux.conf
 
 # Linux-only config directories
