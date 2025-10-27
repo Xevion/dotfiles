@@ -1,0 +1,4 @@
+{{- /* Windows path: %APPDATA%\nushell\config.nu */ -}}
+{{- if eq .chezmoi.os "windows" -}}
+{{- template "nushell/config.nu.tmpl" . -}}
+{{- end -}}
