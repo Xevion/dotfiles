@@ -21,10 +21,13 @@ Set-Alias -Name nano -Value micro
 Set-Alias -Name vim -Value nvim
 Set-Alias -Name lg -Value lazygit
 
-# Directory listing
-function ll { Get-ChildItem -Force | Format-Table -AutoSize }
-function la { Get-ChildItem -Force }
-function l { Get-ChildItem }
+# Directory listing - lsd (modern ls replacement)
+function ls { lsd $args }
+function l { lsd -l $args }
+function la { lsd -a $args }
+function lla { lsd -la $args }
+function lt { lsd --tree $args }
+function ll { lsd -AlFh $args }
 
 # Reload shell profile
 function es { & $PROFILE }

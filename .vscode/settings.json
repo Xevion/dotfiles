@@ -10,6 +10,7 @@
     "*.toml.tmpl": "toml",
     "*.yaml.tmpl": "yaml",
     "*.cfg.tmpl": "ini",
+    "*.fish.tmpl": "fish",
     "*bash_aliases*": "shellscript",
     "*dot_profile*": "shellscript",
     "*dot_gitconfig*": "ini"

@@ -27,7 +27,7 @@
 [user]
 	name = Xevion
 	email = xevion@xevion.dev
-	signingkey = C217005CF3C00672
+	signingkey = 301511AAD64FA365
 
 [commit]
 	gpgsign = true
@@ -45,6 +45,16 @@
 # Common configuration for all platforms
 [core]
 	editor = micro
+	pager = delta
+
+[interactive]
+	diffFilter = delta --color-only
+
+[delta]
+	navigate = true  # use n and N to move between diff sections
+
+[merge]
+	conflictStyle = zdiff3
 
 [init]
 	defaultBranch = master

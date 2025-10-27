@@ -1,0 +1,6 @@
+function chshow --description "Show rendered chezmoi template via fzf"
+    set -l target (find {{ .chezmoi.sourceDir | quote }} -name "*.tmpl" -type f | fzf)
+    if test -n "$target"
+        cat $target | chezmoi execute-template
+    end
+end

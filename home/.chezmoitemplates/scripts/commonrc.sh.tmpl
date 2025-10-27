@@ -1,4 +1,4 @@
-# This template's argument is the shell as a string (bash, zsh).
+# This template's argument is the shell as a string (bash, ...).
 
 # general configuration
 export EDITOR="micro"
@@ -13,9 +13,7 @@ export OPENAI_API_KEY="{{ dopplerProjectJson.OPENAI_CHATGPT_CLI }}"
 # hishtory
 export HISHTORY_SERVER="https://hsh.{{ dopplerProjectJson.PRIVATE_DOMAIN }}"
 export PATH="$PATH:$HOME/.hishtory"
-{{ if eq .shell "zsh" -}}
-source $HOME/.hishtory/config.zsh
-{{ else if eq .shell "bash" -}}
+{{ if eq .shell "bash" -}}
 source $HOME/.hishtory/config.sh
 {{- else -}}
 {{ fail "Unexpected shell." }}
@@ -63,19 +61,6 @@ if [ -d $HOME/.jenv/bin ]; then
 	fi
 fi
 
-if command -v hass-cli &> /dev/null; then
-  export HASS_SERVER={{ dopplerProjectJson.HASS_SERVER_URL }}
-  export HASS_TOKEN={{ dopplerProjectJson.HASS_SERVER_TOKEN }}
-  
-  {{ if eq .shell "bash" -}}
-  source <(_HASS_CLI_COMPLETE=bash_source hass-cli)
-  {{ else if eq .shell "zsh" -}}
-  source <(_HASS_CLI_COMPLETE=zsh_source hass-cli)
-  {{ else if eq .shell "fish" -}}
-  eval (_HASS_CLI_COMPLETE=fish_source hass-cli)
-  {{ end }}
-fi
-
 # pnpm
 export PNPM_HOME="$HOME/.local/share/pnpm"
 case ":$PATH:" in
@@ -93,7 +78,6 @@ if [ -d "$HOME/.pulumi/bin" ]; then
     export PATH=$PATH:$HOME/.pulumi/bin
 fi
 
-# load aliases (note: omz aliases are supposed to be placed in ZSH_CUSTOM?)
 . $HOME/.bash_aliases
 
 
@@ -109,13 +93,3 @@ if [ -d "$HOME/.dotnet" ]; then
   export DOTNET_ROOT="$HOME/.dotnet"
   export PATH="$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools"
 fi
-
-# disable screen blanking
-# source $(brew --prefix)/share/zsh/site-functions/_todoist_peco
-# xset s off && xset -dpms
-# Preferred editor for local and remote sessions
-# if [[ -n $SSH_CONNECTION ]]; then
-#   export EDITOR='micro'
-# else
-#   export EDITOR='nvim'
-# fi

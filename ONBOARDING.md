@@ -10,8 +10,6 @@ When **bolded**, this application won't be installed automatically. It implies t
   - [ ] bw
 - Semi-required applications
   - [ ] **hishtory**
-  - [ ] **zsh**
-  - [ ] **oh-my-zsh**
 - Preferred applications
   - [ ] kitty
   - [ ] micro

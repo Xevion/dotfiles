@@ -14,9 +14,18 @@ sudo apt install -y xclip xsel
 {{ end }}
 
 {{/* TODO: Add basic yes/no prompts before installing packages */ -}}
-if ! type -P zsh; then
-    echo "chezmoi: Installing zsh"
-    sudo apt install zsh
+# Install Fisher (Fish plugin manager) and plugins from fish_plugins file
+if type -P fish; then
+    if [ ! -f ~/.config/fish/functions/fisher.fish ]; then
+        echo "chezmoi: Installing Fisher (Fish plugin manager)"
+        fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher"
+    fi
+
+    # Update plugins from fish_plugins file
+    if [ -f ~/.config/fish/fish_plugins ]; then
+        echo "chezmoi: Updating Fish plugins from fish_plugins file"
+        fish -c "fisher update"
+    fi
 fi
 
 # Install micro (+ register as text editor)
@@ -27,9 +36,8 @@ if ! type -P micro; then
     sudo mv ./micro /usr/bin/micro
 fi
 
-{{/* libpq-dev libssh-dev libsqlite3-dev */ -}}
 echo "chezmoi: Installing apt packages"
-PACKAGES='git fzf zsh fish sqlite curl ripgrep jq' # Install and/or update
+PACKAGES='git fzf fish sqlite curl ripgrep jq' # Install and/or update
 sudo apt install -y $PACKAGES
 
 INSTALL_ONLY_PACKAGES='iperf3 unzip p7zip-full nmap reptyr btop' # Install only if missing
@@ -73,6 +81,27 @@ if ! type -P chatgpt; then
     curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/latest/download/chatgpt-linux-amd64
     chmod +x chatgpt
     sudo mv chatgpt /usr/local/bin/
+fi
+
+# Set Fish as default shell
+if type -P fish; then
+    FISH_PATH=$(which fish)
+    CURRENT_SHELL=$(getent passwd "$USER" | cut -d: -f7)
+
+    if [ "$CURRENT_SHELL" != "$FISH_PATH" ]; then
+        echo "chezmoi: Setting Fish as default shell"
+
+        # Add fish to /etc/shells if not already present
+        if ! grep -q "^$FISH_PATH$" /etc/shells; then
+            echo "$FISH_PATH" | sudo tee -a /etc/shells
+        fi
+
+        # Change default shell
+        sudo chsh -s "$FISH_PATH" "$USER"
+        echo "chezmoi: Default shell changed to Fish. Please log out and back in for changes to take effect."
+    else
+        echo "chezmoi: Fish is already the default shell"
+    fi
 fi
 
 {{- else if eq .chezmoi.os "darwin" -}}

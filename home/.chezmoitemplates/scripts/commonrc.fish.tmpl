@@ -1,0 +1,89 @@
+# Fish shell common configuration
+# This template provides environment setup for Fish shell
+
+# General configuration
+set -gx EDITOR "micro"
+set -gx GPG_TTY (tty)
+set -gx MICRO_TRUECOLOR 1
+set -gx TERM xterm-256color  # fixes terminal colors when ssh'ing into laptop
+
+# Authentication
+set -gx OPENAI_API_KEY "{{ dopplerProjectJson.OPENAI_CHATGPT_CLI }}"
+
+# hishtory (lazy-loaded via __init_hishtory function)
+test -d $HOME/.hishtory && fish_add_path $HOME/.hishtory
+
+# PATH setup
+test -d $HOME/bin && fish_add_path $HOME/bin
+fish_add_path /usr/local/bin
+fish_add_path $HOME/.local/bin
+test -d /usr/local/go/bin && fish_add_path /usr/local/go/bin  # Go
+test -d $HOME/go/bin && fish_add_path $HOME/go/bin  # Go-installed tools
+test -d $HOME/.local/share/bob/nvim-bin && fish_add_path $HOME/.local/share/bob/nvim-bin  # Bob, Neovim package manager
+
+# Deno
+if test -d $HOME/.deno
+    source $HOME/.deno/env.fish 2>/dev/null || set -gx DENO_INSTALL $HOME/.deno && fish_add_path $DENO_INSTALL/bin
+end
+
+# Rust (Cargo)
+if test -f $HOME/.cargo/env.fish
+    source $HOME/.cargo/env.fish
+else if test -f $HOME/.cargo/env
+    # Fallback: parse bash env file
+    set -gx CARGO_HOME $HOME/.cargo
+    fish_add_path $CARGO_HOME/bin
+end
+
+# Homebrew
+if test -f /home/linuxbrew/.linuxbrew/bin/brew
+    eval (/home/linuxbrew/.linuxbrew/bin/brew shellenv)
+end
+
+set -gx PYENV_ROOT $HOME/.pyenv
+
+# bun
+set -gx BUN_INSTALL $HOME/.bun
+fish_add_path $BUN_INSTALL/bin
+# Note: Bun's _bun file is bash-specific, Fish completions handled separately
+
+# jenv (Java version manager)
+if test -d $HOME/.jenv/bin
+    fish_add_path $HOME/.jenv/bin
+    if command -q jenv
+        jenv init - fish | source
+    end
+end
+
+# pnpm
+set -gx PNPM_HOME $HOME/.local/share/pnpm
+if not contains $PNPM_HOME $PATH
+    fish_add_path $PNPM_HOME
+end
+
+# spicetify
+if test -d $HOME/.spicetify
+    fish_add_path $HOME/.spicetify
+end
+
+# pulumi
+if test -d $HOME/.pulumi/bin
+    fish_add_path $HOME/.pulumi/bin
+end
+
+# dotnet
+if test -d $HOME/.dotnet
+    set -gx DOTNET_ROOT $HOME/.dotnet
+    fish_add_path $DOTNET_ROOT
+    fish_add_path $DOTNET_ROOT/tools
+end
+
+# Note: Aliases are defined in Fish-native format in ~/.config/fish/conf.d/abbr.fish
+# The bash_aliases file contains bash-specific syntax and is not sourced here
+
+{{- /* WSL-specific settings */ -}}
+{{- if .data.wsl }}
+
+## Ensures CLI apps open URLs in the default Windows browser
+set -gx BROWSER 'powershell.exe /c start'
+{{- end }}

@@ -1,0 +1,92 @@
+# Fish abbreviations (aliases that expand in place)
+# Managed by chezmoi
+
+# System
+abbr -a sctl 'systemctl'
+abbr -a sctlu 'systemctl --user'
+abbr -a jctl 'journalctl'
+
+# Core aliases - lsd (modern ls replacement)
+abbr -a ls 'lsd'
+abbr -a l 'lsd -l'
+abbr -a la 'lsd -a'
+abbr -a lla 'lsd -la'
+abbr -a lt 'lsd --tree'
+abbr -a ll 'lsd -AlFh'
+abbr -a nano 'micro'
+abbr -a lg 'lazygit'
+abbr -a vim 'nvim'
+abbr -a chlg 'lazygit --path ~/.local/share/chezmoi'
+abbr -a es 'exec fish'
+
+# Chezmoi
+abbr -a cha 'chezmoi apply --interactive'
+abbr -a ch 'chezmoi'
+
+# Remote Management
+abbr -a romanlog "ssh roman 'tail -F /var/log/syslog' --lines 100"
+
+# Other aliases
+abbr -a gpt 'chatgpt'
+abbr -a copilot 'gh copilot'
+abbr -a suggest 'gh copilot suggest -t shell'
+abbr -a spt 'spotify_player'
+abbr -a gitalias 'alias | grep "git "'
+abbr -a mousefix 'sudo udevadm trigger'
+abbr -a bw_login 'set -gx BW_SESSION (bw unlock --raw)'
+
+# Clipboard aliases
+{{ if not .wsl -}}
+abbr -a copy 'xsel -ib'
+abbr -a paste 'xsel -b'
+abbr -a cdp 'cd (xsel -b)'
+{{- else -}}
+abbr -a copy 'clip.exe'
+abbr -a paste 'powershell.exe -noprofile Get-Clipboard'
+abbr -a cdp 'cd (xsel -b)'
+{{- end }}
+
+# Bluetooth device aliases
+abbr -a budsOff 'bluetoothctl block 60:3A:AF:75:61:80'
+abbr -a budsOn 'bluetoothctl unblock 60:3A:AF:75:61:80 && bluetoothctl connect 60:3A:AF:75:61:80'
+abbr -a maestroOff 'bluetoothctl block AC:BF:71:66:FE:B2'
+abbr -a maestroOn 'bluetoothctl unblock AC:BF:71:66:FE:B2 && bluetoothctl connect AC:BF:71:66:FE:B2'
+
+# Git Aliases
+abbr -a ga 'git add'
+abbr -a gaa 'git add .'
+abbr -a gaaa 'git add --all'
+abbr -a gau 'git add --update'
+abbr -a gb 'git branch'
+abbr -a gbd 'git branch --delete'
+abbr -a gc 'git commit'
+abbr -a gcm 'git commit --message'
+abbr -a gcf 'git commit --fixup'
+abbr -a gco 'git checkout'
+abbr -a gcob 'git checkout -b'
+abbr -a gcom 'git checkout master'
+abbr -a gcos 'git checkout staging'
+abbr -a gcod 'git checkout develop'
+abbr -a gd 'git diff'
+abbr -a gda 'git diff HEAD'
+abbr -a glg 'git log --graph --oneline --decorate --all'
+abbr -a gld 'git log --pretty=format:"%h %ad %s" --date=short --all'
+abbr -a gm 'git merge --no-ff'
+abbr -a gma 'git merge --abort'
+abbr -a gmc 'git merge --continue'
+abbr -a gp 'git pull'
+abbr -a gpr 'git pull --rebase'
+abbr -a gr 'git rebase'
+abbr -a gs 'git status'
+abbr -a gss 'git status --short'
+abbr -a gst 'git stash'
+abbr -a gsta 'git stash apply'
+abbr -a gstd 'git stash drop'
+abbr -a gstl 'git stash list'
+abbr -a gstp 'git stash pop'
+abbr -a gsts 'git stash save'
+
+# KiTTY SSH kitten
+if test "$TERM" = "xterm-kitty"
+    abbr -a ssh 'kitty +kitten ssh'
+end

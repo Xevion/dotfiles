@@ -54,7 +54,7 @@
 - [ ] Consolidate PATH modifications into single, organized section in `commonrc.sh.tmpl`
 - [ ] Create modular PATH loading system (one block per tool with conditional checks)
 - [ ] Separate PATH, environment variables, and shell completions into logical sections
-- [ ] Document load order (`.bashrc` → `.zshrc` → `commonrc.sh` → `.bash_aliases`)
+- [ ] Document load order (`.bashrc` → `commonrc.sh` → `.bash_aliases`)
 - [ ] Add comments explaining each tool's PATH modification
 - [ ] Eliminate duplicate PATH additions
 - [ ] Create standard pattern for conditional tool loading
@@ -69,7 +69,7 @@
 - [ ] Move completions to dedicated section (after PATH, before aliases)
 - [ ] Add error handling for missing completion files
 - [ ] Document which tools provide completions
-- [ ] Test completions on bash and zsh
+- [ ] Test completions on bash
 - [ ] Add completion loading performance optimization
 - [ ] Document how to add new tool completions
 

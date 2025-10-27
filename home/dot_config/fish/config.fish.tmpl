@@ -1,0 +1,38 @@
+# Fish shell configuration
+# Managed by chezmoi
+
+# Disable greeting
+set -g fish_greeting
+
+{{- if .wsl }}
+if status is-login
+    and status is-interactive
+    keychain --quiet --agents ssh --eval ~/.ssh/id_rsa | source
+end
+{{- end }}
+
+# Common shared configuration (environment variables, PATH, tool setup)
+{{ template "scripts/commonrc.fish.tmpl" dict "data" . }}
+
+# Chezmoi shell completion
+{{ completion "fish" }}
+
+# VS Code / Cursor shell integration
+if test "$TERM_PROGRAM" = "vscode"
+    if command -q code
+        string replace -r '^' '' (code --locate-shell-integration-path fish) | source
+    else if command -q cursor
+        string replace -r '^' '' (cursor --locate-shell-integration-path fish) | source
+    end
+end
+
+# fzf key bindings (if fzf.fish plugin installed via Fisher)
+# Note: This is handled automatically by Fisher plugin
+
+# Load custom functions from ~/.config/fish/functions/
+# (Fish does this automatically, no explicit sourcing needed)
+
+# Load abbreviations
+if test -f ~/.config/fish/conf.d/abbr.fish
+    source ~/.config/fish/conf.d/abbr.fish
+end

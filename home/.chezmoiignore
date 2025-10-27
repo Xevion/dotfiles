@@ -2,25 +2,12 @@ hooks
 tool-versions
 
 {{/* generated files, cached files, anything that might change unnecessarily */}}
-.oh-my-zsh/cache/**
-.oh-my-zsh/plugins/**
-.oh-my-zsh/templates/**
-.oh-my-zsh/custom/themes/powerlevel10k/**/*.zwc
-.asdf/downloads/**
-.asdf/installs/**
-.asdf/plugins/**
-.asdf/shims/**
-.asdf/tmp/**
-.asdf/repository/**
 
 {{ if eq .chezmoi.os "windows" }}
 {{/* Ignore Linux/Unix-only files on Windows */}}
 
 # Shell configs (Linux-only)
-.oh-my-zsh
 .scripts
-*.zsh
-.zshrc
 .bashrc
 .profile
 .bash_aliases

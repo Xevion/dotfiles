@@ -104,7 +104,7 @@ chezmoi add --encrypt ~/.ssh/config
 ## Platform Coverage
 
 - **OS**: Windows, Linux (WSL/native), macOS
-- **Shells**: bash, zsh, nushell, PowerShell
+- **Shells**: bash, fish, nushell, PowerShell
 - **Tools**: 30+ development tools configured (pyenv, bun, cargo, etc.)
 - **Secrets**: Doppler + age encryption
 

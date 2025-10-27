@@ -1,0 +1,12 @@
+# Defer hishtory initialization to first prompt
+# This runs after startup but before user interaction
+function __init_hishtory --on-event fish_prompt
+    # Remove this function after first run
+    functions --erase __init_hishtory
+
+    # Only initialize if hishtory config exists
+    if test -f $HOME/.hishtory/config.fish
+        set -gx HISHTORY_SERVER "https://hsh.{{ dopplerProjectJson.PRIVATE_DOMAIN }}"
+        source $HOME/.hishtory/config.fish
+    end
+end
