@@ -13,3 +13,7 @@ When **bolded**, this application won't be installed automatically. It implies t
 - Preferred applications
   - [ ] kitty
   - [ ] micro
+- WSL-specific requirements
+  - [ ] **GPG4win** (Windows) - Required for Git commit signing with GUI pinentry
+    - Install via: `scoop install gpg4win`
+    - WSL will automatically link to Windows GPG for native passphrase dialogs

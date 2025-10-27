@@ -22,5 +22,12 @@ key.txt
 
 # Windows-only
 Documents/PowerShell
+AppData/
+
+{{/* WSL-specific: .gnupg is symlinked to Windows GPG directory */}}
+{{ if not .wsl }}
+# On non-WSL Linux, .gnupg is managed separately (not via chezmoi)
+.gnupg
+{{ end }}
 
 {{ end }}

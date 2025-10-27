@@ -1,0 +1,38 @@
+{{- if .wsl -}}
+#!/bin/bash
+set -eu
+
+# WSL GPG Setup - Link to Windows GPG for native pinentry support
+# This script creates a system-level symlink from /usr/local/bin/gpg to Windows gpg.exe
+# This allows WSL to use Windows' native Qt5 pinentry GUI for passphrase prompts
+
+GPG_WINDOWS="/mnt/c/Users/{{ .chezmoi.username }}/scoop/apps/gpg4win/current/GnuPG/bin/gpg.exe"
+GPG_LINK="/usr/local/bin/gpg"
+
+# Check if Windows GPG exists
+if [ ! -f "$GPG_WINDOWS" ]; then
+    echo "WARNING: Windows GPG not found at $GPG_WINDOWS"
+    echo "         Skipping GPG symlink setup"
+    exit 0
+fi
+
+# Check if symlink already exists and is correct
+if [ -L "$GPG_LINK" ]; then
+    CURRENT_TARGET=$(readlink "$GPG_LINK")
+    if [ "$CURRENT_TARGET" = "$GPG_WINDOWS" ]; then
+        echo "GPG symlink already configured correctly"
+        exit 0
+    else
+        echo "Updating GPG symlink (was pointing to: $CURRENT_TARGET)"
+    fi
+else
+    echo "Creating GPG symlink to Windows GPG"
+fi
+
+# Create/update the symlink (requires sudo)
+echo "Note: This requires sudo to create a symlink in /usr/local/bin"
+sudo ln -sf "$GPG_WINDOWS" "$GPG_LINK"
+
+echo "✓ GPG symlink configured: $GPG_LINK -> $GPG_WINDOWS"
+echo "  WSL will now use Windows GPG with native GUI pinentry"
+{{- end -}}

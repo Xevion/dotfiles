@@ -33,6 +33,12 @@ This is a **chezmoi source directory** for managing dotfiles across multiple mac
 - Bootstrap encryption key from Doppler before apply
 - Handle `chezmoi init` and `chezmoi update --init`
 
+**GPG Configuration (WSL-only):**
+- `~/.gnupg` → Symlink to Windows GPG directory (`C:\Users\Xevion\AppData\Roaming\gnupg`)
+- `/usr/local/bin/gpg` → Symlink to Windows `gpg.exe` (via `run_onchange_before_setup-wsl-gpg.sh.tmpl`)
+- Enables native Windows Qt5 pinentry GUI for passphrase prompts
+- Automatic setup on WSL; ignored on regular Linux
+
 ## Critical Restrictions
 
 ### NEVER Do These Actions
