@@ -956,11 +956,6 @@ alias spt = spotify_player
 alias mousefix = sudo udevadm trigger
 {{ end }}
 
-# Bitwarden login (sets environment variable)
-def bw_login [] {
-    $env.BW_SESSION = (bw unlock --raw)
-}
-
 # Clipboard aliases
 {{ if eq .chezmoi.os "windows" }}
 alias copy = clip.exe

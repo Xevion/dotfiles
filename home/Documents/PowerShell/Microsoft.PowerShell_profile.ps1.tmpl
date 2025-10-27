@@ -14,32 +14,69 @@ if (Get-Command mise -ErrorAction SilentlyContinue) {
     Invoke-Expression (& mise activate pwsh | Out-String)
 }
 
-# Aliases - PowerShell equivalents of bash aliases
+# ----------------------
+# Core Aliases
+# ----------------------
 Set-Alias -Name nano -Value micro
 Set-Alias -Name vim -Value nvim
 Set-Alias -Name lg -Value lazygit
 
-# Functions
+# Directory listing
 function ll { Get-ChildItem -Force | Format-Table -AutoSize }
 function la { Get-ChildItem -Force }
-function es { & $PROFILE }  # Reload profile
+function l { Get-ChildItem }
 
-# Chezmoi aliases
-function cha { chezmoi apply --interactive }
+# Reload shell profile
+function es { & $PROFILE }
+
+# ----------------------
+# Chezmoi Aliases
+# ----------------------
 Set-Alias -Name ch -Value chezmoi
+function cha { chezmoi apply --interactive }
+function chlg { lazygit --path {{ .chezmoi.config.sourceDir }} }
 
-# Git aliases
+# ----------------------
+# Git Aliases
+# ----------------------
 function ga { git add $args }
 function gaa { git add . }
+function gaaa { git add --all }
+function gau { git add --update }
+function gb { git branch $args }
+function gbd { git branch --delete $args }
 function gc { git commit $args }
-function gcm { git commit -m $args }
+function gcm { git commit --message $args }
+function gcf { git commit --fixup $args }
 function gco { git checkout $args }
+function gcob { git checkout -b $args }
+function gcom { git checkout master }
+function gcos { git checkout staging }
+function gcod { git checkout develop }
 function gd { git diff $args }
-function gs { git status $args }
+function gda { git diff HEAD }
+function glg { git log --graph --oneline --decorate --all }
+function gld { git log --pretty=format:"%h %ad %s" --date=short --all }
+function gm { git merge --no-ff $args }
+function gma { git merge --abort }
+function gmc { git merge --continue }
 function gp { git pull $args }
+function gpr { git pull --rebase $args }
+function gr { git rebase $args }
+function gs { git status $args }
+function gss { git status --short }
 function gst { git stash $args }
+function gsta { git stash apply $args }
+function gstd { git stash drop $args }
+function gstl { git stash list }
+function gstp { git stash pop $args }
+function gsts { git stash save $args }
+function glf { git log --all --grep="$args" }
+
+# Clipboard aliases (Windows native)
+function cdp { Set-Location (Get-Clipboard) }
 
 # Initialize completions if available
 if (Get-Command chezmoi -ErrorAction SilentlyContinue) {
-    # Chezmoi completion can be set up if needed
+    chezmoi completion powershell | Out-String | Invoke-Expression
 }
