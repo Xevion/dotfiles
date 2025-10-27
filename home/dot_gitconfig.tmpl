@@ -1,16 +1,18 @@
 # Git Configuration - Platform-aware
 # Managed by chezmoi
 
-{{ if eq .chezmoi.os "windows" }}
-# Windows Configuration
+{{ if or (eq .chezmoi.os "windows") .wsl }}
+# Windows/WSL Configuration - Ryan Walters (Professional)
 [user]
 	name = Ryan Walters
 	email = ryan@walters.to
-	signingkey = 39538EC79ACF2597
+	signingkey = 301511AAD64FA365
 
 [commit]
 	gpgsign = true
 
+{{ if eq .chezmoi.os "windows" }}
+# Windows-specific: Use GPG4win
 [gpg]
 	program = C:\\Users\\Xevion\\scoop\\apps\\gpg4win\\current\\GnuPG\\bin\\gpg.exe
 
@@ -21,16 +23,26 @@
 [credential "https://gist.github.com"]
 	helper =
 	helper = !'C:\\Program Files\\GitHub CLI\\gh.exe' auth git-credential
+{{ else }}
+# WSL-specific: Use Windows GPG via symlink
+[gpg]
+	program = /usr/local/bin/gpg
+
+[credential "https://github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+{{ end }}
 
 {{ else }}
-# Linux/macOS Configuration
+# Native Linux/macOS Configuration - Xevion (Personal)
 [user]
 	name = Xevion
 	email = xevion@xevion.dev
-	signingkey = 301511AAD64FA365
-
-[commit]
-	gpgsign = true
+	# No GPG signing - no key available for this identity
 
 [credential "https://github.com"]
 	helper =

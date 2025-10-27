@@ -12,7 +12,7 @@
 - [ ] Document bootstrap process for WSL installations
 - [ ] Document bootstrap process for Windows (including Bun requirement)
 - [ ] Create pre-flight checklist (required tools: Bun, age encryption, chezmoi, etc.)
-- [ ] Document hook system (`.init_pre.ts`, `.update_pre.ts`) and when they execute
+- [x] Document hook system (`.init_pre.ts`, `.update_pre.ts`) and when they execute
 - [ ] Add troubleshooting guide for common installation issues
 - [ ] Document the relationship between source directory and target directory
 - [ ] Add step-by-step first-time setup guide
@@ -25,7 +25,7 @@
 - [ ] Create guide for Doppler integration (project setup, config selection)
 - [ ] Document secret rotation process and schedule
 - [ ] Create checklist for adding new encrypted values
-- [ ] Consolidate all authentication tokens/keys into Doppler or age-encrypted files
+- [x] Consolidate all authentication tokens/keys into Doppler or age-encrypted files (R2 and private domain migrated)
 - [ ] Document age recipient key storage and backup strategy
 - [ ] Add encryption troubleshooting guide
 - [ ] Create template for encrypted file naming conventions
@@ -41,7 +41,7 @@
 - [ ] Document how to handle tools that exist on both platforms
 - [ ] Define file path conventions for cross-platform compatibility
 - [ ] Create testing strategy for multi-platform templates
-- [ ] Document Windows-specific quirks and workarounds
+- [x] Document Windows-specific quirks and workarounds (WSL GPG integration documented)
 
 ---
 
@@ -89,7 +89,7 @@
 **mise (development environment manager):**
 - [ ] Add mise configuration file (`.mise.toml` or per-project configs)
 - [ ] Document mise setup and installation
-- [ ] Integrate mise activation with shell configs
+- [x] Integrate mise activation with shell configs
 - [ ] Document tool version management strategy
 - [ ] Add mise to installation checklist
 
@@ -101,7 +101,7 @@
 - [ ] Test bun hooks (`.init_pre.ts`, `.update_pre.ts`) on all platforms
 
 **Windows Terminal:**
-- [ ] Add `settings.json` template to dotfiles
+- [x] Add `settings.json` template to dotfiles
 - [ ] Document theme/color scheme customization
 - [ ] Add font configuration (Cascadia Code, Nerd Fonts, etc.)
 - [ ] Configure profiles for PowerShell, WSL, cmd
@@ -110,7 +110,7 @@
 **Claude (AI assistant):**
 - [ ] Document Claude configuration location
 - [ ] Add API key management strategy (Doppler?)
-- [ ] Add global CLAUDE.md to dotfiles
+- [x] Add global CLAUDE.md to dotfiles
 - [ ] Create project-specific CLAUDE.md templates
 - [ ] Document sync strategy across machines
 
@@ -165,10 +165,10 @@
 ### 10. Development Tool Configurations
 
 **Git:**
-- [ ] Expand `.gitconfig.tmpl` (currently at `home/dot_config/git/config-ryan.tmpl`)
-- [ ] Add git aliases and shortcuts
-- [ ] Configure diff and merge tools
-- [ ] Add commit signing configuration
+- [x] Expand `.gitconfig.tmpl` (currently at `home/dot_config/git/config-ryan.tmpl`)
+- [x] Add git aliases and shortcuts
+- [x] Configure diff and merge tools
+- [x] Add commit signing configuration
 - [ ] Configure git credential helpers
 - [ ] Add git hooks templates
 
@@ -190,7 +190,7 @@
 - [ ] Add tmux configuration
 - [ ] Add vim/neovim basic config
 - [ ] Add SSH config template
-- [ ] Add GPG configuration
+- [x] Add GPG configuration
 
 ### 11. Package Management Strategy
 
@@ -213,7 +213,7 @@
 
 ### 12. Enhanced Documentation
 
-- [ ] Expand README.md with comprehensive sections
+- [x] Expand README.md with comprehensive sections (Major refactor completed)
 - [ ] Add ARCHITECTURE.md explaining repo structure
 - [ ] Create CONTRIBUTING.md for your future self
 - [ ] Add inline comments to all template files
@@ -263,12 +263,12 @@
 
 ### 16. Cleanup & Maintenance
 
-- [ ] Commit deletion of removed files (nushell/env.nu, dot_gitconfig, etc.)
+- [x] Commit deletion of removed files (nushell/env.nu, dot_gitconfig, etc.) - Converted to templates instead
 - [ ] Clean up commented-out code in commonrc.sh.tmpl (lines 122-130)
 - [ ] Review and update `.chezmoiignore` patterns
 - [ ] Audit and remove unused templates
 - [ ] Standardize file naming conventions across repo
-- [ ] Remove deprecated hooks (old shell-based hooks if fully migrated to TS)
+- [x] Remove deprecated hooks (old shell-based hooks if fully migrated to TS) - Migrated to TypeScript
 - [ ] Archive old/unused configuration files
 - [ ] Update .gitattributes for proper file type detection
 - [ ] Clean up temporary/test files
@@ -284,7 +284,7 @@ These items were in the original TODO.md and need to be categorized/completed:
 - [ ] **rbw executable needs better configuration** - Related to Priority 4, Item 14 (rbw auto-lock)
 - [ ] **rbw config not tracked** - Add rbw config to dotfiles
 - [ ] **hishtory executable not available on init** - Add to installation checklist
-- [ ] **add GPG key to bw** - Add to Priority 1, Item 2 (authentication workflow)
+- [x] **add GPG key to bw** - GPG configuration completed with WSL integration
 - [ ] **dracula theme tracking, kitty/micro** - Add to Priority 3, Item 10 (dev tools)
 - [ ] **lazygit fix difftool** - Add lazygit config to dotfiles
 - [ ] **testing in github codespaces** - Add to Priority 4, Item 15 (testing)
