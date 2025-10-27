@@ -86,6 +86,17 @@ This is a **chezmoi source directory** for managing dotfiles across multiple mac
    - Doppler secrets: `{{ dopplerProjectJson.SECRET_NAME }}`
    - Conditional logic: `{{ if }}...{{ else }}...{{ end }}`
 
+5. **Suggest TODO list updates** (but DO NOT modify automatically)
+   - When a task is completed, check if `TODO.md` exists in the repository
+   - If the completed task relates to items in TODO.md, **suggest** updating the file
+   - Examples of suggestions:
+     - "I've completed [task]. Would you like me to update TODO.md to mark this item as complete?"
+     - "This work relates to items in TODO.md. Should I update the relevant checkboxes?"
+   - **NEVER** modify TODO.md without explicit user approval
+   - User must explicitly approve (even if not specifically) before making changes
+   - Acceptable approvals: "yes", "go ahead", "update it", "sure", etc.
+   - If unclear, ask: "Should I update TODO.md to reflect this completion?"
+
 ## Common Tasks
 
 **Add new dotfile:**

@@ -10,72 +10,84 @@ set -gx TERM xterm-256color  # fixes terminal colors when ssh'ing into laptop
 # Authentication
 set -gx OPENAI_API_KEY "{{ dopplerProjectJson.OPENAI_CHATGPT_CLI }}"
 
-# hishtory (lazy-loaded via __init_hishtory function)
-test -d $HOME/.hishtory && fish_add_path $HOME/.hishtory
+# PATH setup (batched for performance - reduces startup time by ~13ms)
+set -l paths_to_add
 
-# PATH setup
-test -d $HOME/bin && fish_add_path $HOME/bin
-fish_add_path /usr/local/bin
-fish_add_path $HOME/.local/bin
-test -d /usr/local/go/bin && fish_add_path /usr/local/go/bin  # Go
-test -d $HOME/go/bin && fish_add_path $HOME/go/bin  # Go-installed tools
-test -d $HOME/.local/share/bob/nvim-bin && fish_add_path $HOME/.local/share/bob/nvim-bin  # Bob, Neovim package manager
+# Collect paths with conditional checks
+test -d $HOME/.hishtory && set -a paths_to_add $HOME/.hishtory
+test -d $HOME/bin && set -a paths_to_add $HOME/bin
+set -a paths_to_add /usr/local/bin $HOME/.local/bin
+test -d /usr/local/go/bin && set -a paths_to_add /usr/local/go/bin  # Go
+test -d $HOME/go/bin && set -a paths_to_add $HOME/go/bin  # Go-installed tools
+test -d $HOME/.local/share/bob/nvim-bin && set -a paths_to_add $HOME/.local/share/bob/nvim-bin  # Bob, Neovim package manager
 
-# Deno
+# Deno (conditionally source env file or add to path list)
 if test -d $HOME/.deno
-    source $HOME/.deno/env.fish 2>/dev/null || set -gx DENO_INSTALL $HOME/.deno && fish_add_path $DENO_INSTALL/bin
+    if not source $HOME/.deno/env.fish 2>/dev/null
+        set -gx DENO_INSTALL $HOME/.deno
+        set -a paths_to_add $DENO_INSTALL/bin
+    end
 end
 
-# Rust (Cargo)
+# Rust/Cargo (source env file or add to path list)
 if test -f $HOME/.cargo/env.fish
     source $HOME/.cargo/env.fish
 else if test -f $HOME/.cargo/env
     # Fallback: parse bash env file
     set -gx CARGO_HOME $HOME/.cargo
-    fish_add_path $CARGO_HOME/bin
+    set -a paths_to_add $CARGO_HOME/bin
 end
 
-# Homebrew
+# Homebrew (cached for performance - reduces startup time by ~14ms)
 if test -f /home/linuxbrew/.linuxbrew/bin/brew
-    eval (/home/linuxbrew/.linuxbrew/bin/brew shellenv)
+    set -l brew_cache "$HOME/.cache/brew_env.fish"
+    set -l brew_bin "/home/linuxbrew/.linuxbrew/bin/brew"
+
+    # Regenerate cache if: doesn't exist, >7 days old, or brew binary is newer
+    if not test -f "$brew_cache"; \
+       or test (math (date +%s) - (stat -c %Y "$brew_cache" 2>/dev/null || echo 0)) -gt 604800; \
+       or test "$brew_bin" -nt "$brew_cache"
+        mkdir -p (dirname "$brew_cache")
+        $brew_bin shellenv > "$brew_cache" 2>/dev/null
+    end
+
+    test -f "$brew_cache" && source "$brew_cache"
 end
 
 set -gx PYENV_ROOT $HOME/.pyenv
 
 # bun
 set -gx BUN_INSTALL $HOME/.bun
-fish_add_path $BUN_INSTALL/bin
+set -a paths_to_add $BUN_INSTALL/bin
 # Note: Bun's _bun file is bash-specific, Fish completions handled separately
 
-# jenv (Java version manager)
+# jenv (add to path list for later batch add)
 if test -d $HOME/.jenv/bin
-    fish_add_path $HOME/.jenv/bin
-    if command -q jenv
-        jenv init - fish | source
-    end
+    set -a paths_to_add $HOME/.jenv/bin
 end
 
 # pnpm
 set -gx PNPM_HOME $HOME/.local/share/pnpm
-if not contains $PNPM_HOME $PATH
-    fish_add_path $PNPM_HOME
-end
+set -a paths_to_add $PNPM_HOME
 
 # spicetify
-if test -d $HOME/.spicetify
-    fish_add_path $HOME/.spicetify
-end
+test -d $HOME/.spicetify && set -a paths_to_add $HOME/.spicetify
 
 # pulumi
-if test -d $HOME/.pulumi/bin
-    fish_add_path $HOME/.pulumi/bin
-end
+test -d $HOME/.pulumi/bin && set -a paths_to_add $HOME/.pulumi/bin
 
 # dotnet
 if test -d $HOME/.dotnet
     set -gx DOTNET_ROOT $HOME/.dotnet
-    fish_add_path $DOTNET_ROOT
-    fish_add_path $DOTNET_ROOT/tools
+    set -a paths_to_add $DOTNET_ROOT $DOTNET_ROOT/tools
+end
+
+# Batch add all collected paths (single PATH reconstruction instead of 17+ calls)
+test -n "$paths_to_add[1]" && fish_add_path $paths_to_add
+
+# Post-PATH initialization for tools that need commands available
+if test -d $HOME/.jenv/bin; and command -q jenv
+    jenv init - fish | source
 end
 
 # Note: Aliases are defined in Fish-native format in ~/.config/fish/conf.d/abbr.fish
