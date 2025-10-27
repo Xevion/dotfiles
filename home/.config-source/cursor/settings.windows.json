@@ -1,0 +1,336 @@
+{
+  // Editor Settings
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "editor.fontFamily": "Iosevka",
+  "editor.inlineSuggest.enabled": true,
+  "editor.linkedEditing": true,
+  "editor.minimap.showSlider": "always",
+  "diffEditor.renderSideBySide": false,
+  "cursor.diffs.useCharacterLevelDiffs": true,
+
+  // Workbench Settings
+  "workbench.startupEditor": "none",
+  "workbench.tree.indent": 24,
+  "workbench.preferredDarkColorTheme": "Default Light Modern",
+  "workbench.preferredLightColorTheme": "Cursor Light",
+  "workbench.iconTheme": "material-icon-theme",
+
+  // Window Settings
+  "window.autoDetectHighContrast": false,
+  "window.autoDetectColorScheme": true,
+
+  // Terminal Settings
+  "terminal.integrated.commandsToSkipShell": [
+    "-workbench.action.quickOpenView"
+  ],
+  "terminal.integrated.fontFamily": "Iosevka Nerd Font Mono",
+  "terminal.integrated.enablePersistentSessions": false,
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.defaultProfile.linux": "zsh",
+  "terminal.external.windowsExec": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+  "terminal.integrated.profiles.linux": {
+    "bash": {
+      "path": "bash",
+      "icon": "terminal-bash"
+    },
+    "zsh": {
+      "path": "zsh"
+    },
+    "fish": {
+      "path": "fish"
+    },
+    "tmux": {
+      "path": "tmux",
+      "icon": "terminal-tmux"
+    },
+    "pwsh": {
+      "path": "pwsh",
+      "icon": "terminal-powershell"
+    }
+  },
+
+  // File Explorer Settings
+  "explorer.confirmDragAndDrop": false,
+  "explorer.confirmDelete": false,
+  "files.associations": {
+    "*.dialogue": "plaintext"
+  },
+
+  // Git Settings
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.openRepositoryInParentFolders": "always",
+
+  // Security Settings
+  "security.workspace.trust.untrustedFiles": "open",
+  "security.allowedUNCHosts": ["ROMAN"],
+  "security.restrictUNCAccess": false,
+
+  // Language-specific Formatters
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[python]": {
+    "editor.formatOnType": true,
+    "editor.defaultFormatter": "anysphere.cursorpyright"
+  },
+  "[go]": {
+    "editor.defaultFormatter": "golang.go"
+  },
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+  },
+  "[astro]": {
+    "editor.defaultFormatter": "astro-build.astro-vscode"
+  },
+  "[caddyfile]": {
+    "editor.defaultFormatter": "matthewpi.caddyfile-support"
+  },
+  "[shellscript]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format"
+  },
+  "[github-actions-workflow]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[ignore]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format"
+  },
+  "[dotenv]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format"
+  },
+  "[xml]": {
+    "editor.defaultFormatter": "redhat.vscode-xml"
+  },
+  "[properties]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format"
+  },
+  "[gdscript]": {
+    "editor.defaultFormatter": "geequlim.godot-tools"
+  },
+  "[powershell]": {
+    "editor.defaultFormatter": "ms-vscode.powershell"
+  },
+  "[lua]": {
+    "editor.defaultFormatter": "sumneko.lua"
+  },
+  "[prisma]": {
+    "editor.defaultFormatter": "Prisma.prisma"
+  },
+
+  // Language-specific Settings
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "typescript.preferGoToSourceDefinition": true,
+  "javascript.updateImportsOnFileMove.enabled": "never",
+  "javascript.preferGoToSourceDefinition": true,
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.supportDocstringTemplate": true,
+  "go.inlayHints.parameterNames": true,
+  "go.buildTags": "real",
+  "go.toolsManagement.autoUpdate": true,
+  "go.lintTool": "revive",
+  "dotnet.server.useOmnisharp": true,
+  "dotnet.formatting.organizeImportsOnFormat": true,
+
+  // Extension Settings
+  "markdown-preview-enhanced.previewTheme": "github-light.css",
+  "colorize.include": [
+    "**/*.css",
+    "**/*.tsx",
+    "**/*.scss",
+    "**/*.sass",
+    "**/*.less",
+    "**/*.styl"
+  ],
+  "colorize.languages": [
+    "javascript",
+    "css",
+    "sass",
+    "scss",
+    "less",
+    "postcss",
+    "sss",
+    "stylus",
+    "xml",
+    "svg",
+    "typescriptreact"
+  ],
+  "quokka.showStartViewOnFeatureRelease": false,
+  "prisma.showPrismaDataPlatformNotification": false,
+  "poshProTools.showUpgradeNotification": false,
+  "poshProTools.disableNewsNotification": true,
+  "csharpier.enableDiagnostics": false,
+  "powershell.promptToUpdatePowerShell": false,
+  "autoimport.autoComplete": false,
+  "notebook.output.scrolling": true,
+  "json.schemaDownload.enable": true,
+  "evenBetterToml.schema.links": true,
+
+  // GitHub Copilot Settings
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": true,
+    "markdown": true,
+    "scminput": false,
+    "yaml": false
+  },
+  "github.copilot.editor.enableAutoCompletions": true,
+  "github.copilot.nextEditSuggestions.enabled": true,
+
+  // GitLens Settings
+  "gitlens.ai.experimental.model": "vscode",
+  "gitlens.ai.experimental.vscode.model": "copilot:gpt-4o",
+  "gitlens.ai.model": "gitkraken",
+  "gitlens.ai.gitkraken.model": "gemini:gemini-2.0-flash",
+
+  // Cursor-specific Settings
+  "cursor.cpp.disabledLanguages": ["scminput"],
+  "cursor.composer.usageSummaryDisplay": "always",
+
+  // VSCord Settings
+  "vscord.status.image.small.viewing.key": "https://raw.githubusercontent.com/LeonardSSH/vscord/main/assets/icons/vscode.png",
+
+  // Coverage Settings
+  "coverage-gutters.ignoredPathGlobs": "**/{node_modules,venv,.venv,vendor,target,dist,emsdk}/**",
+  "coverage-gutters.manualCoverageFilePaths": [
+    "C:/Users/Xevion/projects/Pac-Man/lcov.info"
+  ],
+
+  // Task Settings
+  "task.allowAutomaticTasks": "on",
+
+  // Remote Settings
+  "remote.SSH.remotePlatform": {
+    "aws": "linux"
+  },
+
+  // Flutter/Dart Settings
+  "dart.flutterSdkPath": "C:\\Users\\Xevion\\.flutter\\flutter",
+
+  // Harper LS Settings
+  "harper-ls.diagnosticSeverity": "hint",
+
+  // Todo Tree Settings
+  "todo-tree.highlights.foregroundColourScheme": [],
+
+  // Spell Check Settings
+  "cSpell.ignorePaths": [
+    "package-lock.json",
+    "node_modules",
+    "vscode-extension",
+    ".git/{info,lfs,logs,refs,objects}/**",
+    ".git/{index,*refs,*HEAD}",
+    ".vscode",
+    ".vscode-insiders",
+    "C:/Users/*/AppData/Roaming/**"
+  ],
+  "cSpell.userWords": [
+    "asgi",
+    "astro",
+    "automations",
+    "autoprefixer",
+    "Behaviour",
+    "Boids",
+    "Caddyfile",
+    "coloors",
+    "Colour",
+    "Debugw",
+    "dotenv",
+    "Errorw",
+    "esbuild",
+    "factorio",
+    "fastapi",
+    "gnueabihf",
+    "groq",
+    "Hackathon",
+    "hypercorn",
+    "imfucked",
+    "jsdoc",
+    "jsdom",
+    "Lerp",
+    "logfile",
+    "Mathf",
+    "microcontroller",
+    "nodelib",
+    "openrgb",
+    "pickone",
+    "pipx",
+    "pkgjs",
+    "plasteel",
+    "proxying",
+    "psycopg",
+    "pydantic",
+    "pyenv",
+    "rdap",
+    "rehype",
+    "resliced",
+    "RFID",
+    "Runnerspace",
+    "Tauri",
+    "undelete",
+    "uvicorn",
+    "vite",
+    "vitejs",
+    "wakatime",
+    "Xevion"
+  ],
+  "files.exclude": {
+    "**/.trunk/*actions/": true,
+    "**/.trunk/*logs/": true,
+    "**/.trunk/*notifications/": true,
+    "**/.trunk/*out/": true,
+    "**/.trunk/*plugins/": true
+  },
+  "files.watcherExclude": {
+    "**/.trunk/*actions/": true,
+    "**/.trunk/*logs/": true,
+    "**/.trunk/*notifications/": true,
+    "**/.trunk/*out/": true,
+    "**/.trunk/*plugins/": true
+  },
+  "trunk.showPreexistingIssues": true,
+  "cursor.composer.shouldAllowCustomModes": true,
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml"
+  },
+  "diffEditor.experimental.showMoves": true,
+  "vscord.status.image.small.editing.key": "https://raw.githubusercontent.com/LeonardSSH/vscord/main/assets/icons/vscode.png",
+  "vscord.status.image.large.notInFile.key": "https://raw.githubusercontent.com/LeonardSSH/vscord/main/assets/icons/idle-vscode.png",
+  "vscord.status.image.large.idle.key": "https://raw.githubusercontent.com/LeonardSSH/vscord/main/assets/icons/idle-vscode.png",
+  "vscord.status.details.text.notInFile": "",
+  "vscord.ignore.organizations": ["Invidae"],
+  "git.blame.editorDecoration.enabled": true,
+  "zig.zls.enabled": "on",
+  "vscord.ignore.workspaces": [".cursor"],
+  "markdownlint.lintWorkspaceGlobs": [
+    "**/*.{md,mkd,mdwn,mdown,markdown,markdn,mdtxt,mdtext,workbook}",
+    "!**/*.code-search",
+    "!**/bower_components",
+    "!**/node_modules",
+    "!**/.git",
+    "!**/vendor",
+    "!**/.cursor/rules"
+  ],
+  "diffEditor.ignoreTrimWhitespace": true,
+  "diffEditor.hideUnchangedRegions.enabled": true,
+  "lldb.suppressUpdateNotifications": true,
+  "prettier.enableDebugLogs": true,
+  "scm.diffDecorationsGutterPattern": {
+    "added": true
+  },
+  "claudeCode.selectedModel": "default",
+  "files.simpleDialog.enable": true
+}

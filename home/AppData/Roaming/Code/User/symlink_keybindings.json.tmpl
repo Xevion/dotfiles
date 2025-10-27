@@ -1,0 +1,4 @@
+{{/* Windows only*/}}
+{{ if eq .chezmoi.os "windows" }}
+{{ .chezmoi.sourceDir }}/.config-source/vscode/keybindings.windows.json
+{{ end }}

@@ -1,0 +1,232 @@
+{
+  "workbench.colorTheme": "GitHub Light",
+  "liquid.format": true,
+  "markdown-preview-enhanced.previewTheme": "github-light.css",
+  "terminal.integrated.commandsToSkipShell": [
+    "-workbench.action.quickOpenView"
+  ],
+  "cSpell.ignorePaths": [
+    "package-lock.json",
+    "node_modules",
+    "vscode-extension",
+    ".git/{info,lfs,logs,refs,objects}/**",
+    ".git/{index,*refs,*HEAD}",
+    ".vscode",
+    ".vscode-insiders",
+    "C:/Users/*/AppData/Roaming/**"
+  ],
+  "cSpell.userWords": [
+    "asgi",
+    "astro",
+    "automations",
+    "autoprefixer",
+    "Behaviour",
+    "Boids",
+    "Caddyfile",
+    "coloors",
+    "Colour",
+    "Debugw",
+    "dotenv",
+    "Errorw",
+    "esbuild",
+    "factorio",
+    "fastapi",
+    "gnueabihf",
+    "groq",
+    "Hackathon",
+    "hypercorn",
+    "imfucked",
+    "jsdoc",
+    "jsdom",
+    "Lerp",
+    "logfile",
+    "Mathf",
+    "microcontroller",
+    "nodelib",
+    "openrgb",
+    "pickone",
+    "pipx",
+    "pkgjs",
+    "plasteel",
+    "proxying",
+    "psycopg",
+    "pydantic",
+    "pyenv",
+    "rdap",
+    "rehype",
+    "resliced",
+    "RFID",
+    "Runnerspace",
+    "Tauri",
+    "undelete",
+    "uvicorn",
+    "vite",
+    "vitejs",
+    "wakatime",
+    "Xevion"
+  ],
+  "[scss]": {
+    "editor.defaultFormatter": "sibiraj-s.vscode-scss-formatter"
+  },
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "explorer.confirmDragAndDrop": false,
+  "explorer.confirmDelete": false,
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "security.workspace.trust.untrustedFiles": "open",
+  "workbench.tree.indent": 24,
+  "editor.linkedEditing": true,
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "workbench.startupEditor": "none",
+  "quokka.showStartViewOnFeatureRelease": false,
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "colorize.include": [
+    "**/*.css",
+    "**/*.tsx",
+    "**/*.scss",
+    "**/*.sass",
+    "**/*.less",
+    "**/*.styl"
+  ],
+  "colorize.languages": [
+    "javascript",
+    "css",
+    "sass",
+    "scss",
+    "less",
+    "postcss",
+    "sss",
+    "stylus",
+    "xml",
+    "svg",
+    "typescriptreact"
+  ],
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "editor.minimap.showSlider": "always",
+  "[astro]": {
+    "editor.defaultFormatter": "astro-build.astro-vscode"
+  },
+  "editor.inlineSuggest.enabled": true,
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": true,
+    "markdown": true,
+    "scminput": false,
+    "yaml": true
+  },
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[python]": {
+    "editor.formatOnType": true,
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  "[go]": {
+    "editor.defaultFormatter": "golang.go"
+  },
+  "security.allowedUNCHosts": ["ROMAN"],
+  "security.restrictUNCAccess": false,
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+  },
+  "logViewer.watch": ["*.log"],
+  "logViewer.options": {
+    "fileCheckInterval": 500
+  },
+  "prisma.showPrismaDataPlatformNotification": false,
+  "github.copilot.editor.enableAutoCompletions": true,
+  "[caddyfile]": {
+    "editor.defaultFormatter": "matthewpi.caddyfile-support"
+  },
+  "workbench.preferredDarkColorTheme": "Copilot Theme - Higher Contrast",
+  "window.autoDetectHighContrast": false,
+  "window.autoDetectColorScheme": true,
+  "workbench.preferredLightColorTheme": "GitHub Light Default",
+  "workbench.iconTheme": "material-icon-theme",
+  "workbench.preferredHighContrastLightColorTheme": "GitHub Light",
+  "workbench.preferredHighContrastColorTheme": "Catppuccin Macchiato",
+  "[shellscript]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format"
+  },
+  "[github-actions-workflow]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "terminal.integrated.fontFamily": "Iosevka Nerd Font Mono",
+  "[ignore]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format"
+  },
+  "[dotenv]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format"
+  },
+  "[sql]": {
+    "editor.defaultFormatter": "inferrinizzard.prettier-sql-vscode"
+  },
+  "go.inlayHints.parameterNames": true,
+  "editor.formatOnSave": true,
+  "python.analysis.autoImportCompletions": true,
+  "task.allowAutomaticTasks": "on",
+  "python.analysis.supportDocstringTemplate": true,
+  "[xml]": {
+    "editor.defaultFormatter": "redhat.vscode-xml"
+  },
+  "gitlens.ai.experimental.model": "vscode",
+  "gitlens.ai.experimental.vscode.model": "copilot:gpt-4o",
+  "[csharp]": {
+    "editor.defaultFormatter": "ms-dotnettools.csharp"
+  },
+  "[properties]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format"
+  },
+  "terminal.integrated.enablePersistentSessions": false,
+  "[xaml]": {
+    "editor.defaultFormatter": "ms-dotnettools.csharp"
+  },
+  "git.openRepositoryInParentFolders": "always",
+  "go.buildTags": "real",
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "[dockerfile]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-docker"
+  },
+  "harper-ls.diagnosticSeverity": "hint",
+  "[gdscript]": {
+    "editor.defaultFormatter": "geequlim.godot-tools"
+  },
+  "[powershell]": {
+    "editor.defaultFormatter": "ms-vscode.powershell"
+  },
+  "files.associations": {
+    "*.dialogue": "plaintext"
+  },
+  "poshProTools.showUpgradeNotification": false,
+  "poshProTools.disableNewsNotification": true,
+  "dotnet.server.useOmnisharp": true,
+  "csharpier.enableDiagnostics": false,
+  "powershell.promptToUpdatePowerShell": false,
+  "dotnet.formatting.organizeImportsOnFormat": true,
+  "editor.fontFamily": "Noto Sans, Iosevka Slab, Iosevka",
+  "remote.SSH.remotePlatform": {
+    "aws": "linux"
+  },
+  "autoimport.autoComplete": false,
+  "[lua]": {
+    "editor.defaultFormatter": "sumneko.lua"
+  },
+  "javascript.updateImportsOnFileMove.enabled": "never",
+  "javascript.preferGoToSourceDefinition": true,
+  "typescript.preferGoToSourceDefinition": true,
+  "[prisma]": {
+    "editor.defaultFormatter": "Prisma.prisma"
+  },
+  "notebook.output.scrolling": true,
+  "github.copilot.nextEditSuggestions.enabled": true,
+  "docker.extension.enableComposeLanguageServer": false
+}

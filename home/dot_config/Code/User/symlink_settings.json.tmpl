@@ -1,0 +1,3 @@
+{{ if (and (eq .chezmoi.os "linux") (not .wsl)) }}
+{{ .chezmoi.sourceDir }}/.config-source/vscode/settings.linux.json
+{{ end }}
