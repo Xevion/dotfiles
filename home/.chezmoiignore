@@ -1,10 +1,16 @@
 hooks
 tool-versions
 
-{{/* generated files, cached files, anything that might change unnecessarily */}}
+{{/* WSL Only Files */}}
+{{ if (not .wsl) }}
 
-{{ if eq .chezmoi.os "windows" }}
-{{/* Ignore Linux/Unix-only files on Windows */}}
+setup-wsl-gpg.sh
+.gnupg/**
+
+{{ end }}
+
+{{/* Linux/Unix Only Files */}}
+{{ if (not (eq .chezmoi.os "linux")) }}
 
 # Shell configs (Linux-only)
 .scripts
@@ -16,18 +22,17 @@ key.txt
 
 # Linux-only config directories
 .config/kitty
+.config/fish
+.config/Code
+.config/Cursor
+.config/lazygit
 
-{{ else }}
-{{/* Ignore Windows-only files on Linux/macOS */}}
-
-# Windows-only
-Documents/PowerShell
-AppData/
-
-{{/* WSL-specific: .gnupg is symlinked to Windows GPG directory */}}
-{{ if not .wsl }}
-# On non-WSL Linux, .gnupg is managed separately (not via chezmoi)
-.gnupg
 {{ end }}
+
+{{/* Windows Only Files */}}
+{{ if (not (eq .chezmoi.os "windows")) }}
+
+Documents/
+AppData/
 
 {{ end }}

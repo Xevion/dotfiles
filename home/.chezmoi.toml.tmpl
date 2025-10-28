@@ -28,7 +28,7 @@
 {{- end -}}
 
 {{- /* Detect if running in WSL */ -}}
-{{- $wsl := true -}}
+{{- $wsl := false -}}
 {{- if eq .chezmoi.os "linux" -}}
 {{-   $wsl = (.chezmoi.kernel.osrelease | lower | contains "microsoft") -}}
 {{- end -}}
@@ -47,6 +47,7 @@ args = [
 	wsl = {{ $wsl }}
 
 [diff]
+    pager = "delta"
 	scriptContents = false
 
 [data.cpu]
@@ -70,7 +71,8 @@ args = [
 
 {{ if eq .chezmoi.os "windows" }}
 [cd]
-	command = "nu"
+	command = "powershell.exe"
+	args = ["-NoLogo"]
 {{ else }}
 [cd]
 	command = "fish"
