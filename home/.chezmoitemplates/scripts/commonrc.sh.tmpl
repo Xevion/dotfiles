@@ -101,6 +101,14 @@ fi
 
 ## Ensures CLI apps open URLs in the default Windows browser (Chrome/Firefox/etc) instead of a CLI browser
 export BROWSER='powershell.exe /c start'
+
+# Cursor IDE CLI (Windows installation accessible from WSL)
+[ -x /mnt/c/Users/Xevion/AppData/Local/Programs/cursor/resources/app/bin/cursor ] && \
+    export PATH="$PATH:/mnt/c/Users/Xevion/AppData/Local/Programs/cursor/resources/app/bin"
+
+# Zed Editor CLI (Windows installation accessible from WSL)
+[ -x /mnt/c/Users/Xevion/AppData/Local/Programs/Zed/bin/zed ] && \
+    export PATH="$PATH:/mnt/c/Users/Xevion/AppData/Local/Programs/Zed/bin"
 {{- end }}
 
 # dotnet

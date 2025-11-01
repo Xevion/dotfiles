@@ -98,4 +98,12 @@ end
 
 ## Ensures CLI apps open URLs in the default Windows browser
 set -gx BROWSER 'powershell.exe /c start'
+
+# Cursor IDE CLI (Windows installation accessible from WSL)
+test -x /mnt/c/Users/Xevion/AppData/Local/Programs/cursor/resources/app/bin/cursor && \
+    fish_add_path /mnt/c/Users/Xevion/AppData/Local/Programs/cursor/resources/app/bin
+
+# Zed Editor CLI (Windows installation accessible from WSL)
+test -x /mnt/c/Users/Xevion/AppData/Local/Programs/Zed/bin/zed && \
+    fish_add_path /mnt/c/Users/Xevion/AppData/Local/Programs/Zed/bin
 {{- end }}
