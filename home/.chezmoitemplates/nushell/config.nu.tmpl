@@ -1045,3 +1045,14 @@ def maestroOn [] {
     bluetoothctl connect "AC:BF:71:66:FE:B2"
 }
 {{ end }}
+
+{{- if .wsl }}
+# Launch Windows Terminal in current directory
+def wt [...args: string] {
+    if ($args | is-empty) {
+        ^wt.exe -w 0 sp wsl --cd (pwd)
+    } else {
+        ^wt.exe -w 0 ...$args wsl --cd (pwd)
+    }
+}
+{{- end }}

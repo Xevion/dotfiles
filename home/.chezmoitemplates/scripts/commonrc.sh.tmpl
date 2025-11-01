@@ -109,6 +109,15 @@ export BROWSER='powershell.exe /c start'
 # Zed Editor CLI (Windows installation accessible from WSL)
 [ -x /mnt/c/Users/Xevion/AppData/Local/Programs/Zed/bin/zed ] && \
     export PATH="$PATH:/mnt/c/Users/Xevion/AppData/Local/Programs/Zed/bin"
+
+# Launch Windows Terminal in current directory
+wt() {
+    if [ $# -eq 0 ]; then
+        wt.exe -w 0 sp wsl --cd "$(pwd)"
+    else
+        wt.exe -w 0 "$@" wsl --cd "$(pwd)"
+    fi
+}
 {{- end }}
 
 # dotnet

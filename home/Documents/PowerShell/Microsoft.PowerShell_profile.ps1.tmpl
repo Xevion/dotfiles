@@ -40,6 +40,18 @@ function cha { chezmoi apply --interactive }
 function chlg { lazygit --path {{ .chezmoi.config.sourceDir }} }
 
 # ----------------------
+# Windows Terminal
+# ----------------------
+# Launch Windows Terminal in current directory
+function wt {
+    if ($args.Count -eq 0) {
+        wt.exe -w 0 sp wsl --cd $PWD.Path
+    } else {
+        wt.exe -w 0 $args wsl --cd $PWD.Path
+    }
+}
+
+# ----------------------
 # Git Aliases
 # ----------------------
 function ga { git add $args }

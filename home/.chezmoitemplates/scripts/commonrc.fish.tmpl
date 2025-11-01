@@ -106,4 +106,13 @@ test -x /mnt/c/Users/Xevion/AppData/Local/Programs/cursor/resources/app/bin/curs
 # Zed Editor CLI (Windows installation accessible from WSL)
 test -x /mnt/c/Users/Xevion/AppData/Local/Programs/Zed/bin/zed && \
     fish_add_path /mnt/c/Users/Xevion/AppData/Local/Programs/Zed/bin
+
+# Launch Windows Terminal in current directory
+function wt
+    if test (count $argv) -eq 0
+        wt.exe -w 0 sp wsl --cd (pwd)
+    else
+        wt.exe -w 0 $argv wsl --cd (pwd)
+    end
+end
 {{- end }}
