@@ -1,0 +1,187 @@
+ **Note**: Project-specific CLAUDE.md files take precedence for project-specific patterns.
+
+## Shell Environment (Windows)
+
+- **You are in Bash on Windows** (Git Bash / MSYS2)
+- ❌ Do NOT use PowerShell commands (`Get-ChildItem`, `Select-Object`, `Move-Item`)
+- ❌ Do NOT use CMD commands (`dir`, `copy`, `del`)
+- ✅ Use standard Bash/Unix commands (`ls`, `cp`, `mv`, `rm`, `grep`)
+- Prefer relative paths for simplicity
+
+## Build & Package Management
+
+### General Principles
+
+- **NEVER invoke `cargo clean`** - rarely necessary and wastes time
+- **Avoid running full builds unless necessary** - prefer type checking and linting
+- Run cargo build or any build commands with lots of output in 'quiet' mode, unless you require access to stacktrace/warnings/etc
+- Alternatively, avoid running the command and stop the prompt there if you simply want the user to test and report back
+
+### Dependency Management
+
+- **Always use package manager commands** over manually editing manifest files:
+  - Rust: `cargo add`, `cargo remove`
+  - Node.js: `pnpm add`, `pnpm remove` (or npm/yarn as appropriate)
+- This ensures lockfiles are updated correctly and consistently
+- **Get the latest compatible version** unless there's a specific reason not to
+  - You can specify versions, but prefer letting the tool grab the latest
+  - Your knowledge cutoff means you often don't know the latest versions
+
+### Check Commands
+
+- Look for project-specific commands first (`just check`, `just test`, etc.)
+- Always prefer project-specific check commands over raw `cargo` or `npm` commands
+
+## Testing
+
+### Test Organization
+
+- **Integration/feature tests**: Place in `tests/` directory
+- **Unit tests**: Place alongside the code they test directly (in same file or adjacent `tests.rs`)
+- Always check project conventions before adding tests
+
+### Running Tests
+
+- Use project-specific test commands (e.g., `just test`) over raw `cargo test`
+- Prefer `cargo nextest run` for executing tests (unless `just test` is available, regardless of what it invokes)
+- Run tests after making changes to verify functionality
+
+### Assertion Style (Rust)
+
+When a project uses `assert2`:
+- Use `assert2::assert!()` instead of `assert_eq!()`
+- Use `assert2::let_assert!()` for pattern matching
+- Use `assert2::check!()` for non-fatal assertions
+
+## Code Style
+
+### Rust
+
+- Prefer direct imports when heavily used: `use glam::U16Vec2;` then `U16Vec2::new()`
+- Prefer iterators and combinators over for loops when idiomatic
+- Prefer slices (`&[T]`) for read-only parameters over `&Vec<T>`
+- Use `#[inline]` for hot-path functions
+
+### TypeScript
+
+- **Prefer absolute imports** (`@/...`) over relative imports when available
+  - Not always necessary or possible - use judgment
+  - Clearer and easier to refactor when the pattern exists in the project
+- Prefer functional programming patterns (map, filter, reduce) over for loops when idiomatic
+
+### General Pattern
+
+- **Write idiomatic code for the language**:
+  - Rust: iterators, combinators, Option/Result patterns
+  - TypeScript: functional patterns, modern ES6+ features
+  - Check existing code patterns before implementing
+
+## Comments & Documentation
+
+- Write comments that explain **WHY**, not **WHAT**
+- **Never reference old implementations, migrations, or refactoring history**
+- **Never add banner comments** (`===`, `-----`, etc.)
+- Update project CLAUDE.md when making architectural decisions
+- Examples of bad comments to avoid:
+  - "Refactored from previous version that used X approach." (never mention past implementations)
+  - "This function was changed to improve performance." (utterly useless, belongs in a commit message potentially, but not code!)
+  - "Logging removed for cleaner output." (also useless, belongs in commit message if anything)
+
+## Git Commits
+
+### Safety & Best Practices
+
+- **Do NOT add co-authoring or attribution to Claude Code/AI**
+- **Be very careful with commit history**:
+  - Avoid rewriting history unless explicitly prompted by user
+  - **Check if commits actually went through** when hooks fail
+  - **Never accidentally amend previous commits** when user meant to create new one
+  - If pre-commit or hooks fail, verify the commit status before retrying
+- Write concise commit messages focusing on "why" rather than "what"
+- If writing the first commit, assume conventional commit style unless user specifies otherwise.
+- For subsequent commits, follow the project's existing commit style.
+- Scale the length and detail of the commit message to the impact of the changes.
+  - A simple rename of a function or type may interact with many files, but it does not deserve a length message.
+  - A complex feature addition or refactor deserves a more detailed message explaining the reasoning. Still, keep things concise.
+  - Never include details like "All tests pass, 92% coverage. A few warnings."
+
+## AI Development Workflow
+
+### Standard Workflow
+
+`modify code → check → test → hand off to user`
+
+1. Make code changes
+2. Run project-specific check commands
+3. Run tests if applicable
+4. **Hand off to user** - do NOT run dev servers or long-running processes
+5. Wait for user feedback
+
+### Codebase Exploration
+
+- **Avoid super complex bash/sed/awk commands** when exploring
+- Use existing tools (Read, Glob, Grep) to manually explore instead
+- Check for existing libraries, frameworks, and code patterns before creating new utilities/APIs
+
+### Question Tool Usage
+
+- **Use for complex tasks and design decisions**:
+  - Architectural choices
+  - Multiple implementation approaches
+  - Feature design options
+  - Clarifying & confirming important requirements, especially vague or conflicting ones
+- **Do NOT use for trivial details**:
+  - Variable naming
+  - Minor formatting choices
+- **Prefer multi-select when appropriate**, single-select when mutually exclusive
+- User appreciates being consulted on larger, more abstract decisions
+
+### When NOT to Build/Run
+
+- ❌ After type checking passes - building is unnecessary
+- ❌ Dev servers (`pnpm dev`, `cargo run`, etc.)
+- ❌ Long-running processes or interactive tools
+- ✅ Only build when user explicitly requests or verifying build config
+
+## Tool Usage
+
+### Prefer Specialized Tools Over Bash
+
+- Read tool for reading files (not `cat`, `head`, `tail`)
+- Edit tool for editing files (not `sed`, `awk`)
+- Write tool for creating files (not `echo >`)
+- Glob tool for finding files (not `find`, `ls`)
+- Grep tool for searching (not `grep`, `rg`)
+- Bash ONLY for actual system commands and terminal operations
+
+## Security & Error Handling
+
+- Watch for security vulnerabilities: command injection, XSS, SQL injection, OWASP Top 10
+- If you write insecure code, **immediately fix it**
+- Validate all external inputs
+- Use appropriate error types for the language
+
+## Quick Reference
+
+### After Making Changes
+
+```bash
+# 1. Check (find project-specific command)
+just check              # or equivalent
+
+# 2. Run tests (if applicable)
+just test               # or equivalent
+
+# 3. STOP - hand off to user for testing
+```
+
+### What to Avoid
+
+- Don't run dev servers, builds, or interactive processes yourself
+- Don't use complex bash pipelines when simpler tools exist
+- Don't manually edit manifests when package manager commands exist
+- Don't assume commits went through when hooks fail
+
+---
+
+**Remember**: Check for project-specific CLAUDE.md files that override these global guidelines.
