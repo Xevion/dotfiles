@@ -18,6 +18,7 @@
 - [ ] Add step-by-step first-time setup guide
 - [ ] Document Doppler setup requirements
 - [ ] Create quick reference card for emergency recovery
+- [ ] Document proper process of adding symlinks (mention updating chemzoiignore, etc.)
 
 ### 2. Standardize Encryption & Authentication Workflow
 

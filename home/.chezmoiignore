@@ -1,5 +1,6 @@
 hooks
 tool-versions
+claude-settings.json
 
 {{/* WSL Only Files */}}
 {{ if (not .wsl) }}
