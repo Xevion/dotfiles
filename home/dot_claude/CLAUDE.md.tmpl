@@ -1,4 +1,6 @@
- **Note**: Project-specific CLAUDE.md files take precedence for project-specific patterns.
+**Note**: Project-specific CLAUDE.md files take precedence for project-specific patterns.
+
+{{- if and (eq .chezmoi.os "windows") (not .wsl) }}
 
 ## Shell Environment (Windows)
 
@@ -7,6 +9,25 @@
 - ❌ Do NOT use CMD commands (`dir`, `copy`, `del`)
 - ✅ Use standard Bash/Unix commands (`ls`, `cp`, `mv`, `rm`, `grep`)
 - Prefer relative paths for simplicity
+{{- else if .wsl }}
+
+## Shell Environment (WSL)
+
+- **You are in WSL (Windows Subsystem for Linux)**
+- ✅ Use standard Linux/Bash commands (`ls`, `cp`, `mv`, `rm`, `grep`)
+- ✅ Full access to Linux tooling and package managers
+- ⚠️ Can access Windows filesystem via `/mnt/c/`, but prefer Linux paths
+- ⚠️ Can call Windows executables (`.exe`), but prefer native Linux tools
+- Prefer relative paths for simplicity
+{{- else if eq .chezmoi.os "linux" }}
+
+## Shell Environment (Linux)
+
+- **You are in a standard Linux environment**
+- ✅ Use standard Bash/Unix commands (`ls`, `cp`, `mv`, `rm`, `grep`)
+- ✅ Full access to Linux tooling and package managers
+- Prefer relative paths for simplicity
+{{- end }}
 
 ## Build & Package Management
 

@@ -20,7 +20,14 @@ This is a **chezmoi source directory** for managing dotfiles across multiple mac
 
 **Template System:**
 - Uses Go templates with platform detection
-- Variables: `.chezmoi.os`, `.chezmoi.homeDir`, `.data.*`
+- Two types of templates with different variable access patterns:
+  - **Regular templates** (e.g., `home/dot_bashrc.tmpl`): Direct access to Chezmoi context
+    - Built-in: `.chezmoi.os`, `.chezmoi.homeDir`
+    - Custom data: `.wsl`, `.chassis`
+  - **Partials** (reusable templates in `home/.chezmoitemplates/`): Must receive context via explicit parameter
+    - Partials don't have automatic access to Chezmoi's context
+    - Context passed as parameter (commonly `data`) when calling the partial
+    - Access everything through parameter: `.data.chezmoi.os`, `.data.wsl`, `.data.chassis`
 - Conditional rendering for Windows/Linux/macOS/WSL
 
 **Secret Management:**
@@ -82,9 +89,11 @@ This is a **chezmoi source directory** for managing dotfiles across multiple mac
    - `chezmoi status` - see what's changed
 
 4. **Use templates correctly**
-   - Platform detection: `.chezmoi.os`, `.data.wsl`, `.data.chassis`
+   - Platform detection in regular templates: `.chezmoi.os`, `.wsl`, `.chassis`
+   - Platform detection in partials: `.data.chezmoi.os`, `.data.wsl`, `.data.chassis`
    - Doppler secrets: `{{ dopplerProjectJson.SECRET_NAME }}`
    - Conditional logic: `{{ if }}...{{ else }}...{{ end }}`
+   - Example partial call: `{{ template "commonrc.sh.tmpl" . }}` (passes entire context as `data`)
 
 5. **Suggest TODO list updates** (but DO NOT modify automatically)
    - When a task is completed, check if `TODO.md` exists in the repository
