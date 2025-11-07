@@ -46,7 +46,7 @@ if test -f /home/linuxbrew/.linuxbrew/bin/brew
     # Regenerate cache if: doesn't exist, >7 days old, or brew binary is newer
     if not test -f "$brew_cache"; \
        or test (math (date +%s) - (stat -c %Y "$brew_cache" 2>/dev/null || echo 0)) -gt 604800; \
-       or test "$brew_bin" -nt "$brew_cache"
+       or test (stat -c %Y "$brew_bin" 2>/dev/null || echo 0) -gt (stat -c %Y "$brew_cache" 2>/dev/null || echo 0)
         mkdir -p (dirname "$brew_cache")
         $brew_bin shellenv > "$brew_cache" 2>/dev/null
     end
