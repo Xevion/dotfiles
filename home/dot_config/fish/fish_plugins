@@ -1,10 +1,4 @@
-# Fish shell plugins managed by Fisher
-# https://github.com/jorgebucaran/fisher
 #
-# To install all plugins: fisher update
-# To add a plugin: fisher install <plugin>
-# To remove a plugin: fisher remove <plugin>
-
 jorgebucaran/fisher
 ilancosman/tide@v6
 patrickf1/fzf.fish
