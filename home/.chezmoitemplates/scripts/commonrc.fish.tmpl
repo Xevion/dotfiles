@@ -116,3 +116,8 @@ function wt
     end
 end
 {{- end }}
+
+# atuin (magical shell history)
+if command -q atuin
+    atuin init fish | source
+end
