@@ -109,7 +109,15 @@
       "Bash(Select-String:*)",
       "Bash(Select-Object:*)",
       "Bash(findstr:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(do)",
+      "Bash(then)",
+      "Bash(echo:*)",
+      "Bash(else)",
+      "Bash(fi)",
+      "Bash(done)",
+      "Bash(mise exec actionlint:*)",
+      "mcp__linear-server__create_issue"
     ],
     "deny": [
       "Bash(git push --force:*)",
@@ -172,8 +180,10 @@
       "Bash(Move-Item:*)",
       "Bash(rm:*)",
       "Bash(del:*)"
-    ]
+    ],
+    "defaultMode": "default"
   },
+  "model": "sonnet",
   "statusLine": {
     "type": "command",
     "command": "bunx -y ccstatusline@latest",
@@ -215,7 +225,8 @@
     "functional-programming@claude-code-workflows": true,
     "shell-scripting@claude-code-workflows": true,
     "observability-monitoring@claude-code-workflows": true,
-    "database-cloud-optimization@claude-code-workflows": true
+    "database-cloud-optimization@claude-code-workflows": true,
+    "jvm-languages@claude-code-workflows": true
   },
   "alwaysThinkingEnabled": true
 }
