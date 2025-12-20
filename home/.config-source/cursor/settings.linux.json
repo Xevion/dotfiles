@@ -26,7 +26,7 @@
   "terminal.integrated.fontFamily": "Iosevka Nerd Font Mono",
   "terminal.integrated.enablePersistentSessions": false,
   "terminal.integrated.defaultProfile.windows": "PowerShell",
-  "terminal.integrated.defaultProfile.linux": "zsh",
+  "terminal.integrated.defaultProfile.linux": "fish (2)",
   "terminal.external.windowsExec": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
   "terminal.integrated.profiles.linux": {
     "bash": {
@@ -331,5 +331,11 @@
   "files.simpleDialog.enable": true,
   "cursor.terminal.usePreviewBox": true,
   "java.trace.server": "verbose",
-  "java.server.launchMode": "Standard"
+  "java.server.launchMode": "Standard",
+  "kotlin.java.home": "/home/xevion/.sdkman/candidates/java/21.0.1-tem/",
+  "terminal.integrated.suggest.enabled": true,
+  "svelte.enable-ts-plugin": true,
+  "[svelte]": {
+    "editor.defaultFormatter": "svelte.svelte-vscode"
+  }
 }
