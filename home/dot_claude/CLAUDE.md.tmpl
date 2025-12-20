@@ -176,6 +176,22 @@ When a project uses `assert2`:
 - Grep tool for searching (not `grep`, `rg`)
 - Bash ONLY for actual system commands and terminal operations
 
+### MCP Tools (When Available)
+
+**gh_grep (GitHub Code Search)**
+- Search real-world code examples from 1M+ public repos
+- Use for: unfamiliar APIs, usage patterns, real implementation examples
+- Search for **literal code**, not keywords: `'useState('`, `'async function'`, `'import React from'`
+- Use regex with `useRegexp: true` for flexible patterns: `'(?s)useEffect\\(\\(\\) => {.*cleanup'`
+- Filter by `language`, `repo`, or `path` to narrow results
+- Perfect for seeing how others solve similar problems
+
+**context7 (Library Documentation)**
+- Get up-to-date docs for libraries/frameworks
+- Two-step process: `resolve-library-id` → `get-library-docs`
+- Use `mode: 'code'` for API references (default), `mode: 'info'` for guides
+- Prefer when you need official docs vs community examples
+
 ## Security & Error Handling
 
 - Watch for security vulnerabilities: command injection, XSS, SQL injection, OWASP Top 10

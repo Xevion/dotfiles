@@ -4,6 +4,21 @@
 
 This is a **chezmoi source directory** for managing dotfiles across multiple machines. Files here are SOURCE files that get templated and deployed to the home directory.
 
+### AI Assistant Configuration
+
+This repository manages configuration for both **Claude Code** (Anthropic's official CLI) and **OpenCode** (an enhanced fork). The configuration is symlinked and shared between both tools:
+
+- **Global guidelines** live in `~/.config/opencode/AGENTS.md` - this file contains cross-platform development guidelines (shell usage, build management, code style, git practices)
+- **Project-specific context** lives in this repository's `CLAUDE.md` - chezmoi-specific instructions and restrictions
+- **Symlinking structure**: The `home/dot_claude/` directory creates symlinks that allow both tools to share the same configuration files (settings.json points to `claude-settings.json` at the repository root)
+- **Custom commands**: Both tools share command definitions stored in `home/dot_claude/commands/` (e.g., `commit-staged.md`, `amend-commit.md`, `reword-commit.md`)
+  - **IMPORTANT**: When adding new command definitions to `home/dot_claude/commands/`, you MUST create corresponding symlinks in `home/dot_config/opencode/command/`
+  - Symlink pattern: `symlink_<command-name>.md` → `../../../dot_claude/commands/<command-name>.md`
+  - Example: `symlink_amend-commit.md` contains `../../../dot_claude/commands/amend-commit.md`
+  - This ensures both Claude Code and OpenCode can access the same command definitions
+
+When working in this repository, you're reading both the global AGENTS.md (general development practices) and this CLAUDE.md (chezmoi-specific guidelines). Project-specific CLAUDE.md files in other repositories take precedence over global guidelines.
+
 ### Key Concepts
 
 **Source vs Target Pattern:**
