@@ -73,6 +73,9 @@ set -a paths_to_add $PNPM_HOME
 # spicetify
 test -d $HOME/.spicetify && set -a paths_to_add $HOME/.spicetify
 
+# opencode
+test -d $HOME/.opencode/bin && set -a paths_to_add $HOME/.opencode/bin
+
 # pulumi
 test -d $HOME/.pulumi/bin && set -a paths_to_add $HOME/.pulumi/bin
 
@@ -119,5 +122,5 @@ end
 
 # atuin (magical shell history)
 if command -q atuin
-    atuin init fish | source
+    atuin init fish --disable-up-arrow | source
 end
