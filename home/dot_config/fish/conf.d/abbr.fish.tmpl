@@ -27,6 +27,8 @@ abbr -a ch 'chezmoi'
 abbr -a romanlog "ssh roman 'tail -F /var/log/syslog' --lines 100"
 
 # Other aliases
+abbr -a oc 'opencode'
+abbr -a cl 'claude'
 abbr -a gpt 'chatgpt'
 abbr -a copilot 'gh copilot'
 abbr -a suggest 'gh copilot suggest -t shell'
@@ -34,6 +36,18 @@ abbr -a spt 'spotify_player'
 abbr -a gitalias 'alias | grep "git "'
 abbr -a mousefix 'sudo udevadm trigger'
 abbr -a bw_login 'set -gx BW_SESSION (bw unlock --raw)'
+
+# Development tools
+abbr -a d 'docker'
+abbr -a j 'just'
+abbr -a cb 'cargo build'
+abbr -a cr 'cargo run'
+abbr -a ct 'cargo nextest run'
+abbr -a cnt 'cargo nextest run'
+
+# GitHub CLI
+abbr -a ghpr 'gh pr'
+abbr -a ghs 'gh secret'
 
 # Clipboard aliases
 {{ if not .wsl -}}
