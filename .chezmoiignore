@@ -1,0 +1,15 @@
+# Opencode ephemeral files and machine-specific data
+.local/share/opencode/auth.json
+.local/share/opencode/mcp-auth.json
+.local/share/opencode/log/
+.local/share/opencode/snapshot/
+.local/share/opencode/storage/
+.local/share/opencode/bin/
+
+# Opencode plugin dependencies and generated files
+.config/opencode/node_modules/
+.config/opencode/bun.lock
+.config/opencode/package.json
+.config/opencode/.gitignore
+.config/opencode/.claude/
+.config/opencode/plugin/
