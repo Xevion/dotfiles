@@ -11,6 +11,15 @@ const log = (...args: any[]): void => {
 };
 
 const filePath = join(homedir(), "key.txt");
+const chezmoiSourceDir = join(homedir(), ".local", "share", "chezmoi");
+
+// Configure git to include repo-local .gitconfig (for age diff support)
+const gitIncludeResult = await $`git -C ${chezmoiSourceDir} config --local include.path ../.gitconfig`.quiet();
+if (gitIncludeResult.exitCode === 0) {
+  log("git include.path configured");
+} else {
+  log("warning: failed to configure git include.path");
+}
 
 if (await exists(filePath)) {
   log("key.txt already exists");
