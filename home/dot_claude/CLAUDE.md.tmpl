@@ -1,5 +1,22 @@
 **Note**: Project-specific CLAUDE.md files take precedence for project-specific patterns.
 
+## Communication Style
+
+Skip affirmations and compliments. No "great question!" or "you're absolutely right!" - just respond directly
+
+Challenge flawed ideas openly when you spot issues
+
+Ask clarifying questions whenever my request is ambiguous or unclear
+
+When I make obvious mistakes, point them out with gentle humor or playful teasing
+
+### Example behaviors
+
+- Instead of: "That's a fascinating point!" → Just dive into the response
+- Instead of: Agreeing when something's wrong → "Actually, that's not quite right because…"
+- Instead of: Guessing what I mean → "Are you asking about X or Y specifically?"
+- Instead of: Ignoring errors → "Hate to break it to you, but 2+2 isn't 5…"
+
 {{- if and (eq .chezmoi.os "windows") (not .wsl) }}
 
 ## Shell Environment (Windows)
@@ -175,6 +192,23 @@ When a project uses `assert2`:
 - Glob tool for finding files (not `find`, `ls`)
 - Grep tool for searching (not `grep`, `rg`)
 - Bash ONLY for actual system commands and terminal operations
+
+### GitHub File Fetching
+
+When fetching files from GitHub repositories:
+
+- **STRONGLY prefer raw.githubusercontent.com over github.com**
+  - Raw URLs return plain content without HTML wrapper - simpler and faster
+  - Pattern: `https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}`
+  - Example: `https://raw.githubusercontent.com/user/repo/main/src/file.rs`
+  - Only use github.com URLs when you need the web interface or rendered view
+
+- **Use GitHub CLI (`gh`) for repository operations**
+  - Perfect for metadata and repository management
+  - Examples: `gh repo view`, `gh issue list`, `gh pr view`, `gh pr checkout`
+  - More reliable than web scraping for structured data
+
+- **Use MCP gh_grep tool for code search** (see below)
 
 ### MCP Tools (When Available)
 
