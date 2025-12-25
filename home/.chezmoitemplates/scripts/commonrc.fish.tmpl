@@ -85,6 +85,12 @@ if test -d $HOME/.dotnet
     set -a paths_to_add $DOTNET_ROOT $DOTNET_ROOT/tools
 end
 
+# CUDA
+if test -d /usr/local/cuda-11.8
+    set -a paths_to_add /usr/local/cuda-11.8/bin
+    test -d /usr/local/cuda-11.8/lib64 && set -gx LD_LIBRARY_PATH /usr/local/cuda-11.8/lib64 $LD_LIBRARY_PATH
+end
+
 # Batch add all collected paths (single PATH reconstruction instead of 17+ calls)
 test -n "$paths_to_add[1]" && fish_add_path $paths_to_add
 
