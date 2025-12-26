@@ -1,34 +1,42 @@
+# Common shell configuration for Bash
 # This template's argument is the shell as a string (bash, ...).
+#
+# Load order: ~/.bashrc → commonrc.sh.tmpl → ~/.bash_aliases
+# Fish equivalent: ~/.config/fish/config.fish → commonrc.fish.tmpl
 
-# general configuration
 export EDITOR="micro"
 export GPG_TTY=$(tty)
 export MICRO_TRUECOLOR=1
 export TERM=xterm-256color  # fixes terminal colors when ssh'ing into laptop
 
-# authentication
-
 export OPENAI_API_KEY="{{ dopplerProjectJson.OPENAI_CHATGPT_CLI }}"
 
-# hishtory
+# hishtory configuration
 export HISHTORY_SERVER="https://hsh.{{ dopplerProjectJson.PRIVATE_DOMAIN }}"
-export PATH="$PATH:$HOME/.hishtory"
-{{ if eq .shell "bash" -}}
-source $HOME/.hishtory/config.sh
-{{- else -}}
-{{ fail "Unexpected shell." }}
-{{- end }}
 
-export PATH=$HOME/bin:/usr/local/bin:$PATH
-export PATH=$PATH:~/.local/bin
-export PATH=$PATH:/usr/local/go/bin  # Go
-export PATH="$HOME/go/bin/:$PATH"  # Go-installed tools
-export PATH="$HOME/.local/share/bob/nvim-bin:$PATH"  # Bob, the Neovim package manager
-if [ -d "$HOME/.deno" ]; then
-  . "$HOME/.deno/env"  # Deno
-fi
-. "$HOME/.cargo/env"  # Rustup + Cargo + Cargo-installed tools
+# Tools are organized in priority order (first = highest priority in PATH)
+# This order matches the Fish config for consistency
 
+## Core system paths
+[ -d "$HOME/bin" ] && export PATH="$HOME/bin:$PATH"
+[ -d "/usr/local/bin" ] && export PATH="/usr/local/bin:$PATH"
+[ -d "$HOME/.local/bin" ] && export PATH="$PATH:$HOME/.local/bin"
+
+## Shell history
+[ -d "$HOME/.hishtory" ] && export PATH="$PATH:$HOME/.hishtory"
+
+## Language Runtimes
+# Go
+[ -d "/usr/local/go/bin" ] && export PATH="$PATH:/usr/local/go/bin"
+[ -d "$HOME/go/bin" ] && export PATH="$HOME/go/bin:$PATH"
+
+# Deno (JavaScript/TypeScript runtime)
+[ -d "$HOME/.deno" ] && . "$HOME/.deno/env"
+
+# Rust/Cargo (Rustup + Cargo + Cargo-installed tools)
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+
+## Package Managers
 # Homebrew (cached for performance - reduces startup time by ~14ms)
 if [ -f /home/linuxbrew/.linuxbrew/bin/brew ]; then
   BREW_CACHE="$HOME/.cache/brew_env.sh"
@@ -45,69 +53,102 @@ if [ -f /home/linuxbrew/.linuxbrew/bin/brew ]; then
   [ -f "$BREW_CACHE" ] && . "$BREW_CACHE"
 fi
 
-command -v rbenv &> /dev/null && eval "$(rbenv init -)"  # rbenv for Ruby
-command -v chatgpt &> /dev/null && . <(chatgpt --set-completions {{ .shell -}}) # chatgpt completions
-{{ if eq .shell "bash" -}}
-. "$HOME/.asdf/asdf.sh"
-. "$HOME/.asdf/completions/asdf.bash"
-{{- end }}
-
-# pyenv, python version manager
-export PYENV_ROOT="$HOME/.pyenv"
-if [[ -d $PYENV_ROOT/bin ]]; then
-  export PATH="$PYENV_ROOT/bin:$PATH"
-  if command -v pyenv &> /dev/null; then
-    eval "$(pyenv init -)"
-    # pyenv virtual-env
-    eval "$(pyenv virtualenv-init -)"
-  fi
-fi
-
-# bun
+## JavaScript Ecosystem
+# bun (JavaScript runtime and package manager)
 export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
+[ -d "$BUN_INSTALL/bin" ] && export PATH="$BUN_INSTALL/bin:$PATH"
 
-# java version manager
-if [ -d $HOME/.jenv/bin ]; then
-	export PATH="$HOME/.jenv/bin:$PATH"
-	if command -v jenv &> /dev/null
-	then
-		eval "$(jenv init -)"
-	fi
-fi
-
-# pnpm
+# pnpm (Fast, disk space efficient package manager)
 export PNPM_HOME="$HOME/.local/share/pnpm"
 case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
 
-# spicetify
-if [ -d "$HOME/.spicetify" ]; then
-    export PATH=$PATH:$HOME/.spicetify
+## Development Tools
+# Bob (Neovim version manager)
+[ -d "$HOME/.local/share/bob/nvim-bin" ] && export PATH="$HOME/.local/share/bob/nvim-bin:$PATH"
+
+# OpenCode (AI-powered coding assistant)
+[ -d "$HOME/.opencode/bin" ] && export PATH="$PATH:$HOME/.opencode/bin"
+
+# Spicetify (Spotify customization CLI)
+[ -d "$HOME/.spicetify" ] && export PATH="$PATH:$HOME/.spicetify"
+
+# Pulumi (Infrastructure as Code)
+[ -d "$HOME/.pulumi/bin" ] && export PATH="$PATH:$HOME/.pulumi/bin"
+
+# .NET SDK
+if [ -d "$HOME/.dotnet" ]; then
+  export DOTNET_ROOT="$HOME/.dotnet"
+  export PATH="$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools"
 fi
 
-# pulumi
-if [ -d "$HOME/.pulumi/bin" ]; then
-    export PATH=$PATH:$HOME/.pulumi/bin
+# Note: Fish uses mise (via conf.d/mise.fish) for unified version management.
+# Bash uses mise as well, falling back to legacy managers if needed.
+
+# mise (unified tool version manager - replaces asdf/pyenv/rbenv/jenv/nvm/etc)
+if command -v mise &> /dev/null; then
+  eval "$(mise activate bash)"
+else
+  # Legacy version managers (fallback if mise not installed)
+  
+  # pyenv (Python version manager)
+  export PYENV_ROOT="$HOME/.pyenv"
+  if [ -d "$PYENV_ROOT/bin" ]; then
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    if command -v pyenv &> /dev/null; then
+      eval "$(pyenv init -)"
+      eval "$(pyenv virtualenv-init -)"
+    fi
+  fi
+
+  # rbenv (Ruby version manager)
+  command -v rbenv &> /dev/null && eval "$(rbenv init -)"
+
+  # jenv (Java version manager)
+  if [ -d "$HOME/.jenv/bin" ]; then
+    export PATH="$HOME/.jenv/bin:$PATH"
+    command -v jenv &> /dev/null && eval "$(jenv init -)"
+  fi
+
+  # asdf (multi-language version manager)
+  {{ if eq .shell "bash" -}}
+  if [ -f "$HOME/.asdf/asdf.sh" ]; then
+    . "$HOME/.asdf/asdf.sh"
+  fi
+  {{- end }}
 fi
 
-. $HOME/.bash_aliases
+# SDKMAN (Java/JVM ecosystem version manager)
+export SDKMAN_DIR="$HOME/.sdkman"
+[ -s "$SDKMAN_DIR/bin/sdkman-init.sh" ] && source "$SDKMAN_DIR/bin/sdkman-init.sh"
 
-# disable screen blanking
-# source $(brew --prefix)/share/zsh/site-functions/_todoist_peco
-# xset s off && xset -dpms
+{{ if eq .shell "bash" -}}
+# hishtory shell integration
+[ -f "$HOME/.hishtory/config.sh" ] && source "$HOME/.hishtory/config.sh"
 
-# Always use `micro` as the preferred editor when connected via SSH
+# asdf completions (if using legacy asdf instead of mise)
+if [ -f "$HOME/.asdf/completions/asdf.bash" ]; then
+  . "$HOME/.asdf/completions/asdf.bash"
+fi
+{{- else -}}
+{{ fail "Unexpected shell." }}
+{{- end }}
+
+# chatgpt CLI completions
+command -v chatgpt &> /dev/null && . <(chatgpt --set-completions {{ .shell }})
+
+[ -f "$HOME/.bash_aliases" ] && . "$HOME/.bash_aliases"
+
+# SSH editor override (always use micro when connected via SSH)
 if [[ -n $SSH_CONNECTION ]]; then
   export EDITOR='micro'
 fi
 
-{{- /* WSL-specific settings */ -}}
 {{- if .data.wsl }}
 
-## Ensures CLI apps open URLs in the default Windows browser (Chrome/Firefox/etc) instead of a CLI browser
+# Windows browser integration (open URLs in Windows browser, not CLI browser)
 export BROWSER='powershell.exe /c start'
 
 # Cursor IDE CLI (Windows installation accessible from WSL)
@@ -118,7 +159,7 @@ export BROWSER='powershell.exe /c start'
 [ -x /mnt/c/Users/Xevion/AppData/Local/Programs/Zed/bin/zed ] && \
     export PATH="$PATH:/mnt/c/Users/Xevion/AppData/Local/Programs/Zed/bin"
 
-# Launch Windows Terminal in current directory
+# Windows Terminal helper function (launch WT in current directory)
 wt() {
     if [ $# -eq 0 ]; then
         wt.exe -w 0 sp wsl --cd "$(pwd)"
@@ -127,16 +168,11 @@ wt() {
     fi
 }
 
+# SSH key management (keychain loads keys once per WSL session)
 eval `keychain --quiet --eval --agents ssh ~/.ssh/id_rsa`
 {{ end }}
 
-# dotnet
-if [ -d "$HOME/.dotnet" ]; then
-  export DOTNET_ROOT="$HOME/.dotnet"
-  export PATH="$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools"
-fi
-
-# atuin
+# atuin (magical shell history with sync)
 if [ -d "$HOME/.atuin" ]; then
   . "$HOME/.atuin/bin/env"
 fi

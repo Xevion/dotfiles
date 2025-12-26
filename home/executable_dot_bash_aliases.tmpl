@@ -110,9 +110,7 @@ mktouch() { mkdir -p $(dirname $1) && touch $1; }
 # When in the appropriate KiTTy terminal, use the SSH kitten
 [ "$TERM" = "xterm-kitty" ] && alias ssh="kitty +kitten ssh"
 
-# ----------------------
-# Git Aliases
-# ----------------------
+# Git aliases
 alias ga='git add'
 alias gaa='git add .'
 alias gaaa='git add --all'
@@ -147,8 +145,5 @@ alias gstl='git stash list'
 alias gstp='git stash pop'
 alias gsts='git stash save'
 
-# ----------------------
-# Git Functions
-# ----------------------
 # Git log find by commit message
 function glf() { git log --all --grep="$1"; }

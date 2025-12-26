@@ -14,9 +14,7 @@ if (Get-Command mise -ErrorAction SilentlyContinue) {
     Invoke-Expression (& mise activate pwsh | Out-String)
 }
 
-# ----------------------
-# Core Aliases
-# ----------------------
+# Core aliases
 Set-Alias -Name nano -Value micro
 Set-Alias -Name vim -Value nvim
 Set-Alias -Name lg -Value lazygit
@@ -32,16 +30,11 @@ function ll { lsd -AlFh $args }
 # Reload shell profile
 function es { & $PROFILE }
 
-# ----------------------
-# Chezmoi Aliases
-# ----------------------
+# Chezmoi aliases
 Set-Alias -Name ch -Value chezmoi
 function cha { chezmoi apply --interactive }
 function chlg { lazygit --path {{ .chezmoi.config.sourceDir }} }
 
-# ----------------------
-# Windows Terminal
-# ----------------------
 # Launch Windows Terminal in current directory
 function wt {
     if ($args.Count -eq 0) {
@@ -51,9 +44,7 @@ function wt {
     }
 }
 
-# ----------------------
-# Git Aliases
-# ----------------------
+# Git aliases
 function ga { git add $args }
 function gaa { git add . }
 function gaaa { git add --all }

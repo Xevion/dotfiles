@@ -1,16 +1,18 @@
-# Fish shell common configuration
+# Common shell configuration for Fish
 # This template provides environment setup for Fish shell
+#
+# Load order: ~/.config/fish/config.fish → commonrc.fish.tmpl → conf.d/*.fish
+# Bash equivalent: ~/.bashrc → commonrc.sh.tmpl → ~/.bash_aliases
 
-# General configuration
 set -gx EDITOR "micro"
 set -gx GPG_TTY (tty)
 set -gx MICRO_TRUECOLOR 1
 set -gx TERM xterm-256color  # fixes terminal colors when ssh'ing into laptop
 
-# Authentication
 set -gx OPENAI_API_KEY "{{ dopplerProjectJson.OPENAI_CHATGPT_CLI }}"
-
-# PATH setup (batched for performance - reduces startup time by ~13ms)
+# Tools are organized in priority order (first = highest priority in PATH)
+# This order matches the Bash config for consistency
+# Batched for performance - reduces startup time by ~13ms
 set -l paths_to_add
 
 # Collect paths with conditional checks
@@ -94,18 +96,20 @@ end
 # Batch add all collected paths (single PATH reconstruction instead of 17+ calls)
 test -n "$paths_to_add[1]" && fish_add_path $paths_to_add
 
+# Note: Fish uses mise (via conf.d/mise.fish) for unified version management.
+# Bash uses mise as well, falling back to legacy managers if needed.
+
 # Post-PATH initialization for tools that need commands available
 if test -d $HOME/.jenv/bin; and command -q jenv
     jenv init - fish | source
 end
 
-# Note: Aliases are defined in Fish-native format in ~/.config/fish/conf.d/abbr.fish
-# The bash_aliases file contains bash-specific syntax and is not sourced here
+# Note: Fish aliases are defined in ~/.config/fish/conf.d/abbr.fish
+# Bash aliases are in ~/.bash_aliases (bash-specific syntax)
 
-{{- /* WSL-specific settings */ -}}
 {{- if .data.wsl }}
 
-## Ensures CLI apps open URLs in the default Windows browser
+# Windows browser integration (open URLs in Windows browser, not CLI browser)
 set -gx BROWSER 'powershell.exe /c start'
 
 # Cursor IDE CLI (Windows installation accessible from WSL)
@@ -116,7 +120,7 @@ test -x /mnt/c/Users/Xevion/AppData/Local/Programs/cursor/resources/app/bin/curs
 test -x /mnt/c/Users/Xevion/AppData/Local/Programs/Zed/bin/zed && \
     fish_add_path /mnt/c/Users/Xevion/AppData/Local/Programs/Zed/bin
 
-# Launch Windows Terminal in current directory
+# Windows Terminal helper function (launch WT in current directory)
 function wt
     if test (count $argv) -eq 0
         wt.exe -w 0 sp wsl --cd (pwd)
@@ -126,7 +130,7 @@ function wt
 end
 {{- end }}
 
-# atuin (magical shell history)
+# atuin (magical shell history with sync)
 if command -q atuin
     atuin init fish --disable-up-arrow | source
 end

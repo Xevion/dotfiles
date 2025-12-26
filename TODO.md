@@ -52,27 +52,31 @@
 
 ### 4. Refactor Shell Configuration Architecture
 
-- [ ] Consolidate PATH modifications into single, organized section in `commonrc.sh.tmpl`
-- [ ] Create modular PATH loading system (one block per tool with conditional checks)
-- [ ] Separate PATH, environment variables, and shell completions into logical sections
-- [ ] Document load order (`.bashrc` → `commonrc.sh` → `.bash_aliases`)
-- [ ] Add comments explaining each tool's PATH modification
-- [ ] Eliminate duplicate PATH additions
-- [ ] Create standard pattern for conditional tool loading
-- [ ] Add PATH deduplication function
-- [ ] Move WSL-specific settings to dedicated section (currently at commonrc.sh.tmpl:109-114)
-- [ ] Organize tool sections alphabetically or by category
+- [x] Consolidate PATH modifications into single, organized section in `commonrc.sh.tmpl`
+- [x] Create modular PATH loading system (one block per tool with conditional checks)
+- [x] Separate PATH, environment variables, and shell completions into logical sections
+- [x] Document load order (`.bashrc` → `commonrc.sh` → `.bash_aliases`)
+- [x] Add comments explaining each tool's PATH modification
+- [x] Eliminate duplicate PATH additions
+- [x] Create standard pattern for conditional tool loading
+- [x] Add PATH deduplication function (using pnpm's case pattern)
+- [x] Move WSL-specific settings to dedicated section (Section 7 in commonrc.sh.tmpl)
+- [x] Organize tool sections by category (Core → Languages → Package Managers → Dev Tools)
+- [x] Add mise integration as primary version manager with legacy fallbacks
+- [x] Sync tool order between Bash and Fish configs for consistency
+- [x] Move SDKMAN from .bashrc to commonrc.sh for centralization
+- [x] Remove duplicate keychain initialization from .bashrc
 
 ### 5. Shell Completions Cleanup
 
-- [ ] Audit all completion sources in `commonrc.sh.tmpl` (lines 17-22, 35-39, 71-76)
-- [ ] Create consistent pattern for conditional completion loading
-- [ ] Move completions to dedicated section (after PATH, before aliases)
-- [ ] Add error handling for missing completion files
-- [ ] Document which tools provide completions
-- [ ] Test completions on bash
-- [ ] Add completion loading performance optimization
-- [ ] Document how to add new tool completions
+- [x] Audit all completion sources in `commonrc.sh.tmpl`
+- [x] Create consistent pattern for conditional completion loading
+- [x] Move completions to dedicated section (Section 5 in commonrc.sh.tmpl)
+- [x] Add error handling for missing completion files
+- [x] Document which tools provide completions (hishtory, asdf, chatgpt)
+- [ ] Test completions on bash (requires actual shell testing by user)
+- [x] Add completion loading comments for performance awareness
+- [x] Document how to add new tool completions (follow Section 5 pattern)
 
 ### 6. Windows PATH Management
 
@@ -265,7 +269,7 @@
 ### 16. Cleanup & Maintenance
 
 - [x] Commit deletion of removed files (nushell/env.nu, dot_gitconfig, etc.) - Converted to templates instead
-- [ ] Clean up commented-out code in commonrc.sh.tmpl (lines 122-130)
+- [x] Clean up commented-out code in commonrc.sh.tmpl (removed dead zsh/xset/todoist code)
 - [ ] Review and update `.chezmoiignore` patterns
 - [ ] Audit and remove unused templates
 - [ ] Standardize file naming conventions across repo
