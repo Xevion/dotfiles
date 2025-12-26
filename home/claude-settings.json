@@ -1,5 +1,6 @@
 {
   "includeCoAuthoredBy": false,
+  "model": "sonnet",
   "permissions": {
     "allow": [
       "Glob",
@@ -229,50 +230,16 @@
     ],
     "defaultMode": "default"
   },
-  "model": "sonnet",
   "statusLine": {
     "type": "command",
     "command": "bunx -y ccstatusline@latest",
     "padding": 0
   },
   "enabledPlugins": {
-    "backend-development@claude-code-workflows": true,
-    "javascript-typescript@claude-code-workflows": true,
-    "security-guidance@claude-code-plugins": true,
     "commit-commands@claude-code-plugins": true,
     "feature-dev@claude-code-plugins": true,
-    "code-documentation@claude-code-workflows": true,
-    "debugging-toolkit@claude-code-workflows": true,
-    "git-pr-workflows@claude-code-workflows": true,
-    "full-stack-orchestration@claude-code-workflows": true,
-    "unit-testing@claude-code-workflows": true,
-    "tdd-workflows@claude-code-workflows": true,
-    "code-review-ai@claude-code-workflows": true,
-    "code-refactoring@claude-code-workflows": true,
-    "dependency-management@claude-code-workflows": true,
-    "error-debugging@claude-code-workflows": true,
-    "error-diagnostics@claude-code-workflows": false,
-    "deployment-strategies@claude-code-workflows": false,
-    "deployment-validation@claude-code-workflows": false,
-    "cicd-automation@claude-code-workflows": true,
-    "application-performance@claude-code-workflows": true,
-    "comprehensive-review@claude-code-workflows": true,
-    "performance-testing-review@claude-code-workflows": false,
-    "framework-migration@claude-code-workflows": false,
-    "codebase-cleanup@claude-code-workflows": true,
-    "database-design@claude-code-workflows": false,
-    "data-validation-suite@claude-code-workflows": false,
-    "api-scaffolding@claude-code-workflows": false,
-    "api-testing-observability@claude-code-workflows": false,
-    "documentation-generation@claude-code-workflows": false,
-    "game-development@claude-code-workflows": false,
-    "accessibility-compliance@claude-code-workflows": false,
-    "systems-programming@claude-code-workflows": true,
-    "functional-programming@claude-code-workflows": true,
-    "shell-scripting@claude-code-workflows": false,
-    "observability-monitoring@claude-code-workflows": false,
-    "database-cloud-optimization@claude-code-workflows": false,
-    "jvm-languages@claude-code-workflows": true
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "ralph-wiggum@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true
 }
