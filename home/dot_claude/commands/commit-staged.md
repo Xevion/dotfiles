@@ -1,17 +1,11 @@
 ---
-allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git commit:*)
+allowed-tools: Bash(git commit:*)
 description: Commit currently staged changes with an appropriate message
 ---
 
 ## Context
 
-- Current git status:
-!`git status`
-- Current git diff line count: !`git diff --cached | wc -l`
-- Current git diff (staged changes only):
-!`if [ $(git diff --cached | wc -l) -lt 200 ]; then git diff --cached; else git diff --cached --stat; fi`
-- Recent commits:
-!`git log --oneline -10`
+!`commit-helper --staged`
 
 ## Your task
 

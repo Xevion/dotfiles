@@ -1,0 +1,435 @@
+#!/usr/bin/env bun
+
+/**
+ * commit-helper - Efficient git context gathering for AI-assisted commits
+ * 
+ * Provides optimized git context with smart truncation and filtering.
+ * Designed to give AI assistants the right amount of context without overwhelming them.
+ * 
+ * Usage:
+ *   commit-helper --staged [maxLines]    # For committing staged changes
+ *   commit-helper --amend [maxLines]     # For amending last commit
+ * 
+ * Default maxLines: 1000
+ */
+
+import { $ } from "bun";
+
+// Files to ignore in diffs (lockfiles, generated files, etc.)
+const IGNORE_PATTERNS = [
+  /package-lock\.json$/,
+  /yarn\.lock$/,
+  /pnpm-lock\.yaml$/,
+  /Cargo\.lock$/,
+  /poetry\.lock$/,
+  /bun\.lockb?$/,
+  /\.min\.(js|css)$/,
+  /\.bundle\.(js|css)$/,
+  /dist\/.*\.map$/,
+  /\.svg$/,  // Often generated or binary-like
+];
+
+// Binary/large file extensions to skip in diffs
+const BINARY_EXTENSIONS = [
+  '.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp',
+  '.pdf', '.zip', '.tar', '.gz', '.woff', '.woff2', '.ttf', '.eot',
+  '.mp4', '.mp3', '.wav', '.avi', '.mov',
+  '.so', '.dylib', '.dll', '.exe',
+];
+
+interface ChangeStats {
+  files: number;
+  additions: number;
+  deletions: number;
+}
+
+interface FileChange {
+  path: string;
+  additions: number;
+  deletions: number;
+  isBinary: boolean;
+  shouldIgnore: boolean;
+}
+
+/**
+ * Parse git diff numstat output into structured data
+ */
+function parseNumstat(numstat: string): FileChange[] {
+  return numstat
+    .split('\n')
+    .filter(line => line.trim())
+    .map(line => {
+      const parts = line.split('\t');
+      const additions = parts[0] === '-' ? 0 : parseInt(parts[0], 10);
+      const deletions = parts[1] === '-' ? 0 : parseInt(parts[1], 10);
+      const path = parts[2] || '';
+      
+      const isBinary = parts[0] === '-' && parts[1] === '-';
+      const shouldIgnore = IGNORE_PATTERNS.some(pattern => pattern.test(path)) ||
+                          BINARY_EXTENSIONS.some(ext => path.endsWith(ext));
+      
+      return { path, additions, deletions, isBinary, shouldIgnore };
+    });
+}
+
+/**
+ * Get overall change statistics
+ */
+function getChangeStats(files: FileChange[]): ChangeStats {
+  return files.reduce((acc, file) => ({
+    files: acc.files + 1,
+    additions: acc.additions + file.additions,
+    deletions: acc.deletions + file.deletions,
+  }), { files: 0, additions: 0, deletions: 0 });
+}
+
+/**
+ * Get file type distribution summary
+ */
+function getFileTypeDistribution(files: FileChange[]): string {
+  const extensions = files.map(f => {
+    const match = f.path.match(/\.([^.]+)$/);
+    return match ? match[1] : '(no extension)';
+  });
+  
+  const counts = new Map<string, number>();
+  for (const ext of extensions) {
+    counts.set(ext, (counts.get(ext) || 0) + 1);
+  }
+  
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([ext, count]) => `  ${count.toString().padStart(3)} .${ext}`)
+    .join('\n');
+}
+
+/**
+ * Get categorized file changes summary
+ */
+function getFileSummary(files: FileChange[]): string {
+  const included = files.filter(f => !f.shouldIgnore && !f.isBinary);
+  const ignored = files.filter(f => f.shouldIgnore);
+  const binary = files.filter(f => f.isBinary && !f.shouldIgnore);
+  
+  let summary = '';
+  
+  if (included.length > 0) {
+    summary += '**Included changes:**\n';
+    summary += included.map(f => {
+      const changes = `(+${f.additions}/-${f.deletions})`;
+      return `  ${changes.padEnd(12)} ${f.path}`;
+    }).join('\n');
+  }
+  
+  if (ignored.length > 0) {
+    summary += '\n\n**Ignored files (lockfiles/generated):**\n';
+    summary += ignored.map(f => `  ${f.path}`).join('\n');
+    summary += '\n  _(Changes to these files are omitted from diff output)_';
+  }
+  
+  if (binary.length > 0) {
+    summary += '\n\n**Binary files:**\n';
+    summary += binary.map(f => `  ${f.path}`).join('\n');
+  }
+  
+  return summary;
+}
+
+/**
+ * Get filtered diff output (excluding ignored files)
+ */
+async function getFilteredDiff(staged: boolean): Promise<string> {
+  const command = staged 
+    ? 'git diff --staged'
+    : 'git diff HEAD~1..HEAD';
+  
+  // Get list of files to exclude
+  const numstatCmd = staged
+    ? 'git diff --staged --numstat'
+    : 'git diff HEAD~1..HEAD --numstat';
+  
+  const numstat = await $`sh -c ${numstatCmd}`.text();
+  const files = parseNumstat(numstat);
+  const filesToExclude = files
+    .filter(f => f.shouldIgnore || f.isBinary)
+    .map(f => f.path);
+  
+  // Build diff command with exclusions
+  if (filesToExclude.length === 0) {
+    return await $`sh -c ${command}`.text();
+  }
+  
+  // Git diff with pathspec exclusions
+  const excludeArgs = filesToExclude.map(f => `:(exclude)${f}`).join(' ');
+  const fullCommand = `${command} -- . ${excludeArgs}`;
+  
+  try {
+    return await $`sh -c ${fullCommand}`.text();
+  } catch {
+    // If exclusion fails, just return full diff
+    return await $`sh -c ${command}`.text();
+  }
+}
+
+/**
+ * Truncate diff to fit within line budget
+ */
+function truncateDiff(diff: string, maxLines: number, filesInfo: string): string {
+  const lines = diff.split('\n');
+  
+  if (lines.length <= maxLines) {
+    return diff;
+  }
+  
+  // Try to include complete file diffs rather than cutting mid-file
+  const fileDiffs: Array<{ header: string; content: string; lineCount: number }> = [];
+  let currentFile: { header: string; lines: string[] } | null = null;
+  
+  for (const line of lines) {
+    if (line.startsWith('diff --git')) {
+      if (currentFile) {
+        fileDiffs.push({
+          header: currentFile.header,
+          content: currentFile.lines.join('\n'),
+          lineCount: currentFile.lines.length,
+        });
+      }
+      currentFile = { header: line, lines: [line] };
+    } else if (currentFile) {
+      currentFile.lines.push(line);
+    }
+  }
+  
+  if (currentFile) {
+    fileDiffs.push({
+      header: currentFile.header,
+      content: currentFile.lines.join('\n'),
+      lineCount: currentFile.lines.length,
+    });
+  }
+  
+  // Include files until we hit the limit
+  let includedLines = 0;
+  const includedDiffs: string[] = [];
+  const omittedFiles: string[] = [];
+  
+  for (const fileDiff of fileDiffs) {
+    if (includedLines + fileDiff.lineCount <= maxLines - 10) { // Reserve space for summary
+      includedDiffs.push(fileDiff.content);
+      includedLines += fileDiff.lineCount;
+    } else {
+      // Extract filename from diff header
+      const match = fileDiff.header.match(/diff --git a\/(.*?) b\//);
+      if (match) {
+        omittedFiles.push(match[1]);
+      }
+    }
+  }
+  
+  let result = includedDiffs.join('\n\n');
+  
+  if (omittedFiles.length > 0) {
+    result += '\n\n---\n';
+    result += `**Note:** ${omittedFiles.length} file(s) omitted due to output size limit:\n`;
+    result += omittedFiles.map(f => `  - ${f}`).join('\n');
+    result += '\n\n_Full changes visible in git status/stat output above._';
+  }
+  
+  return result;
+}
+
+/**
+ * Get preview of new files being added
+ */
+async function getNewFilesPreviews(maxFiles: number = 5, maxLinesPerFile: number = 50): Promise<string> {
+  try {
+    // Get list of new files (A = added)
+    const newFiles = await $`git diff --staged --name-only --diff-filter=A`.text();
+    const files = newFiles.trim().split('\n').filter(f => f);
+    
+    if (files.length === 0) {
+      return '';
+    }
+    
+    const previews: string[] = [];
+    const filesToShow = files.slice(0, maxFiles);
+    
+    for (const file of filesToShow) {
+      // Skip binary files
+      if (BINARY_EXTENSIONS.some(ext => file.endsWith(ext))) {
+        previews.push(`=== ${file} ===\n(binary file)`);
+        continue;
+      }
+      
+      try {
+        const content = await Bun.file(file).text();
+        const lines = content.split('\n').slice(0, maxLinesPerFile);
+        const truncated = lines.length < content.split('\n').length 
+          ? `\n... (${content.split('\n').length - lines.length} more lines)`
+          : '';
+        
+        previews.push(`=== ${file} ===\n${lines.join('\n')}${truncated}`);
+      } catch {
+        previews.push(`=== ${file} ===\n(unreadable)`);
+      }
+    }
+    
+    let result = previews.join('\n\n');
+    
+    if (files.length > maxFiles) {
+      result += `\n\n_... and ${files.length - maxFiles} more new file(s)_`;
+    }
+    
+    return result;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Generate context for staged changes
+ */
+async function stagedContext(maxLines: number): Promise<string> {
+  // Check if there are staged changes
+  try {
+    await $`git diff --staged --quiet`;
+    // If command succeeds (exit 0), there are no changes
+    throw new Error('No staged changes to commit');
+  } catch (err) {
+    // Exit code 1 means there are changes (expected)
+    // Any other error will be re-thrown
+    if (err && typeof err === 'object' && 'exitCode' in err && err.exitCode !== 1) {
+      throw err;
+    }
+  }
+  
+  // Gather all git information
+  const [status, numstat, recentCommits] = await Promise.all([
+    $`git status`.text(),
+    $`git diff --staged --numstat`.text(),
+    $`git log --format='%h %s' -10`.text(),
+  ]);
+  
+  const files = parseNumstat(numstat);
+  const stats = getChangeStats(files);
+  const fileSummary = getFileSummary(files);
+  const fileTypes = getFileTypeDistribution(files);
+  
+  // Calculate how many lines we can use for diff
+  const headerLines = 50; // Approximate lines for headers/summaries
+  const diffMaxLines = Math.max(100, maxLines - headerLines);
+  
+  const diff = await getFilteredDiff(true);
+  const truncatedDiff = truncateDiff(diff, diffMaxLines, fileSummary);
+  
+  const newFilesPreviews = await getNewFilesPreviews(5, 50);
+  
+  // Build output
+  let output = '# Git Commit Context (Staged Changes)\n\n';
+  
+  output += '## Status\n```\n' + status.trim() + '\n```\n\n';
+  
+  output += '## Change Summary\n';
+  output += `**Files:** ${stats.files} | **Additions:** ${stats.additions} | **Deletions:** ${stats.deletions}\n\n`;
+  
+  output += '## Files Changed\n' + fileSummary + '\n\n';
+  
+  output += '## File Types Modified\n```\n' + fileTypes + '\n```\n\n';
+  
+  output += '## Staged Changes (Diff)\n';
+  output += '```diff\n' + truncatedDiff.trim() + '\n```\n\n';
+  
+  if (newFilesPreviews) {
+    output += '## New Files Preview\n```\n' + newFilesPreviews + '\n```\n\n';
+  }
+  
+  output += '## Recent Commit Style\n```\n' + recentCommits.trim() + '\n```\n';
+  
+  return output;
+}
+
+/**
+ * Generate context for amending last commit
+ */
+async function amendContext(maxLines: number): Promise<string> {
+  // Check if we have any commits
+  try {
+    await $`git rev-parse HEAD`;
+  } catch {
+    throw new Error('No commits to amend');
+  }
+  
+  // Gather git information
+  const [stagedStat, lastCommitStat, recentCommits] = await Promise.all([
+    $`git diff --staged --stat`.text(),
+    $`git show --stat --pretty=format: HEAD`.text().then(s => s.split('\n').filter(l => l.trim()).join('\n')),
+    $`git log --oneline -5`.text(),
+  ]);
+  
+  let output = '# Git Commit Context (Amend)\n\n';
+  
+  output += '## Current Staged Changes\n';
+  if (stagedStat.trim()) {
+    output += '```\n' + stagedStat.trim() + '\n```\n\n';
+  } else {
+    output += '_No staged changes (message-only amendment)_\n\n';
+  }
+  
+  output += '## Files in Most Recent Commit\n';
+  output += '```\n' + lastCommitStat.trim() + '\n```\n\n';
+  
+  output += '## Recent Commit History (for style reference)\n';
+  output += '```\n' + recentCommits.trim() + '\n```\n';
+  
+  return output;
+}
+
+/**
+ * Main entry point
+ */
+async function main() {
+  const args = Bun.argv.slice(2);
+  
+  if (args.length === 0 || (!args[0].startsWith('--staged') && !args[0].startsWith('--amend'))) {
+    console.error('Usage: commit-helper --staged [maxLines] | --amend [maxLines]');
+    console.error('  Default maxLines: 1000');
+    process.exit(1);
+  }
+  
+  const mode = args[0];
+  const maxLines = args[1] ? parseInt(args[1], 10) : 1000;
+  
+  if (isNaN(maxLines) || maxLines < 100) {
+    console.error('Error: maxLines must be a number >= 100');
+    process.exit(1);
+  }
+  
+  try {
+    let output: string;
+    
+    if (mode === '--staged') {
+      output = await stagedContext(maxLines);
+    } else if (mode === '--amend') {
+      output = await amendContext(maxLines);
+    } else {
+      throw new Error(`Unknown mode: ${mode}`);
+    }
+    
+    console.log(output);
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(`Error: ${error.message}`);
+      if (error.stack) {
+        console.error('\nStack trace:');
+        console.error(error.stack);
+      }
+    } else if (error && typeof error === 'object') {
+      console.error('Error details:', JSON.stringify(error, null, 2));
+    } else {
+      console.error('Error: Unknown error occurred:', error);
+    }
+    process.exit(1);
+  }
+}
+
+main();

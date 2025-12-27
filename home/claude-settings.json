@@ -1,6 +1,5 @@
 {
   "includeCoAuthoredBy": false,
-  "model": "sonnet",
   "permissions": {
     "allow": [
       "Glob",
@@ -230,6 +229,7 @@
     ],
     "defaultMode": "default"
   },
+  "model": "sonnet",
   "statusLine": {
     "type": "command",
     "command": "bunx -y ccstatusline@latest",
@@ -239,7 +239,8 @@
     "commit-commands@claude-code-plugins": true,
     "feature-dev@claude-code-plugins": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
-    "ralph-wiggum@claude-plugins-official": true
+    "ralph-wiggum@claude-plugins-official": true,
+    "superpowers@superpowers-marketplace": true
   },
   "alwaysThinkingEnabled": true
 }

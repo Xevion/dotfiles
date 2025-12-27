@@ -1,5 +1,6 @@
 {
     "recommendations": [
-        "thenuprojectcontributors.vscode-nushell-lang"
+        "thenuprojectcontributors.vscode-nushell-lang",
+        "bmalehorn.vscode-fish"
     ]
 }

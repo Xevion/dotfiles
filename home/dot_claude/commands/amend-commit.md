@@ -1,18 +1,11 @@
 ---
-allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git show:*), Bash(git commit:*)
+allowed-tools: Bash(git commit:*)
 description: Amend the most recent commit (with staged changes and/or message reword)
 ---
 
 ## Context
 
-**Current staged changes:**
-!`git diff --cached --stat`
-
-**Files in most recent commit:**
-!`git show --stat --pretty=format: HEAD | grep -v '^$'`
-
-**Recent commit history (for style reference):**
-!`git log --oneline -5`
+!`commit-helper --amend`
 
 ## Your task
 

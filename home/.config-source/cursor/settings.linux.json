@@ -337,5 +337,6 @@
   "svelte.enable-ts-plugin": true,
   "[svelte]": {
     "editor.defaultFormatter": "svelte.svelte-vscode"
-  }
+  },
+  "claudeCode.preferredLocation": "panel"
 }
