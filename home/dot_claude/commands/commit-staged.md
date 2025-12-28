@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git commit:*)
+allowed-tools: Bash(git commit:*), Bash(commit-helper:*)
 argument-hint: [optional custom instructions]
 description: Commit currently staged changes with an appropriate message
 ---
