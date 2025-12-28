@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env -S bun --install=fallback
 
 /**
  * claude-usage - Fast CLI tool to fetch Anthropic Claude usage percentages
@@ -17,9 +17,14 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import chalk from 'chalk';
 
 // Configuration
 const CREDENTIALS_PATH = join(homedir(), '.claude', '.credentials.json');
+
+// Parse CLI flags
+const args = process.argv.slice(2);
+const VERBOSE = args.includes('-v') || args.includes('--verbose') || args.includes('-d') || args.includes('--debug');
 
 interface UsagePeriod {
   utilization: number;
@@ -37,6 +42,66 @@ interface Credentials {
   };
 }
 
+interface PaceResult {
+  diff: number;
+  status: string;
+}
+
+/**
+ * Interpolate between two hex colors
+ */
+function interpolateColor(color1: string, color2: string, ratio: number): string {
+  const r1 = parseInt(color1.slice(1, 3), 16);
+  const g1 = parseInt(color1.slice(3, 5), 16);
+  const b1 = parseInt(color1.slice(5, 7), 16);
+  
+  const r2 = parseInt(color2.slice(1, 3), 16);
+  const g2 = parseInt(color2.slice(3, 5), 16);
+  const b2 = parseInt(color2.slice(5, 7), 16);
+  
+  const r = Math.round(r1 + (r2 - r1) * ratio);
+  const g = Math.round(g1 + (g2 - g1) * ratio);
+  const b = Math.round(b1 + (b2 - b1) * ratio);
+  
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/**
+ * Get pastel color based on usage percentage (soft rainbow gradient)
+ */
+function getColorForPercentage(pct: number): string {
+  const stops = [
+    { threshold: 0,   color: '#A5D8DD' }, // Soft cyan
+    { threshold: 15,  color: '#9DCCB4' }, // Soft teal
+    { threshold: 30,  color: '#B8D99A' }, // Soft lime
+    { threshold: 45,  color: '#E8D4A2' }, // Soft yellow
+    { threshold: 60,  color: '#F4B8A4' }, // Soft orange
+    { threshold: 75,  color: '#F5A6A6' }, // Soft red
+    { threshold: 85,  color: '#E89999' }, // Medium red
+    { threshold: 95,  color: '#D88888' }, // Deeper red
+  ];
+  
+  let lower = stops[0];
+  let upper = stops[stops.length - 1];
+  
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (pct >= stops[i].threshold && pct < stops[i + 1].threshold) {
+      lower = stops[i];
+      upper = stops[i + 1];
+      break;
+    }
+  }
+  
+  if (pct >= stops[stops.length - 1].threshold) {
+    return stops[stops.length - 1].color;
+  }
+  
+  const range = upper.threshold - lower.threshold;
+  const position = range > 0 ? (pct - lower.threshold) / range : 0;
+  
+  return interpolateColor(lower.color, upper.color, position);
+}
+
 /**
  * Generate user_id metadata for the request (mimics Claude Code's format)
  */
@@ -48,6 +113,34 @@ function generateUserId(accessToken: string): string {
   const sessionId = crypto.randomUUID();
   
   return `user_${hash}_session_${sessionId}`;
+}
+
+/**
+ * Spinner class for loading animation with rainbow gradient
+ */
+class Spinner {
+  private frames = ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
+  private colors = ['#A5D8DD', '#9DCCB4', '#B8D99A', '#E8D4A2', '#F4B8A4', '#F5A6A6'];
+  private index = 0;
+  private interval: Timer | null = null;
+  
+  start(message: string) {
+    process.stdout.write('\x1B[?25l');
+    
+    this.interval = setInterval(() => {
+      const colorIndex = this.index % this.colors.length;
+      const frame = chalk.hex(this.colors[colorIndex])(this.frames[this.index]);
+      process.stdout.write(`\r${frame} ${chalk.hex('#9CA3AF')(message)}`);
+      this.index = (this.index + 1) % this.frames.length;
+    }, 80);
+  }
+  
+  stop() {
+    if (this.interval) {
+      clearInterval(this.interval);
+      process.stdout.write('\r\x1B[K\x1B[?25h');
+    }
+  }
 }
 
 /**
@@ -76,6 +169,43 @@ async function readToken(): Promise<string> {
 async function fetchUsage(accessToken: string): Promise<UsageData> {
   const userId = generateUserId(accessToken);
   
+  const requestBody = {
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 1,
+    messages: [
+      {
+        role: 'user',
+        content: 'quota',
+      },
+    ],
+    metadata: {
+      user_id: userId,
+    },
+  };
+  
+  const requestHeaders = {
+    'Accept': 'application/json',
+    'Authorization': `Bearer ${accessToken.substring(0, 20)}...`,
+    'anthropic-version': '2023-06-01',
+    'anthropic-beta': 'oauth-2025-04-20,interleaved-thinking-2025-05-14',
+    'anthropic-dangerous-direct-browser-access': 'true',
+    'x-app': 'cli',
+    'User-Agent': 'claude-cli/2.0.76 (external, sdk-cli)',
+    'Content-Type': 'application/json',
+    'accept-language': '*',
+    'sec-fetch-mode': 'cors',
+    'accept-encoding': 'br, gzip, deflate',
+  };
+  
+  if (VERBOSE) {
+    console.log(chalk.hex('#6B7280')('\n=== Debug: API Request ==='));
+    console.log(chalk.hex('#9CA3AF')('URL:'), 'https://api.anthropic.com/v1/messages?beta=true');
+    console.log(chalk.hex('#9CA3AF')('Method:'), 'POST');
+    console.log(chalk.hex('#9CA3AF')('Headers:'), JSON.stringify(requestHeaders, null, 2));
+    console.log(chalk.hex('#9CA3AF')('Body:'), JSON.stringify(requestBody, null, 2));
+    console.log();
+  }
+  
   // Make the exact same request Claude Code makes for checking quota
   const response = await fetch('https://api.anthropic.com/v1/messages?beta=true', {
     method: 'POST',
@@ -92,19 +222,7 @@ async function fetchUsage(accessToken: string): Promise<UsageData> {
       'sec-fetch-mode': 'cors',
       'accept-encoding': 'br, gzip, deflate',
     },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1,
-      messages: [
-        {
-          role: 'user',
-          content: 'quota',
-        },
-      ],
-      metadata: {
-        user_id: userId,
-      },
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
@@ -119,6 +237,25 @@ async function fetchUsage(accessToken: string): Promise<UsageData> {
   const fiveHourReset = parseInt(headers.get('anthropic-ratelimit-unified-5h-reset') || '0');
   const sevenDayReset = parseInt(headers.get('anthropic-ratelimit-unified-7d-reset') || '0');
 
+  if (VERBOSE) {
+    console.log(chalk.hex('#6B7280')('=== Debug: Response Headers ==='));
+    console.log(chalk.hex('#9CA3AF')('Status:'), response.status, response.statusText);
+    
+    // Show all response headers
+    const allHeaders: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      allHeaders[key] = value;
+    });
+    console.log(chalk.hex('#9CA3AF')('All Headers:'), JSON.stringify(allHeaders, null, 2));
+    
+    console.log(chalk.hex('#6B7280')('\n=== Debug: Parsed Values ==='));
+    console.log(chalk.hex('#9CA3AF')('5h utilization:'), fiveHourUtil);
+    console.log(chalk.hex('#9CA3AF')('5h reset:'), fiveHourReset, `(${new Date(fiveHourReset * 1000).toLocaleString()})`);
+    console.log(chalk.hex('#9CA3AF')('7d utilization:'), sevenDayUtil);
+    console.log(chalk.hex('#9CA3AF')('7d reset:'), sevenDayReset, `(${new Date(sevenDayReset * 1000).toLocaleString()})`);
+    console.log();
+  }
+
   return {
     five_hour: {
       utilization: fiveHourUtil,
@@ -132,7 +269,109 @@ async function fetchUsage(accessToken: string): Promise<UsageData> {
 }
 
 /**
- * Format reset time from Unix timestamp
+ * Get pastel color for ahead/behind pace difference
+ */
+function getDiffColor(diffPct: number): string {
+  if (diffPct > 15) return '#E89999';      // Soft red - way ahead
+  if (diffPct > 5) return '#F4B8A4';       // Soft orange - ahead
+  if (diffPct >= -5) return '#E8D4A2';     // Soft yellow - on track
+  if (diffPct >= -15) return '#B8D99A';    // Soft lime - behind (good)
+  return '#A5D8DD';                        // Soft cyan - well under
+}
+
+/**
+ * Get pastel color for reset time based on urgency
+ */
+function getResetColor(resetTimestamp: number): string {
+  const now = Date.now() / 1000;
+  const hoursRemaining = (resetTimestamp - now) / 3600;
+  
+  if (hoursRemaining < 1) return '#E89999';      // Soft red - < 1 hour
+  if (hoursRemaining < 3) return '#F4B8A4';      // Soft orange - < 3 hours
+  if (hoursRemaining < 12) return '#E8D4A2';     // Soft yellow - < 12 hours
+  if (hoursRemaining < 48) return '#B8D99A';     // Soft lime - < 2 days
+  return '#9DCCB4';                              // Soft teal - plenty of time
+}
+
+/**
+ * Get status message based on pace difference
+ */
+function getPaceStatus(diffPct: number): string {
+  if (diffPct > 15) return 'high usage rate';
+  if (diffPct > 5) return 'slightly elevated';
+  if (diffPct >= -5) return 'on track';
+  if (diffPct >= -15) return 'comfortable margin';
+  return 'well under quota';
+}
+
+/**
+ * Calculate pace for 5-hour period (linear usage)
+ */
+function calculate5HourPace(utilization: number, resetTimestamp: number): PaceResult {
+  const now = Date.now() / 1000;
+  const secondsRemaining = resetTimestamp - now;
+  const totalSeconds = 5 * 3600;
+  const secondsElapsed = totalSeconds - secondsRemaining;
+  
+  const expectedUtil = secondsElapsed / totalSeconds;
+  const diff = (utilization - expectedUtil) * 100;
+  
+  return {
+    diff,
+    status: getPaceStatus(diff)
+  };
+}
+
+/**
+ * Calculate elapsed active hours for 7-day period
+ * Active window: 10am-2am (14 hours per day)
+ * 2am is the LAST active hour (2:00-2:59am is active)
+ */
+function calculateElapsedActiveHours(now: Date, reset: Date): number {
+  const totalPeriodSeconds = 7 * 24 * 3600;
+  const remainingSeconds = (reset.getTime() - now.getTime()) / 1000;
+  const elapsedSeconds = totalPeriodSeconds - remainingSeconds;
+  
+  const completeDays = Math.floor(elapsedSeconds / (24 * 3600));
+  
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  
+  let activeHoursToday = 0;
+  
+  if (currentHour >= 10 && currentHour <= 23) {
+    activeHoursToday = (currentHour - 10) + (currentMinute / 60);
+  } else if (currentHour >= 0 && currentHour <= 2) {
+    const hoursAfterMidnight = currentHour + (currentMinute / 60);
+    activeHoursToday = 14 + hoursAfterMidnight;
+  }
+  
+  const totalElapsedActiveHours = (completeDays * 14) + Math.min(activeHoursToday, 14);
+  
+  return totalElapsedActiveHours;
+}
+
+/**
+ * Calculate pace for 7-day period (accounting for active hours)
+ */
+function calculate7DayPace(utilization: number, resetTimestamp: number): PaceResult {
+  const now = new Date();
+  const resetDate = new Date(resetTimestamp * 1000);
+  
+  const totalActiveHours = 7 * 14;
+  const elapsedActiveHours = calculateElapsedActiveHours(now, resetDate);
+  
+  const expectedUtil = elapsedActiveHours / totalActiveHours;
+  const diff = (utilization - expectedUtil) * 100;
+  
+  return {
+    diff,
+    status: getPaceStatus(diff)
+  };
+}
+
+/**
+ * Format reset time from Unix timestamp with relative time and contextual absolute time
  */
 function formatResetTime(resetTimestamp: number): string {
   if (!resetTimestamp) return '';
@@ -141,18 +380,92 @@ function formatResetTime(resetTimestamp: number): string {
   const now = new Date();
   const diffMs = resetDate.getTime() - now.getTime();
   
-  if (diffMs < 0) return '(reset overdue)';
+  if (diffMs < 0) return 'reset overdue';
   
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
   
-  if (diffHours < 24) {
-    return `(resets in ${diffHours}h ${diffMins}m)`;
+  // Format time in local timezone
+  const timeStr = resetDate.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+  
+  // Calculate day difference
+  const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const resetDay = new Date(resetDate.getFullYear(), resetDate.getMonth(), resetDate.getDate());
+  const dayDiff = Math.round((resetDay.getTime() - nowDay.getTime()) / (1000 * 60 * 60 * 24));
+  
+  let dateContext: string;
+  if (dayDiff === 0) {
+    dateContext = `${timeStr} today`;
+  } else if (dayDiff === 1) {
+    dateContext = `${timeStr} tomorrow`;
+  } else if (dayDiff < 7) {
+    // Day of week (abbreviated)
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayName = dayNames[resetDate.getDay()];
+    dateContext = `${dayName} ${timeStr}`;
+  } else {
+    // Check if it's exactly 7 days (same day of week)
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayName = dayNames[resetDate.getDay()];
+    if (resetDate.getDay() === now.getDay()) {
+      dateContext = `next ${dayName} ${timeStr}`;
+    } else {
+      dateContext = `${dayName} ${timeStr}`;
+    }
   }
   
-  const diffDays = Math.floor(diffHours / 24);
-  const remainingHours = diffHours % 24;
-  return `(resets in ${diffDays}d ${remainingHours}h)`;
+  let relativeTime: string;
+  if (diffHours < 24) {
+    relativeTime = `${diffHours}h ${diffMins}m`;
+  } else {
+    const diffDays = Math.floor(diffHours / 24);
+    const remainingHours = diffHours % 24;
+    relativeTime = `${diffDays}d ${remainingHours}h`;
+  }
+  
+  return `resets in ${relativeTime} (${dateContext})`;
+}
+
+/**
+ * Format and display usage output with pastel colors and condensed layout
+ */
+function formatOutput(usage: UsageData): void {
+  const fiveHourPct = usage.five_hour.utilization * 100;
+  const sevenDayPct = usage.seven_day.utilization * 100;
+  
+  const fiveHourColor = getColorForPercentage(fiveHourPct);
+  const sevenDayColor = getColorForPercentage(sevenDayPct);
+  
+  const fiveHourReset = formatResetTime(usage.five_hour.reset);
+  const sevenDayReset = formatResetTime(usage.seven_day.reset);
+  
+  const fiveHourResetColor = getResetColor(usage.five_hour.reset);
+  const sevenDayResetColor = getResetColor(usage.seven_day.reset);
+  
+  const fiveHourPace = calculate5HourPace(usage.five_hour.utilization, usage.five_hour.reset);
+  const sevenDayPace = calculate7DayPace(usage.seven_day.utilization, usage.seven_day.reset);
+  
+  const fiveHourDiffColor = getDiffColor(fiveHourPace.diff);
+  const sevenDayDiffColor = getDiffColor(sevenDayPace.diff);
+  
+  const fiveHourPctStr = fiveHourPct.toFixed(2) + '%';
+  const sevenDayPctStr = sevenDayPct.toFixed(2) + '%';
+  
+  const fiveHourDiffStr = (fiveHourPace.diff >= 0 ? '+' : '') + fiveHourPace.diff.toFixed(2) + '%';
+  const sevenDayDiffStr = (sevenDayPace.diff >= 0 ? '+' : '') + sevenDayPace.diff.toFixed(2) + '%';
+  
+  // Pastel color palette
+  const headerColor = chalk.hex('#9CA3AF');  // Gray 400 - header
+  const labelColor = chalk.hex('#6B7280');   // Gray 500 - period labels
+  const bulletColor = chalk.hex('#9CA3AF');  // Gray 400 - bullets
+  
+  console.log(headerColor('Usage:'));
+  console.log(`  ${labelColor('Hourly (5h)')} ${bulletColor('·')} ${chalk.hex(fiveHourColor)(fiveHourPctStr)} ${bulletColor('•')} ${chalk.hex(fiveHourDiffColor)(fiveHourPace.status)} ${chalk.hex(fiveHourDiffColor)(`(${fiveHourDiffStr} ${fiveHourPace.diff >= 0 ? 'ahead' : 'behind'})`)} ${bulletColor('•')} ${chalk.hex(fiveHourResetColor)(fiveHourReset)}`);
+  console.log(`  ${labelColor('Weekly (7d)')} ${bulletColor('·')} ${chalk.hex(sevenDayColor)(sevenDayPctStr)} ${bulletColor('•')} ${chalk.hex(sevenDayDiffColor)(sevenDayPace.status)} ${chalk.hex(sevenDayDiffColor)(`(${sevenDayDiffStr} ${sevenDayPace.diff >= 0 ? 'ahead' : 'behind'})`)} ${bulletColor('•')} ${chalk.hex(sevenDayResetColor)(sevenDayReset)}`);
 }
 
 /**
@@ -160,20 +473,33 @@ function formatResetTime(resetTimestamp: number): string {
  */
 async function main() {
   try {
-    // Read OAuth token from credentials file
-    const accessToken = await readToken();
-
-    // Fetch usage data from API headers
-    const usage = await fetchUsage(accessToken);
-
-    // Format and display
-    const fiveHourPct = Math.round(usage.five_hour.utilization * 100);
-    const sevenDayPct = Math.round(usage.seven_day.utilization * 100);
+    const spinner = new Spinner();
     
-    const fiveHourReset = formatResetTime(usage.five_hour.reset);
-    const sevenDayReset = formatResetTime(usage.seven_day.reset);
+    if (VERBOSE) {
+      console.log(chalk.hex('#6B7280')('=== Debug: Configuration ==='));
+      console.log(chalk.hex('#9CA3AF')('Credentials path:'), CREDENTIALS_PATH);
+      console.log(chalk.hex('#9CA3AF')('Verbose mode:'), VERBOSE);
+      console.log();
+    }
+    
+    const accessToken = await readToken();
+    
+    if (VERBOSE) {
+      console.log(chalk.hex('#6B7280')('=== Debug: Authentication ==='));
+      console.log(chalk.hex('#9CA3AF')('Token loaded:'), `${accessToken.substring(0, 20)}...${accessToken.substring(accessToken.length - 10)}`);
+      console.log(chalk.hex('#9CA3AF')('Token length:'), accessToken.length);
+      console.log();
+    }
 
-    console.log(`5h: ${fiveHourPct}% ${fiveHourReset} | 7d: ${sevenDayPct}% ${sevenDayReset}`);
+    if (!VERBOSE) {
+      spinner.start('Fetching usage data...');
+    }
+    const usage = await fetchUsage(accessToken);
+    if (!VERBOSE) {
+      spinner.stop();
+    }
+
+    formatOutput(usage);
 
   } catch (error) {
     if (error instanceof Error) {
