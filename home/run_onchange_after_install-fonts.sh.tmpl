@@ -1,0 +1,30 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# Font Installer Hook
+# Runs automatically when fonts.toml changes
+#
+# fonts.toml hash: {{ include "dot_config/fontconfig/fonts.toml" | sha256sum }}
+
+set -eu
+
+echo "chezmoi: Font configuration changed, installing fonts..."
+
+SCRIPT="$HOME/.local/bin/install-fonts.ts"
+
+if [ ! -f "$SCRIPT" ]; then
+    echo "chezmoi: Font installer not found at $SCRIPT"
+    echo "chezmoi: Run 'chezmoi apply' again after the script is installed"
+    exit 0
+fi
+
+if ! command -v bun &> /dev/null; then
+    echo "chezmoi: bun not found, skipping font installation"
+    echo "chezmoi: Install bun and run 'chezmoi apply' again"
+    exit 0
+fi
+
+# Run the font installer
+bun "$SCRIPT"
+
+echo "chezmoi: Font installation complete"
+{{ end -}}
