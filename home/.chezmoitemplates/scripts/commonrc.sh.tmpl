@@ -170,6 +170,10 @@ wt() {
 
 # SSH key management (keychain loads keys once per WSL session)
 eval `keychain --quiet --eval --agents ssh ~/.ssh/id_rsa`
+{{- else }}
+
+# Native Linux browser (use Vivaldi)
+export BROWSER=vivaldi-stable
 {{ end }}
 
 # atuin (magical shell history with sync)

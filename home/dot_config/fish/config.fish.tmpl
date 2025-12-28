@@ -26,8 +26,20 @@ if test "$TERM_PROGRAM" = "vscode"
     end
 end
 
-# fzf key bindings (if fzf.fish plugin installed via Fisher)
-# Note: This is handled automatically by Fisher plugin
+# fzf.fish configuration (PatrickF1/fzf.fish via Fisher)
+if functions -q fzf_configure_bindings
+    # Remap CTRL+V (variables) to Alt+Ctrl+V to avoid paste conflict
+    # Disable history (--history=) to let Atuin keep CTRL+R
+    fzf_configure_bindings --variables=\e\cv --history=
+
+    # Always include hidden files (dotfiles) in searches
+    set -g fzf_fd_opts --hidden
+
+    # Directory search: Ctrl+I toggles gitignored files
+    set -g fzf_directory_opts \
+        --header 'C-i: toggle ignored' \
+        --bind 'ctrl-i:reload(fd --type f --hidden --no-ignore)+change-prompt(+ignored > )'
+end
 
 # Load custom functions from ~/.config/fish/functions/
 # (Fish does this automatically, no explicit sourcing needed)

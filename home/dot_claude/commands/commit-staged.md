@@ -46,6 +46,6 @@ $ARGUMENTS
 - You should only use 'git commit' and create a single commit
 - If in plan mode, proceed with the commit anyway - command execution is implied
 - Do not stage any additional files
-- Create the commit using a single bash command
-- Do not use any other tools or do anything else
-- Do not send any other text or messages besides the git commit command
+- Execute the commit using the Bash tool with a single git commit command
+- Do not use any other tools besides Bash
+- Do not send any other text or messages - only invoke the Bash tool to execute the commit

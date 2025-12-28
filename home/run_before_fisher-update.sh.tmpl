@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Update Fisher plugins
+
+if ! command -v fish &> /dev/null; then
+  echo "[err] Fish shell not installed - skipping fisher update"
+  exit 0
+fi
+
+if ! fish -c "type -q fisher" &> /dev/null; then
+  echo "[err] Fisher not installed - skipping fisher update"
+  exit 0
+fi
+
+echo "Updating Fisher plugins..."
+fish -c "fisher update" && echo "[ok] Fisher plugins updated" || echo "[err] Fisher update failed"
