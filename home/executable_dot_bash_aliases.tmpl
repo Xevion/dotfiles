@@ -16,8 +16,10 @@ alias chlg='lazygit --path ~/.local/share/chezmoi'
 alias es='exec $SHELL'
 
 # Chezmoi
-alias cha='chezmoi apply --interactive'
+alias cha='chezmoi apply'
+alias chai='chezmoi apply --interactive'
 alias ch='chezmoi'
+alias cdc='chezmoi cd'
 chshow() {
     target=$(find {{ .chezmoi.sourceDir | quote }} -name "*.tmpl" -type f | fzf)
     cat $target | chezmoi execute-template

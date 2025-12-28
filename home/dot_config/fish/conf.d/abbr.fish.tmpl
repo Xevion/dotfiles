@@ -20,8 +20,10 @@ abbr -a chlg 'lazygit --path ~/.local/share/chezmoi'
 abbr -a es 'exec fish'
 
 # Chezmoi
-abbr -a cha 'chezmoi apply --interactive'
+abbr -a cha 'chezmoi apply'
+abbr -a chai 'chezmoi apply --interactive'
 abbr -a ch 'chezmoi'
+alias cdc='chezmoi cd'
 
 # Remote Management
 abbr -a romanlog "ssh roman 'tail -F /var/log/syslog' --lines 100"
