@@ -2,16 +2,6 @@
 
 /**
  * claude-usage - Fast CLI tool to fetch Anthropic Claude usage percentages
- * 
- * Requirements:
- * - Bun runtime
- * - ~/.claude/.credentials.json with valid OAuth token
- * 
- * Usage:
- *   claude-usage
- *   cu          # alias
- *   usage       # alias
- *   ccu         # alias (claude-check-usage)
  */
 
 import { existsSync } from 'fs';
@@ -20,7 +10,8 @@ import { homedir } from 'os';
 import chalk from 'chalk';
 
 // Configuration
-const CREDENTIALS_PATH = join(homedir(), '.claude', '.credentials.json');
+const CLAUDE_CODE_PATH = join(homedir(), '.claude', '.credentials.json');
+const OPENCODE_PATH = join(homedir(), '.local', 'share', 'opencode', 'auth.json');
 
 // Parse CLI flags
 const args = process.argv.slice(2);
@@ -36,10 +27,25 @@ interface UsageData {
   seven_day: UsagePeriod;
 }
 
-interface Credentials {
+interface ClaudeCodeCredentials {
   claudeAiOauth?: {
     accessToken?: string;
   };
+}
+
+interface OpenCodeAuth {
+  anthropic?: {
+    type: string;
+    access?: string;
+    refresh?: string;
+    expires?: number;
+  };
+}
+
+interface TokenResult {
+  token: string;
+  source: 'claude-code' | 'opencode';
+  expiresAt?: number;
 }
 
 interface PaceResult {
@@ -144,30 +150,133 @@ class Spinner {
 }
 
 /**
- * Read OAuth token from credentials file
+ * Read OAuth token from credentials files (checks both Claude Code and OpenCode)
  */
-async function readToken(): Promise<string> {
-  if (!existsSync(CREDENTIALS_PATH)) {
-    throw new Error(`Credentials file not found: ${CREDENTIALS_PATH}\nPlease run 'claude setup-token' first.`);
+async function readToken(): Promise<TokenResult> {
+  const errors: string[] = [];
+  
+  // Try OpenCode first (likely to be more up-to-date)
+  if (existsSync(OPENCODE_PATH)) {
+    try {
+      const fileContent = Bun.file(OPENCODE_PATH);
+      const auth: OpenCodeAuth = await fileContent.json() as OpenCodeAuth;
+      
+      const token = auth.anthropic?.access;
+      if (token) {
+        const expiresAt = auth.anthropic?.expires;
+        
+        // Check if token is expired
+        if (expiresAt && expiresAt < Date.now()) {
+          errors.push(`OpenCode token found but expired (expired at ${new Date(expiresAt).toLocaleString()})`);
+        } else {
+          return {
+            token,
+            source: 'opencode',
+            expiresAt
+          };
+        }
+      } else {
+        errors.push(`OpenCode auth file exists but no Anthropic access token found`);
+      }
+    } catch (error) {
+      errors.push(`Failed to read OpenCode auth: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
   }
-
-  const fileContent = Bun.file(CREDENTIALS_PATH);
-  const credentials: Credentials = await fileContent.json() as Credentials;
-
-  const token = credentials.claudeAiOauth?.accessToken;
-  if (!token) {
-    throw new Error('No access token found in credentials file. Please run \'claude setup-token\' to authenticate.');
+  
+  // Try Claude Code
+  if (existsSync(CLAUDE_CODE_PATH)) {
+    try {
+      const fileContent = Bun.file(CLAUDE_CODE_PATH);
+      const credentials: ClaudeCodeCredentials = await fileContent.json() as ClaudeCodeCredentials;
+      
+      const token = credentials.claudeAiOauth?.accessToken;
+      if (token) {
+        return {
+          token,
+          source: 'claude-code'
+        };
+      } else {
+        errors.push('Claude Code credentials file exists but no access token found');
+      }
+    } catch (error) {
+      errors.push(`Failed to read Claude Code credentials: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
   }
+  
+  // No valid tokens found
+  const errorMsg = [
+    'No valid OAuth token found.',
+    '',
+    'Checked locations:',
+    `  • OpenCode: ${OPENCODE_PATH}`,
+    `  • Claude Code: ${CLAUDE_CODE_PATH}`,
+  ];
+  
+  if (errors.length > 0) {
+    errorMsg.push('', 'Details:');
+    errors.forEach(err => errorMsg.push(`  • ${err}`));
+  }
+  
+  throw new Error(errorMsg.join('\n'));
+}
 
-  return token;
+/**
+ * Get human-readable status message from HTTP status code
+ */
+function getStatusMessage(status: number): string {
+  const statusMessages: Record<number, string> = {
+    400: 'Bad Request',
+    401: 'Unauthorized',
+    403: 'Forbidden',
+    404: 'Not Found',
+    429: 'Rate Limited',
+    500: 'Internal Server Error',
+    502: 'Bad Gateway',
+    503: 'Service Unavailable',
+  };
+  return statusMessages[status] || 'Unknown Error';
+}
+
+/**
+ * Format API error with enhanced details
+ */
+function formatApiError(status: number, url: string, accessToken: string, responseText: string, tokenSource?: string): string {
+  const statusMsg = getStatusMessage(status);
+  const tokenPreview = `${accessToken.substring(0, 8)}...${accessToken.substring(accessToken.length - 4)}`;
+  
+  let errorDetails = '';
+  try {
+    const errorJson = JSON.parse(responseText);
+    
+    // Extract key fields for compact display
+    const errorType = errorJson.error?.type || errorJson.type || 'unknown';
+    const errorMessage = errorJson.error?.message || errorJson.message || 'No message';
+    
+    errorDetails = chalk.hex('#E89999')(`  ${chalk.bold('Type:')} ${errorType}\n`);
+    errorDetails += chalk.hex('#F4B8A4')(`  ${chalk.bold('Message:')} ${errorMessage}`);
+  } catch {
+    // If not JSON, show raw text (truncated)
+    const truncated = responseText.length > 150 ? responseText.substring(0, 150) + '...' : responseText;
+    errorDetails = chalk.hex('#F4B8A4')(`  ${truncated}`);
+  }
+  
+  const lines = [
+    chalk.hex('#E89999')(`${chalk.bold('API Error:')} ${status} ${statusMsg}`),
+    chalk.hex('#9CA3AF')(`  ${chalk.bold('URL:')} ${url}`),
+    chalk.hex('#9CA3AF')(`  ${chalk.bold('Token:')} ${tokenPreview}${tokenSource ? ` (from ${tokenSource})` : ''}`),
+    errorDetails
+  ];
+  
+  return lines.join('\n');
 }
 
 /**
  * Fetch usage data by making an API request and reading rate limit headers
  * This request matches what Claude Code sends for checking limit
  */
-async function fetchUsage(accessToken: string): Promise<UsageData> {
+async function fetchUsage(accessToken: string, tokenSource?: string): Promise<UsageData> {
   const userId = generateUserId(accessToken);
+  const apiUrl = 'https://api.anthropic.com/v1/messages?beta=true';
   
   const requestBody = {
     model: 'claude-haiku-4-5-20251001',
@@ -199,7 +308,7 @@ async function fetchUsage(accessToken: string): Promise<UsageData> {
   
   if (VERBOSE) {
     console.log(chalk.hex('#6B7280')('\n=== Debug: API Request ==='));
-    console.log(chalk.hex('#9CA3AF')('URL:'), 'https://api.anthropic.com/v1/messages?beta=true');
+    console.log(chalk.hex('#9CA3AF')('URL:'), apiUrl);
     console.log(chalk.hex('#9CA3AF')('Method:'), 'POST');
     console.log(chalk.hex('#9CA3AF')('Headers:'), JSON.stringify(requestHeaders, null, 2));
     console.log(chalk.hex('#9CA3AF')('Body:'), JSON.stringify(requestBody, null, 2));
@@ -207,7 +316,7 @@ async function fetchUsage(accessToken: string): Promise<UsageData> {
   }
   
   // Make the exact same request Claude Code makes for checking limit
-  const response = await fetch('https://api.anthropic.com/v1/messages?beta=true', {
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Accept': 'application/json',
@@ -227,7 +336,7 @@ async function fetchUsage(accessToken: string): Promise<UsageData> {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`API request failed (${response.status}): ${text.substring(0, 200)}`);
+    throw new Error(formatApiError(response.status, apiUrl, accessToken, text, tokenSource));
   }
 
   // Extract rate limit headers from response
@@ -472,29 +581,36 @@ function formatOutput(usage: UsageData): void {
  * Main entry point
  */
 async function main() {
+  const spinner = new Spinner();
+  
   try {
-    const spinner = new Spinner();
-    
     if (VERBOSE) {
       console.log(chalk.hex('#6B7280')('=== Debug: Configuration ==='));
-      console.log(chalk.hex('#9CA3AF')('Credentials path:'), CREDENTIALS_PATH);
+      console.log(chalk.hex('#9CA3AF')('Claude Code path:'), CLAUDE_CODE_PATH);
+      console.log(chalk.hex('#9CA3AF')('OpenCode path:'), OPENCODE_PATH);
       console.log(chalk.hex('#9CA3AF')('Verbose mode:'), VERBOSE);
       console.log();
     }
     
-    const accessToken = await readToken();
+    const tokenResult = await readToken();
     
     if (VERBOSE) {
       console.log(chalk.hex('#6B7280')('=== Debug: Authentication ==='));
-      console.log(chalk.hex('#9CA3AF')('Token loaded:'), `${accessToken.substring(0, 20)}...${accessToken.substring(accessToken.length - 10)}`);
-      console.log(chalk.hex('#9CA3AF')('Token length:'), accessToken.length);
+      console.log(chalk.hex('#9CA3AF')('Token source:'), tokenResult.source);
+      console.log(chalk.hex('#9CA3AF')('Token loaded:'), `${tokenResult.token.substring(0, 20)}...${tokenResult.token.substring(tokenResult.token.length - 10)}`);
+      console.log(chalk.hex('#9CA3AF')('Token length:'), tokenResult.token.length);
+      if (tokenResult.expiresAt) {
+        const expiresDate = new Date(tokenResult.expiresAt);
+        const isExpired = tokenResult.expiresAt < Date.now();
+        console.log(chalk.hex('#9CA3AF')('Token expires:'), expiresDate.toLocaleString(), isExpired ? chalk.hex('#E89999')('(EXPIRED)') : chalk.hex('#9DCCB4')('(valid)'));
+      }
       console.log();
     }
 
     if (!VERBOSE) {
       spinner.start('Fetching usage data...');
     }
-    const usage = await fetchUsage(accessToken);
+    const usage = await fetchUsage(tokenResult.token, tokenResult.source);
     if (!VERBOSE) {
       spinner.stop();
     }
@@ -502,8 +618,10 @@ async function main() {
     formatOutput(usage);
 
   } catch (error) {
+    spinner.stop();
+    
     if (error instanceof Error) {
-      console.error(`Error: ${error.message}`);
+      console.error(error.message);
     } else {
       console.error('Error: Unknown error occurred');
     }
