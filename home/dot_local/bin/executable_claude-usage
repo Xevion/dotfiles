@@ -164,7 +164,7 @@ async function readToken(): Promise<string> {
 
 /**
  * Fetch usage data by making an API request and reading rate limit headers
- * This request matches what Claude Code sends for checking quota
+ * This request matches what Claude Code sends for checking limit
  */
 async function fetchUsage(accessToken: string): Promise<UsageData> {
   const userId = generateUserId(accessToken);
@@ -175,7 +175,7 @@ async function fetchUsage(accessToken: string): Promise<UsageData> {
     messages: [
       {
         role: 'user',
-        content: 'quota',
+        content: 'limit',
       },
     ],
     metadata: {
@@ -206,7 +206,7 @@ async function fetchUsage(accessToken: string): Promise<UsageData> {
     console.log();
   }
   
-  // Make the exact same request Claude Code makes for checking quota
+  // Make the exact same request Claude Code makes for checking limit
   const response = await fetch('https://api.anthropic.com/v1/messages?beta=true', {
     method: 'POST',
     headers: {
@@ -269,14 +269,14 @@ async function fetchUsage(accessToken: string): Promise<UsageData> {
 }
 
 /**
- * Get pastel color for ahead/behind pace difference
+ * Get pastel color for ahead/under pace difference
  */
 function getDiffColor(diffPct: number): string {
   if (diffPct > 15) return '#E89999';      // Soft red - way ahead
   if (diffPct > 5) return '#F4B8A4';       // Soft orange - ahead
   if (diffPct >= -5) return '#E8D4A2';     // Soft yellow - on track
-  if (diffPct >= -15) return '#B8D99A';    // Soft lime - behind (good)
-  return '#A5D8DD';                        // Soft cyan - well under
+  if (diffPct >= -15) return '#B8D99A';    // Soft lime - below (good)
+  return '#A5D8DD';                        // Soft cyan - well under limit
 }
 
 /**
@@ -301,7 +301,7 @@ function getPaceStatus(diffPct: number): string {
   if (diffPct > 5) return 'slightly elevated';
   if (diffPct >= -5) return 'on track';
   if (diffPct >= -15) return 'comfortable margin';
-  return 'well under quota';
+  return 'well under limit';
 }
 
 /**
@@ -464,8 +464,8 @@ function formatOutput(usage: UsageData): void {
   const bulletColor = chalk.hex('#9CA3AF');  // Gray 400 - bullets
   
   console.log(headerColor('Usage:'));
-  console.log(`  ${labelColor('Hourly (5h)')} ${bulletColor('·')} ${chalk.hex(fiveHourColor)(fiveHourPctStr)} ${bulletColor('•')} ${chalk.hex(fiveHourDiffColor)(fiveHourPace.status)} ${chalk.hex(fiveHourDiffColor)(`(${fiveHourDiffStr} ${fiveHourPace.diff >= 0 ? 'ahead' : 'behind'})`)} ${bulletColor('•')} ${chalk.hex(fiveHourResetColor)(fiveHourReset)}`);
-  console.log(`  ${labelColor('Weekly (7d)')} ${bulletColor('·')} ${chalk.hex(sevenDayColor)(sevenDayPctStr)} ${bulletColor('•')} ${chalk.hex(sevenDayDiffColor)(sevenDayPace.status)} ${chalk.hex(sevenDayDiffColor)(`(${sevenDayDiffStr} ${sevenDayPace.diff >= 0 ? 'ahead' : 'behind'})`)} ${bulletColor('•')} ${chalk.hex(sevenDayResetColor)(sevenDayReset)}`);
+  console.log(`  ${labelColor('Hourly (5h)')} ${bulletColor('·')} ${chalk.hex(fiveHourColor)(fiveHourPctStr)} ${bulletColor('•')} ${chalk.hex(fiveHourDiffColor)(fiveHourPace.status)} ${chalk.hex(fiveHourDiffColor)(`(${fiveHourDiffStr} ${fiveHourPace.diff >= 0 ? 'ahead' : 'under'})`)} ${bulletColor('•')} ${chalk.hex(fiveHourResetColor)(fiveHourReset)}`);
+  console.log(`  ${labelColor('Weekly (7d)')} ${bulletColor('·')} ${chalk.hex(sevenDayColor)(sevenDayPctStr)} ${bulletColor('•')} ${chalk.hex(sevenDayDiffColor)(sevenDayPace.status)} ${chalk.hex(sevenDayDiffColor)(`(${sevenDayDiffStr} ${sevenDayPace.diff >= 0 ? 'ahead' : 'below'})`)} ${bulletColor('•')} ${chalk.hex(sevenDayResetColor)(sevenDayReset)}`);
 }
 
 /**
