@@ -73,6 +73,7 @@
 	renameLimit = 10000
 	renames = true
 	renameThreshold = 25
+	noprefix = false
 
 [init]
 	defaultBranch = master
@@ -82,3 +83,6 @@
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
+[status]
+	showUntrackedFiles = all
+	submoduleSummary = true
