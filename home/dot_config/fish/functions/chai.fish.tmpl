@@ -23,7 +23,7 @@ function chai --description "Interactive chezmoi apply with fzf diff preview"
         --with-nth=4 \
         --nth=1 \
         --prompt='Apply Changes > ' \
-        --preview='chezmoi diff {1} 2>/dev/null | bat -pp --color=always --language=diff' \
+        --preview='chezmoi diff ~/{1} 2>/dev/null | bat -pp --color=always --language=diff' \
         --preview-window=right:60%:wrap \
         --multi \
         --bind='ctrl-a:toggle-all' \

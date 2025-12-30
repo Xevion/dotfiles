@@ -949,8 +949,8 @@ alias romanlog = ssh roman 'tail -F /var/log/syslog' --lines 100
 
 # Other aliases
 alias gpt = chatgpt
-alias copilot = gh copilot
-alias suggest = gh copilot suggest -t shell
+alias copilot = copilot
+alias suggest = copilot -p "suggest:" --allow-all-tools
 alias spt = spotify_player
 {{ if eq .chezmoi.os "linux" }}
 alias mousefix = sudo udevadm trigger
