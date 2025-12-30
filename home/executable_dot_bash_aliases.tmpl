@@ -29,10 +29,6 @@ alias cha='chezmoi apply'
 alias chai='chezmoi apply --interactive'
 alias ch='chezmoi'
 alias cdc='chezmoi cd'
-chshow() {
-    target=$(find {{ .chezmoi.sourceDir | quote }} -name "*.tmpl" -type f | fzf)
-    cat $target | chezmoi execute-template
-}
 
 # Remote Management
 alias romanlog="ssh roman 'tail -F /var/log/syslog' --lines 100"
@@ -158,3 +154,41 @@ alias gsts='git stash save'
 
 # Git log find by commit message
 function glf() { git log --all --grep="$1"; }
+
+# fzf abbreviation/alias search
+if command -v fzf-abbr-search.ts &> /dev/null && command -v fzf &> /dev/null; then
+    fzf_search_abbr() {
+        local result key selected
+        result=$(fzf-abbr-search.ts | fzf \
+            --ansi \
+            --height=50% \
+            --reverse \
+            --delimiter=$'\t' \
+            --with-nth=4 \
+            --nth=1,2 \
+            --prompt='Aliases > ' \
+            --preview='echo {2}' \
+            --preview-window=up:3:wrap \
+            --expect='tab' \
+            --header='Enter: insert name | Tab: insert expansion')
+        
+        if [ -n "$result" ]; then
+            # First line is key, second line is selected
+            key=$(echo "$result" | head -n1)
+            selected=$(echo "$result" | tail -n1)
+            
+            if [ -n "$selected" ]; then
+                if [ "$key" = "tab" ]; then
+                    # Insert expansion (field 2)
+                    READLINE_LINE="${READLINE_LINE:0:$READLINE_POINT}$(echo "$selected" | cut -f2)${READLINE_LINE:$READLINE_POINT}"
+                else
+                    # Insert name (field 1)
+                    READLINE_LINE="${READLINE_LINE:0:$READLINE_POINT}$(echo "$selected" | cut -f1)${READLINE_LINE:$READLINE_POINT}"
+                fi
+            fi
+        fi
+    }
+    
+    # Bind to Alt+A
+    bind -x '"\ea": fzf_search_abbr'
+fi
