@@ -14,7 +14,7 @@ function chshow --description "Browse chezmoi managed files with fzf preview"
         --with-nth=4 \
         --nth=1,2 \
         --prompt='Chezmoi Files > ' \
-        --preview='chezmoi cat {1} 2>/dev/null || echo "Preview unavailable"' \
+        --preview='chezmoi cat {1} 2>/dev/null | bat -pp --color=always --file-name={1} 2>/dev/null || echo "Preview unavailable"' \
         --preview-window=right:60%:wrap \
         --expect='ctrl-e' \
         --header='Enter: view | Ctrl+E: edit source')
