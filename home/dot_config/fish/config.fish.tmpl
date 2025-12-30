@@ -44,6 +44,12 @@ end
 # Load custom functions from ~/.config/fish/functions/
 # (Fish does this automatically, no explicit sourcing needed)
 
+# Custom keybindings
+if functions -q fzf_search_abbr
+    bind \ea fzf_search_abbr  # Alt+A: Search abbreviations/aliases
+    bind -M insert \ea fzf_search_abbr  # Also bind in insert mode
+end
+
 # Load abbreviations
 if test -f ~/.config/fish/conf.d/abbr.fish
     source ~/.config/fish/conf.d/abbr.fish
