@@ -19,7 +19,7 @@ fallback = "Noto Serif"
 
 [mono]
 # Monospace fonts for code and terminals
-primary = "Iosevka"
+primary = "Fira Code"
 fallback = "JetBrains Mono"
 
 [emoji]
