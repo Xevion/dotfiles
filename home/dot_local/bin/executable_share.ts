@@ -39,6 +39,27 @@ interface UploadResult {
   size: number;
 }
 
+type FixMode = 'never' | 'prompt' | 'always';
+
+interface MediaIssue {
+  id: string;
+  description: string;
+  severity: 'error' | 'warning';
+  autoFix: boolean; // true = instant/lossless, false = slow/lossy
+  fix: (buffer: Buffer) => Promise<Buffer>;
+}
+
+interface ProbeResult {
+  issues: MediaIssue[];
+  metadata: Record<string, unknown>;
+}
+
+interface VideoProbe {
+  duration: number | null;
+  codec: string | null;
+  hasFaststart: boolean;
+}
+
 type TimeoutHandle = ReturnType<typeof setTimeout>;
 type IntervalHandle = ReturnType<typeof setInterval>;
 
@@ -62,7 +83,10 @@ const SIZE_THRESHOLDS = {
   image: 10 * 1024 * 1024,
   video: 50 * 1024 * 1024,
   binary: 100 * 1024 * 1024,
+  reencodeAuto: 10 * 1024 * 1024, // Auto re-encode incompatible codecs below this size
 };
+
+const INCOMPATIBLE_VIDEO_CODECS = ['hevc', 'h265', 'av1'];
 
 const COLORS = {
   spinner: ['#A5D8DD', '#9DCCB4', '#B8D99A', '#E8D4A2', '#F4B8A4', '#F5A6A6'],
@@ -84,6 +108,7 @@ const MIME_EXTENSIONS: Record<string, string> = {
   'image/tiff': 'tiff',
   'image/heic': 'heic',
   'image/heif': 'heif',
+  'image/avif': 'avif',
   'video/mp4': 'mp4',
   'video/webm': 'webm',
   'video/quicktime': 'mov',
@@ -103,6 +128,7 @@ const EXTENSION_MIMES: Record<string, string> = {
   'tiff': 'image/tiff',
   'heic': 'image/heic',
   'heif': 'image/heif',
+  'avif': 'image/avif',
   'mp4': 'video/mp4',
   'webm': 'video/webm',
   'mov': 'video/quicktime',
@@ -508,6 +534,368 @@ async function cleanupTempFiles(...paths: string[]): Promise<void> {
   }
 }
 
+// ============================================================================
+// Media Validation
+// ============================================================================
+
+async function hasCommand(cmd: string): Promise<boolean> {
+  try {
+    await $`which ${cmd}`.quiet();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function writeTempFile(buffer: Buffer, ext = ''): Promise<string> {
+  const path = join(tmpdir(), `share-probe-${nanoid(8)}${ext}`);
+  await Bun.write(path, buffer);
+  return path;
+}
+
+function parseFixMode(value: string | undefined): FixMode {
+  if (!value) return 'prompt';
+  const v = value.toLowerCase();
+  if (v.startsWith('n')) return 'never';
+  if (v.startsWith('a')) return 'always';
+  return 'prompt';
+}
+
+function isAudioMime(mime: string): boolean {
+  return mime.startsWith('audio/');
+}
+
+async function probeVideoMetadata(buffer: Buffer): Promise<VideoProbe | null> {
+  if (!await hasCommand('ffprobe')) {
+    debug('ffprobe not found, skipping video validation');
+    return null;
+  }
+
+  const tmpPath = await writeTempFile(buffer);
+  try {
+    const result = await $`ffprobe -v error -show_format -show_streams -of json ${tmpPath}`.json();
+    const format = result.format || {};
+    const videoStream = result.streams?.find((s: { codec_type: string }) => s.codec_type === 'video');
+
+    // Check for faststart by looking at format tags or probing atom order
+    // A proper check would require parsing the file, but we can infer from tags
+    const hasFaststart = format.tags?.major_brand === 'isom' ||
+      format.format_name?.includes('mov') && format.tags?.compatible_brands?.includes('isom');
+
+    return {
+      duration: format.duration ? parseFloat(format.duration) : null,
+      codec: videoStream?.codec_name?.toLowerCase() || null,
+      hasFaststart: !!hasFaststart,
+    };
+  } catch (e) {
+    debug('ffprobe failed', e instanceof Error ? e.message : String(e));
+    return null;
+  } finally {
+    await cleanupTempFiles(tmpPath);
+  }
+}
+
+async function probeVideo(buffer: Buffer): Promise<ProbeResult | null> {
+  const probe = await probeVideoMetadata(buffer);
+  if (!probe) return null;
+
+  const issues: MediaIssue[] = [];
+
+  // Missing duration metadata - remux fixes this and also adds faststart
+  if (probe.duration === null) {
+    issues.push({
+      id: 'missing-duration',
+      description: 'Missing duration metadata',
+      severity: 'error',
+      autoFix: true,
+      fix: remuxVideo,
+    });
+    // Skip faststart check since remux handles it
+  } else if (!probe.hasFaststart) {
+    // Only check faststart if duration exists (otherwise remux already handles it)
+    issues.push({
+      id: 'missing-faststart',
+      description: 'MP4 not optimized for streaming',
+      severity: 'warning',
+      autoFix: true,
+      fix: addFaststart,
+    });
+  }
+
+  // Incompatible codec - this is separate since it requires re-encoding
+  if (probe.codec && INCOMPATIBLE_VIDEO_CODECS.includes(probe.codec)) {
+    const isSmall = buffer.length < SIZE_THRESHOLDS.reencodeAuto;
+    issues.push({
+      id: 'incompatible-codec',
+      description: `Codec '${probe.codec}' has limited browser/Discord support`,
+      severity: 'warning',
+      autoFix: isSmall,
+      fix: reencodeVideo,
+    });
+  }
+
+  return { issues, metadata: probe };
+}
+
+async function probeImage(_buffer: Buffer, mime: string): Promise<ProbeResult | null> {
+  const issues: MediaIssue[] = [];
+
+  if (mime === 'image/heic' || mime === 'image/heif') {
+    issues.push({
+      id: 'heic-compat',
+      description: 'HEIC not supported in browsers',
+      severity: 'error',
+      autoFix: true,
+      fix: convertImageToJpeg,
+    });
+  }
+
+  if (mime === 'image/avif') {
+    issues.push({
+      id: 'avif-compat',
+      description: 'AVIF has limited browser support',
+      severity: 'warning',
+      autoFix: true,
+      fix: convertImageToWebp,
+    });
+  }
+
+  return issues.length > 0 ? { issues, metadata: { originalMime: mime } } : null;
+}
+
+async function probeAudio(buffer: Buffer): Promise<ProbeResult | null> {
+  if (!await hasCommand('ffprobe')) {
+    debug('ffprobe not found, skipping audio validation');
+    return null;
+  }
+
+  const tmpPath = await writeTempFile(buffer);
+  try {
+    const result = await $`ffprobe -v error -show_format -of json ${tmpPath}`.json();
+    const format = result.format || {};
+    const issues: MediaIssue[] = [];
+
+    if (!format.duration || format.duration === 'N/A') {
+      issues.push({
+        id: 'missing-duration',
+        description: 'Missing duration metadata',
+        severity: 'error',
+        autoFix: true,
+        fix: remuxAudio,
+      });
+    }
+
+    return issues.length > 0 ? { issues, metadata: format } : null;
+  } catch (e) {
+    debug('ffprobe failed for audio', e instanceof Error ? e.message : String(e));
+    return null;
+  } finally {
+    await cleanupTempFiles(tmpPath);
+  }
+}
+
+async function validateMedia(buffer: Buffer, mimeType: string): Promise<ProbeResult | null> {
+  if (isVideoMime(mimeType)) {
+    return probeVideo(buffer);
+  } else if (isImageMime(mimeType)) {
+    return probeImage(buffer, mimeType);
+  } else if (isAudioMime(mimeType)) {
+    return probeAudio(buffer);
+  }
+  return null;
+}
+
+async function applyFixes(
+  buffer: Buffer,
+  mimeType: string,
+  issues: MediaIssue[],
+  mode: FixMode,
+  skipPrompts: boolean
+): Promise<{ buffer: Buffer; mimeType: string; applied: string[] }> {
+  if (mode === 'never' || issues.length === 0) {
+    for (const issue of issues) {
+      log(`Skipped: ${issue.description}`, 'dim');
+    }
+    return { buffer, mimeType, applied: [] };
+  }
+
+  const applied: string[] = [];
+
+  for (const issue of issues) {
+    const shouldAuto = mode === 'always' || (mode === 'prompt' && issue.autoFix);
+
+    if (shouldAuto) {
+      log(`Fixing: ${issue.description}`, 'info');
+      buffer = await issue.fix(buffer);
+      applied.push(issue.id);
+    } else if (mode === 'prompt') {
+      if (skipPrompts) {
+        log(`Skipped: ${issue.description}`, 'dim');
+        continue;
+      }
+
+      const proceed = await confirm(`Fix: ${issue.description}?`);
+      if (proceed) {
+        buffer = await issue.fix(buffer);
+        applied.push(issue.id);
+      }
+    }
+  }
+
+  // Update mimeType based on applied fixes
+  if (applied.includes('heic-compat')) {
+    mimeType = 'image/jpeg';
+  } else if (applied.includes('avif-compat')) {
+    mimeType = 'image/webp';
+  } else if (applied.includes('incompatible-codec')) {
+    mimeType = 'video/mp4';
+  }
+
+  return { buffer, mimeType, applied };
+}
+
+// ============================================================================
+// Media Fix Functions
+// ============================================================================
+
+async function remuxVideo(buffer: Buffer): Promise<Buffer> {
+  const spinner = new Spinner();
+  spinner.start('Remuxing video...');
+
+  const inputPath = await writeTempFile(buffer);
+  const outputPath = join(tmpdir(), `share-remux-${nanoid(8)}.webm`);
+
+  try {
+    // Remux without re-encoding, adding faststart for MP4
+    await $`ffmpeg -y -i ${inputPath} -c copy -fflags +genpts ${outputPath}`.quiet();
+
+    const result = Buffer.from(await Bun.file(outputPath).arrayBuffer());
+    spinner.stop();
+    log('Fixed video metadata', 'success');
+    return result;
+  } catch (e) {
+    spinner.stop();
+    throw new Error(`Video remux failed: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    await cleanupTempFiles(inputPath, outputPath);
+  }
+}
+
+async function addFaststart(buffer: Buffer): Promise<Buffer> {
+  const spinner = new Spinner();
+  spinner.start('Optimizing for streaming...');
+
+  const inputPath = await writeTempFile(buffer);
+  const outputPath = join(tmpdir(), `share-faststart-${nanoid(8)}.mp4`);
+
+  try {
+    await $`ffmpeg -y -i ${inputPath} -c copy -movflags +faststart ${outputPath}`.quiet();
+
+    const result = Buffer.from(await Bun.file(outputPath).arrayBuffer());
+    spinner.stop();
+    log('Optimized for streaming', 'success');
+    return result;
+  } catch (e) {
+    spinner.stop();
+    throw new Error(`Faststart optimization failed: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    await cleanupTempFiles(inputPath, outputPath);
+  }
+}
+
+async function reencodeVideo(buffer: Buffer): Promise<Buffer> {
+  const spinner = new Spinner();
+  spinner.start('Re-encoding video for compatibility...');
+
+  const inputPath = await writeTempFile(buffer);
+  const outputPath = join(tmpdir(), `share-reencode-${nanoid(8)}.mp4`);
+
+  try {
+    await $`ffmpeg -y -i ${inputPath} -c:v libx264 -crf 23 -preset medium -c:a aac -b:a 128k -movflags +faststart ${outputPath}`.quiet();
+
+    const result = Buffer.from(await Bun.file(outputPath).arrayBuffer());
+    spinner.stop();
+    log('Re-encoded to H.264', 'success');
+    return result;
+  } catch (e) {
+    spinner.stop();
+    throw new Error(`Video re-encode failed: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    await cleanupTempFiles(inputPath, outputPath);
+  }
+}
+
+async function remuxAudio(buffer: Buffer): Promise<Buffer> {
+  const spinner = new Spinner();
+  spinner.start('Fixing audio metadata...');
+
+  const inputPath = await writeTempFile(buffer);
+  // Detect format and use same extension
+  const outputPath = join(tmpdir(), `share-audio-${nanoid(8)}.mka`);
+
+  try {
+    await $`ffmpeg -y -i ${inputPath} -c copy ${outputPath}`.quiet();
+
+    const result = Buffer.from(await Bun.file(outputPath).arrayBuffer());
+    spinner.stop();
+    log('Fixed audio metadata', 'success');
+    return result;
+  } catch (e) {
+    spinner.stop();
+    throw new Error(`Audio remux failed: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    await cleanupTempFiles(inputPath, outputPath);
+  }
+}
+
+async function convertImageToJpeg(buffer: Buffer): Promise<Buffer> {
+  const spinner = new Spinner();
+  spinner.start('Converting to JPEG...');
+
+  const inputPath = await writeTempFile(buffer);
+  const outputPath = join(tmpdir(), `share-convert-${nanoid(8)}.jpg`);
+
+  try {
+    await $`convert ${inputPath} -quality 90 ${outputPath}`.quiet();
+
+    const result = Buffer.from(await Bun.file(outputPath).arrayBuffer());
+    spinner.stop();
+    log('Converted to JPEG', 'success');
+    return result;
+  } catch (e) {
+    spinner.stop();
+    throw new Error(`JPEG conversion failed: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    await cleanupTempFiles(inputPath, outputPath);
+  }
+}
+
+async function convertImageToWebp(buffer: Buffer): Promise<Buffer> {
+  const spinner = new Spinner();
+  spinner.start('Converting to WebP...');
+
+  const inputPath = await writeTempFile(buffer);
+  const outputPath = join(tmpdir(), `share-convert-${nanoid(8)}.webp`);
+
+  try {
+    await $`convert ${inputPath} -quality 85 ${outputPath}`.quiet();
+
+    const result = Buffer.from(await Bun.file(outputPath).arrayBuffer());
+    spinner.stop();
+    log('Converted to WebP', 'success');
+    return result;
+  } catch (e) {
+    spinner.stop();
+    throw new Error(`WebP conversion failed: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    await cleanupTempFiles(inputPath, outputPath);
+  }
+}
+
+// ============================================================================
+// Original Conversion Functions (kept for -c flag compatibility)
+// ============================================================================
+
 async function convertImage(buffer: Buffer, fromMime: string, shouldConvert: boolean): Promise<Buffer> {
   const needsConversion = fromMime === 'image/bmp' ||
     (shouldConvert && (fromMime === 'image/heic' || fromMime === 'image/heif' || fromMime === 'image/tiff'));
@@ -668,6 +1056,7 @@ async function main() {
     options: {
       verbose: { type: 'boolean', short: 'v' },
       convert: { type: 'boolean', short: 'c' },
+      fix: { type: 'string', short: 'F' },
       yes: { type: 'boolean', short: 'y' },
       name: { type: 'string', short: 'n' },
       help: { type: 'boolean', short: 'h' },
@@ -687,16 +1076,32 @@ ${chalk.hex(COLORS.label)('Arguments:')}
 
 ${chalk.hex(COLORS.label)('Options:')}
   -v, --verbose       Enable debug output
-  -c, --convert       Convert media before upload (ImageMagick/ffmpeg)
+  -c, --convert       Convert media before upload (re-encode video, etc.)
+  -F, --fix <mode>    Fix media issues: n=never, p=prompt (default), a=always
   -y, --yes           Skip confirmation prompts
   -n, --name <name>   Custom filename (without extension)
   -h, --help          Show this help
+
+${chalk.hex(COLORS.label)('Fix Modes:')}
+  -Fn, --fix=never    Skip all fixes, upload as-is
+  -Fp, --fix=prompt   Auto-fix quick/lossless, prompt for slow/lossy (default)
+  -Fa, --fix=always   Apply all fixes automatically
+
+${chalk.hex(COLORS.label)('Media Fixes (auto-applied by default):')}
+  • Missing video duration/metadata (remux)
+  • MP4 streaming optimization (faststart)
+  • HEIC/AVIF browser compatibility (convert to JPEG/WebP)
+
+${chalk.hex(COLORS.label)('Media Fixes (prompted or with -Fa):')}
+  • Video re-encoding for codec compatibility (H.265/AV1 → H.264)
+  • Large file optimizations
 
 ${chalk.hex(COLORS.label)('Examples:')}
   share                      # Upload clipboard content
   share screenshot.png       # Upload specific file
   cat file.txt | share       # Upload from stdin
-  share -c large-video.mov   # Convert then upload
+  share -c large-video.mov   # Convert/re-encode then upload
+  share -Fa video.webm       # Fix all issues automatically
 
 ${chalk.hex(COLORS.label)('Environment Variables:')}
   R2_ENDPOINT              S3-compatible endpoint URL
@@ -746,6 +1151,33 @@ ${chalk.hex(COLORS.label)('Environment Variables:')}
       filename = `${baseName}-${nanoid(8)}.${ext}`;
     }
 
+    // Determine fix mode: -c implies -Fa (always fix), otherwise parse -F flag
+    const fixMode = values.convert ? 'always' : parseFixMode(values.fix);
+
+    // Validate and fix media issues
+    if (fixMode !== 'never') {
+      const probeResult = await validateMedia(buffer, mimeType);
+
+      if (probeResult && probeResult.issues.length > 0) {
+        debug('Media issues detected', probeResult.metadata);
+
+        const fixResult = await applyFixes(
+          buffer,
+          mimeType,
+          probeResult.issues,
+          fixMode,
+          values.yes || false
+        );
+
+        buffer = fixResult.buffer;
+        mimeType = fixResult.mimeType;
+
+        if (fixResult.applied.length > 0) {
+          debug('Applied fixes', fixResult.applied);
+        }
+      }
+    }
+
     if (!values.yes) {
       let needsConfirm = false;
       let reason = '';
@@ -770,14 +1202,12 @@ ${chalk.hex(COLORS.label)('Environment Variables:')}
       }
     }
 
-    if (isImageMime(mimeType)) {
-      buffer = await convertImage(buffer, mimeType, values.convert || false);
-      if (mimeType === 'image/bmp') {
-        mimeType = 'image/png';
-      } else if (values.convert && (mimeType === 'image/heic' || mimeType === 'image/heif')) {
-        mimeType = 'image/jpeg';
-      }
+    // Legacy conversion path: BMP always converts, -c triggers full re-encode
+    if (isImageMime(mimeType) && mimeType === 'image/bmp') {
+      buffer = await convertImage(buffer, mimeType, false);
+      mimeType = 'image/png';
     } else if (isVideoMime(mimeType) && values.convert) {
+      // Full video conversion (re-encode with scaling, etc.) only with -c
       buffer = await convertVideo(buffer);
       mimeType = 'video/mp4';
     }
