@@ -34,7 +34,8 @@ async function getStatus(): Promise<StatusEntry[]> {
     process.exit(1);
   }
 
-  const lines = result.text().trim().split("\n").filter(Boolean);
+  // Don't trim() - it removes leading spaces which are part of the status format
+  const lines = result.text().split("\n").filter(line => line.length > 0);
   
   if (lines.length === 0) {
     // No changes - this is a success, not an error
