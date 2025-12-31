@@ -4,6 +4,11 @@
 # Disable greeting
 set -g fish_greeting
 
+# Display reminder banner for interactive shells
+if status is-interactive
+    {{ template "scripts/reminder-banner.tmpl" dict "shell" "fish" }}
+end
+
 {{- if .wsl }}
 if status is-login
     and status is-interactive

@@ -1,0 +1,56 @@
+{{- /* Reminder banner for interactive shells */ -}}
+{{- /* Shows files in ~/reminders/ when opening a new terminal */ -}}
+{{- if eq .shell "fish" }}
+# Display reminder banner if files exist in ~/reminders/
+if test -d ~/reminders
+    set -l reminder_files (ls -1 ~/reminders 2>/dev/null)
+    set -l reminder_count (count $reminder_files)
+    
+    if test $reminder_count -gt 0
+        # Detect Nerd Font support (kitty, wezterm, alacritty, vscode, Windows Terminal)
+        set -l icon "Reminders:"
+        if set -q KITTY_WINDOW_ID; or set -q WEZTERM_EXECUTABLE; or set -q ALACRITTY_SOCKET; \
+           or test "$TERM_PROGRAM" = "vscode"; or set -q WT_SESSION
+            set icon (printf "\uf435")
+        end
+        
+        if test $reminder_count -eq 1
+            echo "$icon $reminder_files[1]"
+        else
+            # Build comma-separated list and truncate to 80 chars
+            set -l file_list (string join ", " $reminder_files)
+            if test (string length "$file_list") -gt 80
+                set file_list (string sub -l 77 "$file_list")"..."
+            end
+            echo "$icon $reminder_count reminders: $file_list"
+        end
+    end
+end
+{{- else if eq .shell "bash" }}
+# Display reminder banner if files exist in ~/reminders/
+if [ -d ~/reminders ]; then
+    mapfile -t reminder_files < <(ls -1 ~/reminders 2>/dev/null)
+    reminder_count=${#reminder_files[@]}
+    
+    if [ $reminder_count -gt 0 ]; then
+        # Detect Nerd Font support (kitty, wezterm, alacritty, vscode, Windows Terminal)
+        icon="Reminders:"
+        if [ -n "$KITTY_WINDOW_ID" ] || [ -n "$WEZTERM_EXECUTABLE" ] || [ -n "$ALACRITTY_SOCKET" ] || \
+           [ "$TERM_PROGRAM" = "vscode" ] || [ -n "$WT_SESSION" ]; then
+            icon=$'\uf435'
+        fi
+        
+        if [ $reminder_count -eq 1 ]; then
+            echo "$icon ${reminder_files[0]}"
+        else
+            # Build comma-separated list and truncate to 80 chars
+            file_list=$(printf '%s, ' "${reminder_files[@]}")
+            file_list="${file_list%, }"  # Remove trailing comma+space
+            if [ ${#file_list} -gt 80 ]; then
+                file_list="${file_list:0:77}..."
+            fi
+            echo "$icon $reminder_count reminders: $file_list"
+        fi
+    fi
+fi
+{{- end }}
