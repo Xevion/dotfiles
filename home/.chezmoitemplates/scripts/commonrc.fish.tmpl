@@ -88,6 +88,9 @@ test -d $HOME/.opencode/bin && set -a paths_to_add $HOME/.opencode/bin
 # pulumi
 test -d $HOME/.pulumi/bin && set -a paths_to_add $HOME/.pulumi/bin
 
+# humanlog
+test -d $HOME/.humanlog/bin && set -a paths_to_add $HOME/.humanlog/bin
+
 # dotnet
 if test -d $HOME/.dotnet
     set -gx DOTNET_ROOT $HOME/.dotnet
@@ -102,6 +105,10 @@ end
 
 # Batch add all collected paths (single PATH reconstruction instead of 17+ calls)
 test -n "$paths_to_add[1]" && fish_add_path $paths_to_add
+# foundry (appended to PATH - lower priority)
+if test -d $HOME/.foundry/bin
+    set -gx PATH $PATH $HOME/.foundry/bin
+end
 
 # Note: Fish uses mise (via conf.d/mise.fish) for unified version management.
 # Bash uses mise as well, falling back to legacy managers if needed.

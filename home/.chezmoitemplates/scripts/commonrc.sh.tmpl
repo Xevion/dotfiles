@@ -84,6 +84,12 @@ esac
 # Pulumi (Infrastructure as Code)
 [ -d "$HOME/.pulumi/bin" ] && export PATH="$PATH:$HOME/.pulumi/bin"
 
+# humanlog (JSON log formatting)
+[ -d "$HOME/.humanlog/bin" ] && export PATH="$PATH:$HOME/.humanlog/bin"
+
+# Foundry (Ethereum development framework - appended to PATH)
+[ -d "$HOME/.foundry/bin" ] && export PATH="$PATH:$HOME/.foundry/bin"
+
 # .NET SDK
 if [ -d "$HOME/.dotnet" ]; then
   export DOTNET_ROOT="$HOME/.dotnet"
