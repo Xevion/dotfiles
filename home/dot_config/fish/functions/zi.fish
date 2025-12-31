@@ -4,6 +4,12 @@ function zi --description "zoxide interactive smart cd"
     if not set -q __zoxide_initialized
         set -g __zoxide_initialized 1
 
+        # Configure fzf options for zoxide interactive mode
+        set -gx _ZO_FZF_OPTS '
+  --preview="lsd -1 --color=always --icon=always {2..}"
+  --preview-window=down,30%
+'
+
         # Run zoxide init
         if command -q zoxide
             zoxide init fish | source
