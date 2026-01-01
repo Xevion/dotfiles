@@ -26,8 +26,6 @@ set -l paths_to_add
 test -d $HOME/.hishtory && set -a paths_to_add $HOME/.hishtory
 test -d $HOME/bin && set -a paths_to_add $HOME/bin
 set -a paths_to_add /usr/local/bin $HOME/.local/bin
-test -d /usr/local/go/bin && set -a paths_to_add /usr/local/go/bin  # Go
-test -d $HOME/go/bin && set -a paths_to_add $HOME/go/bin  # Go-installed tools
 test -d $HOME/.local/share/bob/nvim-bin && set -a paths_to_add $HOME/.local/share/bob/nvim-bin  # Bob, Neovim package manager
 
 # Deno (conditionally source env file or add to path list)

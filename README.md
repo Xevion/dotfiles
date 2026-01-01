@@ -17,6 +17,7 @@ This repository is not intended for others, but is kept public in the spirit of 
 Documentation, references, etc.
 
 - [www.chezmoi.io][chezmoi]
+- [Symlink Patterns](docs/symlink-patterns.md) - Guide to symlink organization and patterns
 
 ## Important Commands
 

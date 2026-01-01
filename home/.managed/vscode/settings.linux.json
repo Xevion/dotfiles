@@ -1,0 +1,160 @@
+{
+  // Editor Settings
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "editor.fontFamily": "Iosevka",
+  "editor.inlineSuggest.enabled": true,
+  "editor.linkedEditing": true,
+  "editor.minimap.showSlider": "always",
+  "diffEditor.renderSideBySide": false,
+
+  // Workbench Settings
+  "workbench.startupEditor": "none",
+  "workbench.tree.indent": 24,
+  "workbench.colorTheme": "GitHub Light",
+  "workbench.iconTheme": "material-icon-theme",
+
+  // Window Settings
+  "window.autoDetectHighContrast": false,
+  "window.autoDetectColorScheme": true,
+
+  // Terminal Settings
+  "terminal.integrated.commandsToSkipShell": [
+    "-workbench.action.quickOpenView"
+  ],
+  "terminal.integrated.fontFamily": "Iosevka Nerd Font Mono",
+  "terminal.integrated.enablePersistentSessions": false,
+  "terminal.integrated.defaultProfile.linux": "fish",
+  "terminal.integrated.profiles.linux": {
+    "bash": {
+      "path": "bash",
+      "icon": "terminal-bash"
+    },
+    "fish": {
+      "path": "fish"
+    },
+    "tmux": {
+      "path": "tmux",
+      "icon": "terminal-tmux"
+    },
+    "pwsh": {
+      "path": "pwsh",
+      "icon": "terminal-powershell"
+    }
+  },
+
+  // File Explorer Settings
+  "explorer.confirmDragAndDrop": false,
+  "explorer.confirmDelete": false,
+  "files.associations": {
+    "*.dialogue": "plaintext"
+  },
+
+  // Git Settings
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.openRepositoryInParentFolders": "always",
+
+  // Security Settings
+  "security.workspace.trust.untrustedFiles": "open",
+
+  // cSpell Settings (from Windows config)
+  "cSpell.ignorePaths": [
+    "package-lock.json",
+    "node_modules",
+    "vscode-extension",
+    ".git/{info,lfs,logs,refs,objects}/**",
+    ".git/{index,*refs,*HEAD}",
+    ".vscode",
+    ".vscode-insiders"
+  ],
+  "cSpell.userWords": [
+    "asgi",
+    "astro",
+    "automations",
+    "autoprefixer",
+    "Behaviour",
+    "Boids",
+    "Caddyfile",
+    "coloors",
+    "Colour",
+    "Debugw",
+    "dotenv",
+    "Errorw",
+    "esbuild",
+    "factorio",
+    "fastapi",
+    "gnueabihf",
+    "groq",
+    "Hackathon",
+    "hypercorn",
+    "imfucked",
+    "jsdoc",
+    "jsdom",
+    "Lerp",
+    "logfile",
+    "Mathf",
+    "microcontroller",
+    "nodelib",
+    "openrgb",
+    "pickone",
+    "pipx",
+    "pkgjs",
+    "plasteel",
+    "proxying",
+    "psycopg",
+    "pydantic",
+    "pyenv",
+    "rdap",
+    "rehype",
+    "resliced",
+    "RFID",
+    "Runnerspace",
+    "Tauri",
+    "undelete",
+    "uvicorn",
+    "vite",
+    "vitejs",
+    "wakatime",
+    "Xevion"
+  ],
+
+  // Language-specific Formatters
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[scss]": {
+    "editor.defaultFormatter": "sibiraj-s.vscode-scss-formatter"
+  },
+  "[python]": {
+    "editor.formatOnType": true,
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  "[go]": {
+    "editor.defaultFormatter": "golang.go"
+  },
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+  },
+  "[astro]": {
+    "editor.defaultFormatter": "astro-build.astro-vscode"
+  },
+  "[caddyfile]": {
+    "editor.defaultFormatter": "matthewpi.caddyfile-support"
+  },
+  "[shellscript]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format"
+  }
+}

@@ -1,5 +1,9 @@
+# Symlinked config sources (stored in .managed/, not copied to home)
+.managed
+
+# Build/validation scripts (called by chezmoi hooks, not managed files)
 hooks
-tool-versions
+
 claude-settings.json
 
 {{/* WSL Only Files */}}
