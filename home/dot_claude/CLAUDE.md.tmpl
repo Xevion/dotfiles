@@ -70,6 +70,46 @@ When I make obvious mistakes, point them out with gentle humor or playful teasin
 - Look for project-specific commands first (`just check`, `just test`, etc.)
 - Always prefer project-specific check commands over raw `cargo` or `npm` commands
 
+## Command Execution
+
+### Check --help Before Unfamiliar Commands
+
+**Always check `<command> --help` when:**
+- Using a CLI for the first time in a session
+- Command fails unexpectedly or behaves differently than expected
+- You need to find non-interactive, quiet, or verbose flags
+- Working with tools that have version-specific behavior
+
+Even familiar commands may have different flags across versions. Your training data may not reflect the installed version.
+
+### Handle Interactive Prompts
+
+Many CLI tools prompt for input by default and will hang waiting for responses. Before running commands that might prompt:
+
+1. Check `--help` for non-interactive flags (`--yes`, `-y`, `--no-input`, `--assume-yes`, `--non-interactive`)
+2. Use those flags explicitly rather than hoping the tool detects non-TTY
+
+**Common patterns:**
+- `npx shadcn@latest add button --yes --overwrite`
+- `apt install -y package`
+- `npm init -y`
+
+### Output Limiting - Use Judgment
+
+Don't reflexively pipe through `head`/`tail`. Only limit output when you're confident you don't need the excluded portion.
+
+**Limit output when:**
+- Command has noisy interactive elements (progress spinners, live updates)
+- You specifically need only the end (e.g., build errors come last)
+- Output is genuinely massive and you need specific sections
+
+**Let full output through when:**
+- Output is moderate (<50-100 lines as rough guide)
+- You need comprehensive context to understand the result
+- Unsure what part matters - capture everything first, then re-run with limits if needed
+
+❌ Don't paginate across multiple invocations when one full capture would suffice
+
 ## Testing
 
 ### Test Organization
