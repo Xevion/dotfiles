@@ -31,6 +31,7 @@ key.txt
 .config/Code
 .config/Cursor
 .config/lazygit
+.config/zed
 
 {{ end }}
 
