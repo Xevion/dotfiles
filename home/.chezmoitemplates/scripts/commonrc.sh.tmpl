@@ -39,20 +39,9 @@ export HISHTORY_SERVER="https://hsh.{{ dopplerProjectJson.PRIVATE_DOMAIN }}"
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
 ## Package Managers
-# Homebrew (cached for performance - reduces startup time by ~14ms)
+# Homebrew
 if [ -f /home/linuxbrew/.linuxbrew/bin/brew ]; then
-  BREW_CACHE="$HOME/.cache/brew_env.sh"
-  BREW_BIN="/home/linuxbrew/.linuxbrew/bin/brew"
-
-  # Regenerate cache if: doesn't exist, >7 days old, or brew binary is newer
-  if [ ! -f "$BREW_CACHE" ] || \
-     [ $(( $(date +%s) - $(stat -c %Y "$BREW_CACHE" 2>/dev/null || echo 0) )) -gt 604800 ] || \
-     [ "$BREW_BIN" -nt "$BREW_CACHE" ]; then
-    mkdir -p "$(dirname "$BREW_CACHE")"
-    "$BREW_BIN" shellenv > "$BREW_CACHE" 2>/dev/null
-  fi
-
-  [ -f "$BREW_CACHE" ] && . "$BREW_CACHE"
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 fi
 
 ## JavaScript Ecosystem
