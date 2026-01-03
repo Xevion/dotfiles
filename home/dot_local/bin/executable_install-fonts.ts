@@ -49,11 +49,14 @@ interface FontDetails extends GoogleFont {
   variants: FontVariant[];
 }
 
+interface FontCategoryConfig {
+  primary: string;
+  fallback?: string;
+}
+
 interface FontConfig {
-  [category: string]: {
-    primary: string;
-    fallback?: string;
-  };
+  categories: Record<string, FontCategoryConfig>;
+  extras: string[];
 }
 
 interface FuseResult<T> {
@@ -67,7 +70,8 @@ interface FuseResult<T> {
 // ============================================================================
 
 const FONTS_DIR = join(homedir(), ".local", "share", "fonts");
-const CONFIG_PATH = join(homedir(), ".config", "fontconfig", "fonts.toml");
+// Meta-config location: chezmoi source dir, not deployed to filesystem
+const CONFIG_PATH = join(homedir(), ".local", "share", "chezmoi", "meta", "fonts.toml");
 const API_BASE = "https://gwfh.mranftl.com/api";
 const CACHE_FILE = join(homedir(), ".cache", "font-catalog.json");
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -81,6 +85,10 @@ interface GitHubFontConfig {
 }
 
 const GITHUB_FONTS: Record<string, GitHubFontConfig> = {
+  "ZedMono NF": {
+    repo: "ryanoasis/nerd-fonts",
+    assetPattern: /^ZedMono\.zip$/,
+  },
   Iosevka: {
     repo: "be5invis/Iosevka",
     assetPattern: /^PkgTTF-Iosevka-[\d.]+\.zip$/,
@@ -517,7 +525,7 @@ async function loadConfig(): Promise<FontConfig> {
   const content = await Bun.file(CONFIG_PATH).text();
 
   // Simple TOML parser for our specific format
-  const config: FontConfig = {};
+  const config: FontConfig = { categories: {}, extras: [] };
   let currentSection = "";
 
   for (const line of content.split("\n")) {
@@ -530,16 +538,33 @@ async function loadConfig(): Promise<FontConfig> {
     const sectionMatch = trimmed.match(/^\[(\w+)\]$/);
     if (sectionMatch) {
       currentSection = sectionMatch[1];
-      config[currentSection] = { primary: "" };
+      if (currentSection !== "extras") {
+        config.categories[currentSection] = { primary: "" };
+      }
       continue;
     }
 
-    // Key-value pair
+    // Handle [extras] section - array of fonts
+    if (currentSection === "extras") {
+      // Match: fonts = ["Font1", "Font2"]
+      const arrayMatch = trimmed.match(/^fonts\s*=\s*\[(.*)\]$/);
+      if (arrayMatch) {
+        const arrayContent = arrayMatch[1];
+        // Parse quoted strings from array
+        const fontMatches = arrayContent.matchAll(/"([^"]+)"/g);
+        for (const match of fontMatches) {
+          config.extras.push(match[1]);
+        }
+      }
+      continue;
+    }
+
+    // Key-value pair for category sections
     const kvMatch = trimmed.match(/^(\w+)\s*=\s*"([^"]+)"$/);
-    if (kvMatch && currentSection) {
+    if (kvMatch && currentSection && currentSection !== "extras") {
       const [, key, value] = kvMatch;
       if (key === "primary" || key === "fallback") {
-        config[currentSection][key] = value;
+        config.categories[currentSection][key] = value;
       }
     }
   }
@@ -630,12 +655,15 @@ async function installFromConfig(): Promise<void> {
     mkdirSync(FONTS_DIR, { recursive: true });
   }
 
-  // Collect all fonts to install
+  // Collect all fonts to install from categories
   const fontsToInstall: string[] = [];
-  for (const category of Object.values(config)) {
+  for (const category of Object.values(config.categories)) {
     if (category.primary) fontsToInstall.push(category.primary);
     if (category.fallback) fontsToInstall.push(category.fallback);
   }
+
+  // Add extras
+  fontsToInstall.push(...config.extras);
 
   // Remove duplicates
   const uniqueFonts = [...new Set(fontsToInstall)];

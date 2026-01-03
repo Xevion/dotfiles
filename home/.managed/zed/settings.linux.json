@@ -7,12 +7,19 @@
 // custom settings, run `zed: open default settings` from the
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
-  "base_keymap": "Cursor",
+  "vim_mode": false,
+  "icon_theme": "Material Icon Theme",
+  "use_system_path_prompts": false,
+  "base_keymap": "VSCode",
   "ui_font_size": 16,
   "buffer_font_size": 15,
+  "auto_signature_help": false,
   "theme": {
-    "mode": "dark",
+    "mode": "light",
     "light": "One Light",
-    "dark": "Gruvbox Dark Hard"
+    "dark": "Min Dark (Blurred)"
+  },
+  "terminal": {
+    "font_family": "ZedMono Nerd Font"
   }
 }

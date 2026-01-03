@@ -10,24 +10,38 @@
     "context": "Workspace",
     "bindings": {
       // "shift shift": "file_finder::Toggle"
-    }
+    },
   },
   {
     "context": "Editor && vim_mode == insert",
     "bindings": {
-      // "j k": "vim::NormalBefore"
-    }
+      "j k": "vim::NormalBefore",
+    },
   },
   {
     "context": "Editor",
     "bindings": {
-      "alt-pageup": "editor::HalfPageUp"
-    }
+      "alt-pageup": "editor::HalfPageUp",
+    },
   },
   {
     "context": "Editor",
     "bindings": {
-      "alt-pagedown": "editor::HalfPageDown"
-    }
-  }
+      "alt-pagedown": "editor::HalfPageDown",
+    },
+  },
+  {
+    "context": "Workspace",
+    "bindings": {
+      "ctrl-tab": "pane::ActivateNextItem",
+      "ctrl-shift-tab": "pane::ActivatePreviousItem",
+    },
+  },
+  {
+    "context": "Editor",
+    "bindings": {
+      "ctrl-alt-left": "pane::SwapItemLeft",
+      "ctrl-alt-right": "pane::SwapItemRight",
+    },
+  },
 ]

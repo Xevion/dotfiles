@@ -1,9 +1,9 @@
 {{ if eq .chezmoi.os "linux" -}}
 #!/bin/bash
 # Font Installer Hook
-# Runs automatically when fonts.toml changes
+# Runs automatically when meta/fonts.toml changes
 #
-# fonts.toml hash: {{ include "dot_config/fontconfig/fonts.toml" | sha256sum }}
+# fonts.toml hash: {{ include "../meta/fonts.toml" | sha256sum }}
 
 set -eu
 

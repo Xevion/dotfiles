@@ -1,0 +1,35 @@
+# Font Installation Meta-Config
+#
+# This file drives the install-fonts.ts script.
+# It is NOT deployed to the filesystem.
+#
+# Fonts are sourced from:
+# - Google Fonts (via google-webfonts-helper API)
+# - GitHub releases (for fonts like Iosevka, ZedMono NF)
+#
+# Run `install-fonts.ts --help` for manual usage.
+# Run `install-fonts.ts --search <query>` to find fonts.
+
+[ui]
+# Sans-serif fonts for user interface elements
+primary = "Inter"
+fallback = "Noto Sans"
+
+[serif]
+# Serif fonts for documents and reading
+primary = "Source Serif 4"
+fallback = "Noto Serif"
+
+[mono]
+# Monospace fonts for code and terminals
+primary = "Geist Mono"
+fallback = "JetBrains Mono"
+
+[emoji]
+# Emoji font for unicode emoji support
+primary = "Noto Color Emoji"
+
+[extras]
+# Additional fonts to install without category assignment
+# Useful for fonts needed by specific applications
+fonts = ["ZedMono NF"]
