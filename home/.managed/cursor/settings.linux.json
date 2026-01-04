@@ -12,7 +12,6 @@
   // Workbench Settings
   "workbench.startupEditor": "none",
   "workbench.tree.indent": 24,
-  "workbench.preferredLightColorTheme": "Cursor Light",
   "workbench.iconTheme": "material-icon-theme",
 
   // Window Settings

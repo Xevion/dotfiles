@@ -240,7 +240,8 @@
     "feature-dev@claude-code-plugins": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
     "ralph-wiggum@claude-plugins-official": true,
-    "superpowers@superpowers-marketplace": true
+    "superpowers@superpowers-marketplace": true,
+    "gopls-lsp@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true
 }

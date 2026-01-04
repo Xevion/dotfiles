@@ -15,9 +15,9 @@
   "buffer_font_size": 15,
   "auto_signature_help": false,
   "theme": {
-    "mode": "light",
+    "mode": "dark",
     "light": "One Light",
-    "dark": "Min Dark (Blurred)"
+    "dark": "One Dark"
   },
   "terminal": {
     "font_family": "ZedMono Nerd Font"
