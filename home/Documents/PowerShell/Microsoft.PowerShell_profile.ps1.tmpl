@@ -86,3 +86,7 @@ function cdp { Set-Location (Get-Clipboard) }
 if (Get-Command chezmoi -ErrorAction SilentlyContinue) {
     chezmoi completion powershell | Out-String | Invoke-Expression
 }
+
+if (Get-Command gh -ErrorAction SilentlyContinue) {
+    Invoke-Expression -Command $(gh completion -s powershell | Out-String)
+}

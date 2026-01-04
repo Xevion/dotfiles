@@ -66,6 +66,9 @@ esac
 # Spicetify (Spotify customization CLI)
 [ -d "$HOME/.spicetify" ] && export PATH="$PATH:$HOME/.spicetify"
 
+# JetBrains Toolbox (IDE launcher and updater)
+[ -d "$HOME/.local/share/JetBrains/Toolbox/scripts" ] && export PATH="$PATH:$HOME/.local/share/JetBrains/Toolbox/scripts"
+
 # Pulumi (Infrastructure as Code)
 [ -d "$HOME/.pulumi/bin" ] && export PATH="$PATH:$HOME/.pulumi/bin"
 
@@ -135,6 +138,9 @@ fi
 
 # chatgpt CLI completions
 command -v chatgpt &> /dev/null && . <(chatgpt --set-completions {{ .shell }})
+
+# GitHub CLI completions
+command -v gh &> /dev/null && eval "$(gh completion -s bash)"
 
 [ -f "$HOME/.bash_aliases" ] && . "$HOME/.bash_aliases"
 
