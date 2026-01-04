@@ -1,0 +1,57 @@
+# Delta Configuration - Dracula Theme
+[delta]
+    # Core Settings
+    navigate = true                      # n/N to jump between files
+    side-by-side = false                 # Unified diff (better for small changes)
+    line-numbers = true                  # Show line numbers
+    syntax-theme = Dracula               # Match Dracula theme
+    paging = never                       # Let lazygit handle paging
+
+    # Display Quality
+    true-color = always
+    hyperlinks = true
+    hyperlinks-file-link-format = "file://{path}"
+
+    # Line Number Styling (clearer format)
+    line-numbers-left-format = "{nm:>4} ⋮"   # Old file line
+    line-numbers-right-format = "{np:>4} │"  # New file line
+    line-numbers-left-style = "#6272a4"      # Dracula comment
+    line-numbers-right-style = "#6272a4"
+    line-numbers-minus-style = "#ff5555"     # Red for removed
+    line-numbers-plus-style = "#50fa7b"      # Green for added
+    line-numbers-zero-style = "#6272a4"      # Comment for unchanged
+
+    # Hunk Headers (the @@ lines)
+    hunk-header-style = file line-number syntax
+    hunk-header-decoration-style = "#bd93f9" box  # Purple box
+    hunk-header-line-number-style = "#f1fa8c"     # Yellow line numbers
+
+    # File Headers
+    file-style = "#ff79c6" bold            # Pink filename
+    file-decoration-style = "#ff79c6" ul   # Underline
+
+    # Diff Styling (subtle backgrounds)
+    minus-style = syntax "#3f2d3d"                    # Subtle red bg for deletions
+    minus-emph-style = syntax "#5f3746"               # Stronger red for changed parts
+    minus-non-emph-style = syntax auto
+    plus-style = syntax "#273a2e"                     # Subtle green bg for additions
+    plus-emph-style = syntax "#2f4f39"                # Stronger green for changed parts
+    plus-non-emph-style = syntax auto
+
+    # Whitespace Handling
+    whitespace-error-style = "#ff5555" reverse        # Highlight trailing whitespace
+
+    # Merge Conflict Styling
+    merge-conflict-begin-symbol = "⌃"
+    merge-conflict-end-symbol = "⌄"
+    merge-conflict-ours-diff-header-style = "#f1fa8c" bold
+    merge-conflict-theirs-diff-header-style = "#f1fa8c" bold italic
+
+[interactive]
+    diffFilter = delta --color-only --features=interactive
+
+[delta "interactive"]
+    keep-plus-minus-markers = false
+
+[diff]
+    colorMoved = default

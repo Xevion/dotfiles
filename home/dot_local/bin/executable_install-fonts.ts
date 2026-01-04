@@ -18,10 +18,6 @@ import { join, basename } from "node:path";
 import { parseArgs } from "node:util";
 import { $ } from "bun";
 
-// ============================================================================
-// Types
-// ============================================================================
-
 interface GoogleFont {
   id: string;
   family: string;
@@ -65,13 +61,16 @@ interface FuseResult<T> {
   score?: number;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 const FONTS_DIR = join(homedir(), ".local", "share", "fonts");
 // Meta-config location: chezmoi source dir, not deployed to filesystem
-const CONFIG_PATH = join(homedir(), ".local", "share", "chezmoi", "meta", "fonts.toml");
+const CONFIG_PATH = join(
+  homedir(),
+  ".local",
+  "share",
+  "chezmoi",
+  "meta",
+  "fonts.toml",
+);
 const API_BASE = "https://gwfh.mranftl.com/api";
 const CACHE_FILE = join(homedir(), ".cache", "font-catalog.json");
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -124,10 +123,6 @@ const CYAN = "\x1b[36m";
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 
-// ============================================================================
-// Logging
-// ============================================================================
-
 const log = {
   info: (msg: string) => console.log(`${BLUE}[info]${RESET} ${msg}`),
   success: (msg: string) => console.log(`${GREEN}[ok]${RESET} ${msg}`),
@@ -135,10 +130,6 @@ const log = {
   error: (msg: string) => console.log(`${RED}[error]${RESET} ${msg}`),
   step: (msg: string) => console.log(`${CYAN}>>>${RESET} ${msg}`),
 };
-
-// ============================================================================
-// Simple Fuzzy Matching (no external deps)
-// ============================================================================
 
 function fuzzyScore(needle: string, haystack: string): number {
   const n = needle.toLowerCase();
@@ -181,7 +172,7 @@ function fuzzySearch<T>(
   query: string,
   getKey: (item: T) => string,
   threshold = 0.3,
-  limit = 5
+  limit = 5,
 ): FuseResult<T>[] {
   const results: FuseResult<T>[] = [];
 
@@ -197,13 +188,9 @@ function fuzzySearch<T>(
     .slice(0, limit);
 }
 
-// ============================================================================
-// API Functions
-// ============================================================================
-
 async function fetchWithRetry(
   url: string,
-  retries = 3
+  retries = 3,
 ): Promise<Response | null> {
   for (let i = 0; i < retries; i++) {
     try {
@@ -267,14 +254,7 @@ async function fetchFontDetails(fontId: string): Promise<FontDetails | null> {
   return response.json();
 }
 
-// ============================================================================
-// Font Installation
-// ============================================================================
-
-async function downloadFont(
-  url: string,
-  destPath: string
-): Promise<boolean> {
+async function downloadFont(url: string, destPath: string): Promise<boolean> {
   try {
     const response = await fetchWithRetry(url);
     if (!response) return false;
@@ -287,10 +267,6 @@ async function downloadFont(
     return false;
   }
 }
-
-// ============================================================================
-// GitHub Font Installation (Iosevka, etc.)
-// ============================================================================
 
 interface GitHubRelease {
   tag_name: string;
@@ -330,7 +306,9 @@ async function installGitHubFont(fontName: string): Promise<boolean> {
 
   if (!asset) {
     log.error(`No matching asset found for ${fontName} in ${release.tag_name}`);
-    log.info(`Available assets: ${release.assets.map((a) => a.name).join(", ")}`);
+    log.info(
+      `Available assets: ${release.assets.map((a) => a.name).join(", ")}`,
+    );
     return false;
   }
 
@@ -364,7 +342,9 @@ async function installGitHubFont(fontName: string): Promise<boolean> {
   rmSync(zipPath, { force: true });
 
   const files = readdirSync(fontDir).filter((f) => f.endsWith(".ttf"));
-  log.success(`Installed ${fontName}: ${files.length} files (${release.tag_name})`);
+  log.success(
+    `Installed ${fontName}: ${files.length} files (${release.tag_name})`,
+  );
 
   return true;
 }
@@ -398,7 +378,7 @@ function weightToName(weight: number): string {
 
 async function installFont(
   fontName: string,
-  catalog: GoogleFont[]
+  catalog: GoogleFont[],
 ): Promise<boolean> {
   // Fuzzy search for the font
   const results = fuzzySearch(catalog, fontName, (f) => f.family, 0.3, 5);
@@ -413,7 +393,7 @@ async function installFont(
       fontName,
       (name) => name,
       0.3,
-      3
+      3,
     );
     if (githubMatches.length > 0) {
       const suggestions = githubMatches.map((r) => r.item).join(", ");
@@ -427,7 +407,7 @@ async function installFont(
       fontName,
       (f) => f.family,
       0.2,
-      5
+      5,
     );
     if (looseSuggestions.length > 0) {
       const suggestions = looseSuggestions.map((r) => r.item.family).join(", ");
@@ -442,7 +422,7 @@ async function installFont(
   // Warn if not an exact match
   if (font.family.toLowerCase() !== fontName.toLowerCase()) {
     log.warn(
-      `"${fontName}" matched to "${font.family}" (score: ${(bestMatch.score ?? 0).toFixed(2)})`
+      `"${fontName}" matched to "${font.family}" (score: ${(bestMatch.score ?? 0).toFixed(2)})`,
     );
   }
 
@@ -500,7 +480,7 @@ async function installFont(
   if (successCount > 0) {
     log.success(
       `Installed ${font.family}: ${successCount} files` +
-        (failCount > 0 ? ` (${failCount} failed)` : "")
+        (failCount > 0 ? ` (${failCount} failed)` : ""),
     );
     return true;
   } else {
@@ -512,10 +492,6 @@ async function installFont(
     return false;
   }
 }
-
-// ============================================================================
-// Configuration
-// ============================================================================
 
 async function loadConfig(): Promise<FontConfig> {
   if (!existsSync(CONFIG_PATH)) {
@@ -572,10 +548,6 @@ async function loadConfig(): Promise<FontConfig> {
   return config;
 }
 
-// ============================================================================
-// Main Commands
-// ============================================================================
-
 async function listFonts(): Promise<void> {
   const catalog = await fetchFontCatalog();
 
@@ -612,7 +584,7 @@ async function searchFonts(query: string): Promise<void> {
     query,
     (name) => name,
     0.2,
-    10
+    10,
   );
 
   if (results.length === 0 && githubResults.length === 0) {
@@ -627,7 +599,7 @@ async function searchFonts(query: string): Promise<void> {
     const fontName = result.item;
     const score = ((result.score ?? 0) * 100).toFixed(0);
     console.log(
-      `  ${GREEN}${fontName}${RESET} (monospace) - via GitHub [${score}% match]`
+      `  ${GREEN}${fontName}${RESET} (monospace) - via GitHub [${score}% match]`,
     );
   }
 
@@ -637,7 +609,7 @@ async function searchFonts(query: string): Promise<void> {
     const score = ((result.score ?? 0) * 100).toFixed(0);
     const variants = Array.isArray(font.variants) ? font.variants.length : "?";
     console.log(
-      `  ${GREEN}${font.family}${RESET} (${font.category}) - ${variants} variants [${score}% match]`
+      `  ${GREEN}${font.family}${RESET} (${font.category}) - ${variants} variants [${score}% match]`,
     );
   }
   console.log();
@@ -710,10 +682,6 @@ async function installFromConfig(): Promise<void> {
     console.log(`  ${RED}Failed:${RESET} ${failCount}`);
   }
 }
-
-// ============================================================================
-// Entry Point
-// ============================================================================
 
 async function main(): Promise<void> {
   const { values, positionals } = parseArgs({

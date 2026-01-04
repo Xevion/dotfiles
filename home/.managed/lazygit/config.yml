@@ -1,23 +1,137 @@
 gui:
+  # Dracula Theme - Official Colors
   theme:
     activeBorderColor:
-      - "#E97387"
+      - "#ff79c6" # Pink
       - bold
     inactiveBorderColor:
-      - "#a5adce"
-    optionsTextColor:
-      - "#8caaee"
-    selectedLineBgColor:
-      - "#ECCFD3"
-    cherryPickedCommitBgColor:
-      - "#51576d"
-    cherryPickedCommitFgColor:
-      - "#CFF2E2"
-    unstagedChangesColor:
-      - "#E97387"
-    defaultFgColor:
-      - "#6B6B6B"
+      - "#6272a4" # Comment
     searchingActiveBorderColor:
-      - "#e5c890"
+      - "#8be9fd" # Cyan
+      - bold
+    optionsTextColor:
+      - "#bd93f9" # Purple
+    selectedLineBgColor:
+      - "#44475a" # Current Line
+    inactiveViewSelectedLineBgColor:
+      - bold
+    cherryPickedCommitFgColor:
+      - "#8be9fd" # Cyan
+    cherryPickedCommitBgColor:
+      - "#44475a" # Current Line
+    markedBaseCommitFgColor:
+      - "#f1fa8c" # Yellow
+    markedBaseCommitBgColor:
+      - "#44475a" # Current Line
+    unstagedChangesColor:
+      - "#ff5555" # Red
+    defaultFgColor:
+      - "#f8f8f2" # Foreground
     authorColors:
-      "*": "#babbf1"
+      "*": "#bd93f9" # Unified purple for all authors
+  # Nerd Fonts
+  nerdFontsVersion: "3"
+  showFileIcons: true
+  # Visual Preferences
+  border: "rounded"
+  animateExplosion: true
+  # Info Density (Balanced)
+  showListFooter: true
+  showFileTree: true
+  showCommandLog: true
+  showBottomLine: true
+  showPanelJumps: true
+  commitHashLength: 8
+  showBranchCommitHash: false
+  showDivergenceFromBaseBranch: "arrowAndNumber"
+  # Disable Annoying Popups
+  skipDiscardChangeWarning: true
+  skipStashWarning: true
+  skipRewordInEditorWarning: true
+  showRandomTip: false
+  # Window Sizing
+  scrollHeight: 8
+  sidePanelWidth: 0.3333
+  expandFocusedSidePanel: false
+  # Commit Display
+  commitAuthorShortLength: 2
+  commitAuthorLongLength: 17
+git:
+  # Paging (use delta)
+  pagers:
+    - colorArg: always
+      pager: delta
+  # Auto-behaviors
+  autoFetch: true
+  autoRefresh: true
+  fetchAll: true
+  autoStageResolvedConflicts: true
+  # Commit Settings
+  commit:
+    signOff: false
+    autoWrapCommitMessage: true
+    autoWrapWidth: 72
+  # Log Display
+  log:
+    order: "topo-order"
+    showGraph: "always"
+    showWholeGraph: false
+  # Parsing
+  parseEmoji: true
+  # Copy Behavior
+  truncateCopiedCommitHashesTo: 12
+os:
+  edit: "micro {{filename}}"
+  editAtLine: "micro {{filename}}:{{line}}"
+  editAtLineAndWait: "micro {{filename}}:{{line}}"
+  editInTerminal: true
+update:
+  method: "never"
+confirmOnQuit: false
+quitOnTopLevelReturn: false
+disableStartupPopups: true
+promptToReturnFromSubprocess: false
+refresher:
+  refreshInterval: 2 # Fast refresh for file changes
+  fetchInterval: 60 # Fetch from remote every 60s
+customCommands:
+  - key: "a"
+    context: "commits"
+    description: "Show CI status for commit"
+    command: 'bash -c "gh run list --commit {{.SelectedCommit.Sha}} --json conclusion,status,name,updatedAt --jq ''if length == 0 then \"No CI runs found\" else .[] | \"\\(.name): \\(if .conclusion == \"success\" then \"✓\" elif .conclusion == \"failure\" then \"✗\" elif .status == \"in_progress\" then \"⏳\" else \"?\" end) \\(.conclusion // .status)\" end''"'
+    loadingText: "Checking CI status..."
+  - key: "A"
+    context: "commits"
+    description: "View CI logs for commit"
+    command: 'bash -c "RUN_ID=$(gh run list --commit {{.SelectedCommit.Sha}} --json databaseId -q ''.[0].databaseId''); if [ -n \"$RUN_ID\" ]; then gh run view $RUN_ID --log; else echo \"No CI runs found for this commit\"; fi"'
+    loadingText: "Loading CI logs..."
+  - key: "a"
+    context: "localBranches"
+    description: "Show CI status for branch"
+    command: 'bash -c "gh run list --branch {{.SelectedLocalBranch.Name}} -L 1 --json conclusion,status,name,updatedAt --jq ''if length == 0 then \"No CI runs for this branch\" else .[0] | \"Latest: \\(.name) - \\(if .conclusion == \"success\" then \"✓ Passed\" elif .conclusion == \"failure\" then \"✗ Failed\" elif .status == \"in_progress\" then \"⏳ Running\" else .status end) (\\(.updatedAt))\" end''"'
+    loadingText: "Checking CI status..."
+  - key: "A"
+    context: "localBranches"
+    description: "View latest CI run for branch"
+    command: 'bash -c "RUN_ID=$(gh run list --branch {{.SelectedLocalBranch.Name}} -L 1 --json databaseId -q ''.[0].databaseId''); if [ -n \"$RUN_ID\" ]; then gh run view $RUN_ID --log; else echo \"No CI runs found for this branch\"; fi"'
+    loadingText: "Loading CI logs..."
+  - key: "w"
+    context: "files"
+    description: "Commit staged changes without pre-commit hooks"
+    prompts:
+      - type: "input"
+        title: "Commit message"
+        key: "message"
+    command: 'git commit --no-verify -m "{{.Form.message}}"'
+  - key: "o"
+    context: "commits"
+    description: "Open commit in GitHub"
+    command: "gh browse {{.SelectedCommit.Sha}}"
+  - key: "o"
+    context: "files"
+    description: "Open file in GitHub"
+    command: "gh browse {{.SelectedFile.Name}}"
+  - key: "<c-r>"
+    context: "localBranches"
+    description: "Create PR for branch"
+    command: "gh pr create --fill --web"
