@@ -72,10 +72,10 @@ const REQUIRED_ENV = [
   "R2_BUCKET",
 ];
 const ENV = {
-  endpoint: process.env.R2_ENDPOINT || "",
-  accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
-  secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
-  bucket: process.env.R2_BUCKET || "",
+  endpoint: "{{ dopplerProjectJson.R2_ENDPOINT }}",
+  accessKeyId: "{{ dopplerProjectJson.R2_ACCESS_KEY_ID }}",
+  secretAccessKey: "{{ dopplerProjectJson.R2_SECRET_ACCESS_KEY }}",
+  bucket: "{{ dopplerProjectJson.R2_BUCKET }}",
 };
 
 const TIMING = {

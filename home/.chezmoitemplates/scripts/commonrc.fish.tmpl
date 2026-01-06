@@ -11,12 +11,6 @@ set -gx TERM xterm-256color  # fixes terminal colors when ssh'ing into laptop
 
 set -gx OPENAI_API_KEY "{{ dopplerProjectJson.OPENAI_CHATGPT_CLI }}"
 
-# R2 configuration
-set -gx R2_ENDPOINT "{{ dopplerProjectJson.R2_ENDPOINT }}"
-set -gx R2_ACCESS_KEY_ID "{{ dopplerProjectJson.R2_ACCESS_KEY_ID }}"
-set -gx R2_SECRET_ACCESS_KEY "{{ dopplerProjectJson.R2_SECRET_ACCESS_KEY }}"
-set -gx R2_BUCKET "{{ dopplerProjectJson.R2_BUCKET }}"
-
 # Tools are organized in priority order (first = highest priority in PATH)
 # This order matches the Bash config for consistency
 # Batched for performance - reduces startup time by ~13ms
