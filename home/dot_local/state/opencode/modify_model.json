@@ -1,0 +1,68 @@
+#!/bin/bash
+# Ensure Anthropic 4.5 models are in OpenCode favorites
+
+SCRIPT=$(mktemp)
+trap "rm -f $SCRIPT" EXIT
+
+cat > "$SCRIPT" <<'TYPESCRIPT'
+import stableHash from "stable-hash@latest";
+
+interface ModelRef {
+  providerID: string;
+  modelID: string;
+}
+
+interface ModelState {
+  recent?: ModelRef[];
+  favorite?: ModelRef[];
+  variant?: Record<string, string>;
+}
+
+const REQUIRED_FAVORITES: ModelRef[] = [
+  { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+  { providerID: "anthropic", modelID: "claude-opus-4-5" },
+  { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
+];
+
+const originalText = await Bun.stdin.text();
+const hasTrailingNewline = originalText.endsWith('\n');
+const originalState: ModelState = originalText.trim() ? JSON.parse(originalText) : {};
+const originalHash = stableHash(originalState);
+
+const modifiedState: ModelState = JSON.parse(JSON.stringify(originalState));
+
+if (!Array.isArray(modifiedState.favorite)) {
+  modifiedState.favorite = [];
+}
+
+for (const required of REQUIRED_FAVORITES) {
+  const exists = modifiedState.favorite.some(
+    (fav) => fav.providerID === required.providerID && fav.modelID === required.modelID
+  );
+  if (!exists) {
+    modifiedState.favorite.push(required);
+  }
+}
+
+const modifiedHash = stableHash(modifiedState);
+
+// Only output changes if data actually changed
+if (originalHash === modifiedHash) {
+  process.stdout.write(originalText);
+} else {
+  // Preserve original formatting style (check for newlines in actual JSON, not trailing ones)
+  const isPrettified = originalText.trim().includes('\n');
+  const output = isPrettified 
+    ? JSON.stringify(modifiedState, null, 2)
+    : JSON.stringify(modifiedState);
+  
+  // Preserve trailing newline behavior
+  if (hasTrailingNewline) {
+    console.log(output);
+  } else {
+    process.stdout.write(output);
+  }
+}
+TYPESCRIPT
+
+exec bun "$SCRIPT"
