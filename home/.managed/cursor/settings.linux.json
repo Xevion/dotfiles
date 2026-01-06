@@ -2,7 +2,7 @@
   // Editor Settings
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,
-  "editor.fontFamily": "Iosevka",
+  "editor.fontFamily": "ZedMono NF",
   "editor.inlineSuggest.enabled": true,
   "editor.linkedEditing": true,
   "editor.minimap.showSlider": "always",
@@ -22,7 +22,6 @@
   "terminal.integrated.commandsToSkipShell": [
     "-workbench.action.quickOpenView"
   ],
-  "terminal.integrated.fontFamily": "Iosevka Nerd Font Mono",
   "terminal.integrated.enablePersistentSessions": false,
   "terminal.integrated.defaultProfile.windows": "PowerShell",
   "terminal.integrated.defaultProfile.linux": "fish (2)",
@@ -337,5 +336,6 @@
   "[svelte]": {
     "editor.defaultFormatter": "svelte.svelte-vscode"
   },
-  "claudeCode.preferredLocation": "panel"
+  "claudeCode.preferredLocation": "panel",
+  "terminal.integrated.fontLigatures.enabled": true
 }

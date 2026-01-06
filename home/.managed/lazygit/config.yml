@@ -95,26 +95,27 @@ refresher:
   refreshInterval: 2 # Fast refresh for file changes
   fetchInterval: 60 # Fetch from remote every 60s
 customCommands:
-  - key: "a"
-    context: "commits"
-    description: "Show CI status for commit"
-    command: 'bash -c "gh run list --commit {{.SelectedCommit.Sha}} --json conclusion,status,name,updatedAt --jq ''if length == 0 then \"No CI runs found\" else .[] | \"\\(.name): \\(if .conclusion == \"success\" then \"✓\" elif .conclusion == \"failure\" then \"✗\" elif .status == \"in_progress\" then \"⏳\" else \"?\" end) \\(.conclusion // .status)\" end''"'
-    loadingText: "Checking CI status..."
-  - key: "A"
-    context: "commits"
-    description: "View CI logs for commit"
-    command: 'bash -c "RUN_ID=$(gh run list --commit {{.SelectedCommit.Sha}} --json databaseId -q ''.[0].databaseId''); if [ -n \"$RUN_ID\" ]; then gh run view $RUN_ID --log; else echo \"No CI runs found for this commit\"; fi"'
-    loadingText: "Loading CI logs..."
-  - key: "a"
-    context: "localBranches"
-    description: "Show CI status for branch"
-    command: 'bash -c "gh run list --branch {{.SelectedLocalBranch.Name}} -L 1 --json conclusion,status,name,updatedAt --jq ''if length == 0 then \"No CI runs for this branch\" else .[0] | \"Latest: \\(.name) - \\(if .conclusion == \"success\" then \"✓ Passed\" elif .conclusion == \"failure\" then \"✗ Failed\" elif .status == \"in_progress\" then \"⏳ Running\" else .status end) (\\(.updatedAt))\" end''"'
-    loadingText: "Checking CI status..."
-  - key: "A"
-    context: "localBranches"
-    description: "View latest CI run for branch"
-    command: 'bash -c "RUN_ID=$(gh run list --branch {{.SelectedLocalBranch.Name}} -L 1 --json databaseId -q ''.[0].databaseId''); if [ -n \"$RUN_ID\" ]; then gh run view $RUN_ID --log; else echo \"No CI runs found for this branch\"; fi"'
-    loadingText: "Loading CI logs..."
+  # Disabled 'a' and 'A' keybinds
+  # - key: "a"
+  #   context: "commits"
+  #   description: "Show CI status for commit"
+  #   command: 'bash -c "gh run list --commit {{.SelectedCommit.Sha}} --json conclusion,status,name,updatedAt --jq ''if length == 0 then \"No CI runs found\" else .[] | \"\\(.name): \\(if .conclusion == \"success\" then \"✓\" elif .conclusion == \"failure\" then \"✗\" elif .status == \"in_progress\" then \"⏳\" else \"?\" end) \\(.conclusion // .status)\" end''"'
+  #   loadingText: "Checking CI status..."
+  # - key: "A"
+  #   context: "commits"
+  #   description: "View CI logs for commit"
+  #   command: 'bash -c "RUN_ID=$(gh run list --commit {{.SelectedCommit.Sha}} --json databaseId -q ''.[0].databaseId''); if [ -n \"$RUN_ID\" ]; then gh run view $RUN_ID --log; else echo \"No CI runs found for this commit\"; fi"'
+  #   loadingText: "Loading CI logs..."
+  # - key: "a"
+  #   context: "localBranches"
+  #   description: "Show CI status for branch"
+  #   command: 'bash -c "gh run list --branch {{.SelectedLocalBranch.Name}} -L 1 --json conclusion,status,name,updatedAt --jq ''if length == 0 then \"No CI runs for this branch\" else .[0] | \"Latest: \\(.name) - \\(if .conclusion == \"success\" then \"✓ Passed\" elif .conclusion == \"failure\" then \"✗ Failed\" elif .status == \"in_progress\" then \"⏳ Running\" else .status end) (\\(.updatedAt))\" end''"'
+  #   loadingText: "Checking CI status..."
+  # - key: "A"
+  #   context: "localBranches"
+  #   description: "View latest CI run for branch"
+  #   command: 'bash -c "RUN_ID=$(gh run list --branch {{.SelectedLocalBranch.Name}} -L 1 --json databaseId -q ''.[0].databaseId''); if [ -n \"$RUN_ID\" ]; then gh run view $RUN_ID --log; else echo \"No CI runs found for this branch\"; fi"'
+  #   loadingText: "Loading CI logs..."
   - key: "w"
     context: "files"
     description: "Commit staged changes without pre-commit hooks"
