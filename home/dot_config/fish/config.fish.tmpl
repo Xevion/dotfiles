@@ -55,7 +55,29 @@ if functions -q fzf_search_abbr
     bind -M insert \ea fzf_search_abbr  # Also bind in insert mode
 end
 
+# Alt+C: Replace line with 'cd <last-arg>' (useful after mkdir)
+bind \ec fish_cd_last_arg
+bind -M insert \ec fish_cd_last_arg
+
+# Alt+D: Discover directories with fd+fzf (from git root or cwd)
+bind \ed _fzf_discover_directory
+bind -M insert \ed _fzf_discover_directory
+
+# Alt+Shift+D: Discover directories from HOME with fd+fzf
+bind \eD _fzf_discover_home
+bind -M insert \eD _fzf_discover_home
+
 # Load abbreviations
 if test -f ~/.config/fish/conf.d/abbr.fish
     source ~/.config/fish/conf.d/abbr.fish
+end
+
+# Initialize zoxide eagerly for cd tracking
+if command -q zoxide
+    zoxide init fish | source
+
+    # Alias cd to use zoxide (keeps muscle memory, gets smart navigation)
+    function cd --description "zoxide-powered smart cd"
+        __zoxide_z $argv
+    end
 end
