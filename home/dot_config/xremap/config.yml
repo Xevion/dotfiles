@@ -1,0 +1,14 @@
+# xremap configuration
+# https://github.com/xremap/xremap
+#
+# Dual-function Caps Lock:
+# - Tap: Escape (great for vim mode)
+# - Hold: Ctrl (reduces pinky strain)
+
+modmap:
+  - name: Caps Lock to Ctrl/Escape
+    remap:
+      CapsLock:
+        held: leftctrl
+        alone: esc
+        alone_timeout_millis: 200

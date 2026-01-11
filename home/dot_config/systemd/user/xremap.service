@@ -1,0 +1,12 @@
+[Unit]
+Description=xremap key remapper
+After=graphical-session.target rebinded.service
+Wants=rebinded.service
+
+[Service]
+ExecStart=%h/.cargo/bin/xremap %h/.config/xremap/config.yml
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
