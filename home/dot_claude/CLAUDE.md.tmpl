@@ -94,21 +94,9 @@ Many CLI tools prompt for input by default and will hang waiting for responses. 
 - `apt install -y package`
 - `npm init -y`
 
-### Output Limiting - Use Judgment
+### Output Limiting
 
-Don't reflexively pipe through `head`/`tail`. Only limit output when you're confident you don't need the excluded portion.
-
-**Limit output when:**
-- Command has noisy interactive elements (progress spinners, live updates)
-- You specifically need only the end (e.g., build errors come last)
-- Output is genuinely massive and you need specific sections
-
-**Let full output through when:**
-- Output is moderate (<50-100 lines as rough guide)
-- You need comprehensive context to understand the result
-- Unsure what part matters - capture everything first, then re-run with limits if needed
-
-❌ Don't paginate across multiple invocations when one full capture would suffice
+Don't pipe commands through `head` or `tail` unless the output is truly massive (500+ lines) and you know exactly which section you need. When in doubt, capture the full output.
 
 ## Testing
 
