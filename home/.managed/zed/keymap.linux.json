@@ -5,41 +5,178 @@
 //
 // To see the default key bindings run `zed: open default keymap`
 // from the command palette.
+//
+// Custom left-hand optimized keymap
+// - Ctrl+G prefix for "Go to" navigation commands
+// - Dangerous Linux bindings disabled (Alt+Shift+F12, etc.)
+// - Debugger F-keys freed up
 [
+  // ==========================================================================
+  // DISABLED DANGEROUS/UNUSED BINDINGS
+  // ==========================================================================
+  {
+    "bindings": {
+      // DANGEROUS: Alt+Shift+F12 switches to Linux TTY!
+      "alt-shift-f12": null,
+      // Debugger bindings (rarely used, freeing F-keys)
+      "f4": null,
+      "shift-f5": null,
+      "ctrl-shift-f5": null,
+      "f6": null,
+      "f7": null,
+      "ctrl-f11": null,
+      "shift-f11": null,
+    },
+  },
+  {
+    "context": "Editor",
+    "bindings": {
+      // Disable F-key navigation (using Ctrl+G prefix instead)
+      "f12": null,
+      "alt-f12": null,
+      "ctrl-f12": null,
+      "shift-f12": null,
+      "ctrl-shift-f10": null,
+      // Disable F9 debugger bindings
+      "f9": null,
+      "shift-f9": null,
+      // Free up rarely used toggles
+      "ctrl-;": null,
+      "ctrl-'": null,
+    },
+  },
+  {
+    "context": "Pane",
+    "bindings": {
+      // Disable Alt+1-9 tab switching (rarely used)
+      "alt-1": null,
+      "alt-2": null,
+      "alt-3": null,
+      "alt-4": null,
+      "alt-5": null,
+      "alt-6": null,
+      "alt-7": null,
+      "alt-8": null,
+      "alt-9": null,
+      "alt-0": null,
+    },
+  },
   {
     "context": "Workspace",
     "bindings": {
-      // "shift shift": "file_finder::Toggle"
+      // Disable Alt+1-9 pane switching (rarely used)
+      "alt-1": null,
+      "alt-2": null,
+      "alt-3": null,
+      "alt-4": null,
+      "alt-5": null,
+      "alt-6": null,
+      "alt-7": null,
+      "alt-8": null,
+      "alt-9": null,
+    },
+  },
+
+  // ==========================================================================
+  // CTRL+G NAVIGATION PREFIX SYSTEM
+  // ==========================================================================
+  {
+    "context": "Editor",
+    "bindings": {
+      // Go to Definition
+      "ctrl-g d": "editor::GoToDefinition",
+      "ctrl-g shift-d": "editor::GoToDefinitionSplit",
+      // Find All References (was dangerous Alt+Shift+F12!)
+      "ctrl-g r": "editor::FindAllReferences",
+      // Go to Implementation
+      "ctrl-g i": "editor::GoToImplementation",
+      // Go to Type Definition
+      "ctrl-g t": "editor::GoToTypeDefinition",
+      "ctrl-g shift-t": "editor::GoToTypeDefinitionSplit",
+      // Git Blame
+      "ctrl-g b": "git::Blame",
+      // Go to Hunk (git changes)
+      "ctrl-g h": "editor::GoToHunk",
+      "ctrl-g shift-h": "editor::GoToPreviousHunk",
+    },
+  },
+  {
+    "context": "Editor && mode == full",
+    "bindings": {
+      // Go to Line (moved from direct Ctrl+G)
+      "ctrl-g l": "go_to_line::Toggle",
+      // Outline (current file symbols)
+      "ctrl-g o": "outline::Toggle",
+    },
+  },
+  {
+    "context": "Workspace",
+    "bindings": {
+      // Go to Symbol (project-wide)
+      "ctrl-g s": "project_symbols::Toggle",
+    },
+  },
+
+  // ==========================================================================
+  // NEW DIRECT BINDINGS (LEFT-HAND OPTIMIZED)
+  // ==========================================================================
+  {
+    "context": "Editor",
+    "bindings": {
+      // Rename Symbol (was F2, now Ctrl+Shift+R for "Rename")
+      "ctrl-shift-r": "editor::Rename",
+      // Hover / Quick Info (was Ctrl+K Ctrl+I)
+      "alt-q": "editor::Hover",
+    },
+  },
+  {
+    "context": "Pane",
+    "bindings": {
+      // Go Back/Forward (was awkward Ctrl+Alt+-/_)
+      "alt-[": "pane::GoBack",
+      "Xf86launch9": "pane::GoBack",
+      "alt-]": "pane::GoForward",
+      "Xf86launch8": "pane::GoForward",
+    },
+  },
+
+  // ==========================================================================
+  // RELOCATED BINDINGS
+  // ==========================================================================
+  {
+    "context": "Editor && mode == full && edit_prediction",
+    "bindings": {
+      // Edit prediction cycling (moved from Alt+[/] to Alt+,/.)
+      "alt-.": "editor::NextEditPrediction",
+      "alt-,": "editor::PreviousEditPrediction",
+    },
+  },
+
+  // ==========================================================================
+  // EXISTING CUSTOM BINDINGS (PRESERVED)
+  // ==========================================================================
+  {
+    "context": "Workspace",
+    "bindings": {
+      // Tab switching
+      "ctrl-tab": "pane::ActivateNextItem",
+      "ctrl-shift-tab": "pane::ActivatePreviousItem",
     },
   },
   {
     "context": "Editor && vim_mode == insert",
     "bindings": {
+      // Vim escape with jk
       "j k": "vim::NormalBefore",
     },
   },
   {
     "context": "Editor",
     "bindings": {
+      // Half page scrolling
       "alt-pageup": "editor::HalfPageUp",
-    },
-  },
-  {
-    "context": "Editor",
-    "bindings": {
       "alt-pagedown": "editor::HalfPageDown",
-    },
-  },
-  {
-    "context": "Workspace",
-    "bindings": {
-      "ctrl-tab": "pane::ActivateNextItem",
-      "ctrl-shift-tab": "pane::ActivatePreviousItem",
-    },
-  },
-  {
-    "context": "Editor",
-    "bindings": {
+      // Swap tabs left/right
       "ctrl-alt-left": "pane::SwapItemLeft",
       "ctrl-alt-right": "pane::SwapItemRight",
     },
