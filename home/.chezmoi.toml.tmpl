@@ -45,10 +45,11 @@
 encryption = "age"
 
 [merge]
-command = "bash"
+command = "chezmoi-merge-helper.sh"
 args = [
-	"-c",
-	"cp {{ "{{" }} .Target {{ "}}" }} {{ "{{" }} .Target {{ "}}" }}.base && code --new-window --wait --merge {{ "{{" }} .Destination {{ "}}" }} {{ "{{" }} .Target {{ "}}" }} {{ "{{" }} .Target {{ "}}" }}.base {{ "{{" }} .Source {{ "}}" }}",
+	"{{ "{{" }} .Destination {{ "}}" }}",
+	"{{ "{{" }} .Target {{ "}}" }}",
+	"{{ "{{" }} .Source {{ "}}" }}",
 ]
 
 [data]

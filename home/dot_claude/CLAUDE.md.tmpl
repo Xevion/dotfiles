@@ -221,38 +221,88 @@ When a project uses `assert2`:
 - Grep tool for searching (not `grep`, `rg`)
 - Bash ONLY for actual system commands and terminal operations
 
-### GitHub File Fetching
+### GitHub & External Resources
 
-When fetching files from GitHub repositories:
+**Fetching file content from GitHub:**
 
 - **STRONGLY prefer raw.githubusercontent.com over github.com**
   - Raw URLs return plain content without HTML wrapper - simpler and faster
   - Pattern: `https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}`
-  - Example: `https://raw.githubusercontent.com/user/repo/main/src/file.rs`
+  - For specific commits/tags: `https://raw.githubusercontent.com/{owner}/{repo}/{commit-sha}/{path}`
   - Only use github.com URLs when you need the web interface or rendered view
 
-- **Use GitHub CLI (`gh`) for repository operations**
-  - Perfect for metadata and repository management
-  - Examples: `gh repo view`, `gh issue list`, `gh pr view`, `gh pr checkout`
-  - More reliable than web scraping for structured data
+**GitHub CLI (`gh`) for everything else:**
 
-- **Use MCP gh_grep tool for code search** (see below)
+- **Authenticated API access** - use `gh api` for direct GitHub API calls:
+  - `gh api repos/{owner}/{repo}/releases/latest` - get latest release info
+  - `gh api repos/{owner}/{repo}/contents/{path}` - get file metadata/content
+  - `gh api repos/{owner}/{repo}` - get repository details
+  - Supports GraphQL: `gh api graphql -f query='...'`
+
+- **Search GitHub** - use `gh search` subcommands:
+  - `gh search repos "query"` - find repositories
+  - `gh search issues "query" --repo owner/repo` - search issues
+  - `gh search code "query"` - GitHub's native code search (different from gh_grep)
+
+- **Repository operations** - metadata and management:
+  - `gh repo view owner/repo` - repository info
+  - `gh release list -R owner/repo` - list releases with versions
+  - `gh issue/pr view` - issue and PR details
 
 ### MCP Tools (When Available)
 
-**gh_grep (GitHub Code Search)**
-- Search real-world code examples from 1M+ public repos
-- Use for: unfamiliar APIs, usage patterns, real implementation examples
-- Search for **literal code**, not keywords: `'useState('`, `'async function'`, `'import React from'`
-- Use regex with `useRegexp: true` for flexible patterns: `'(?s)useEffect\\(\\(\\) => {.*cleanup'`
-- Filter by `language`, `repo`, or `path` to narrow results
-- Perfect for seeing how others solve similar problems
+**gh_grep - CRITICAL: THIS IS LITERAL PATTERN MATCHING, NOT SEMANTIC SEARCH**
+
+This tool searches for **exact character sequences** in source code files. It is `grep`, not Google.
+
+It CANNOT:
+- Understand what you're looking for conceptually
+- Find "related" code or similar patterns
+- Interpret natural language or keywords
+
+❌ **WRONG** - these will fail or return garbage:
+- `"how to handle errors"` → literally searches for that sentence in code
+- `"authentication"` → only finds that exact word as a string, not auth implementations
+- `"best practices"` → completely useless
+- `"react state management"` → meaningless as a code pattern
+
+✅ **CORRECT** - search for actual code that appears in source files:
+- `'useAuth('` → finds useAuth function calls
+- `'catch (AuthError'` → finds specific error handling
+- `'implements OAuth'` → finds class implementations
+- `'(?s)async function.*await fetch'` with `useRegexp: true` → async functions with fetch
+
+**Rule of thumb**: If your query wouldn't make sense copy-pasted into a source file, it's wrong.
+
+Use `language`, `repo`, and `path` filters to narrow results.
 
 **context7 (Library Documentation)**
 - Get up-to-date docs for libraries/frameworks
-- Two-step process: `resolve-library-id` → `get-library-docs`
-- Use `mode: 'code'` for API references (default), `mode: 'info'` for guides
-- Prefer when you need official docs vs community examples
+- Two-step process: `resolve-library-id` → `query-docs`
+- Prefer when you need official documentation vs community examples from gh_grep
+
+## Useful CLI Tools
+
+Prefer these over convoluted bash pipelines or manual parsing.
+
+**JSON Processing (`jq`):**
+- Use for parsing API responses, transforming configs, extracting data
+- Example: `gh api repos/owner/repo/releases | jq '.[0] | {tag: .tag_name, date: .published_at}'`
+- Pipe any JSON output through jq for readable formatting: `... | jq .`
+
+**Quick TypeScript Scripts (`bun`):**
+- When shell gets too complex, write a quick inline script instead
+- Prefer over chained `sed`/`awk`/`grep` pipelines for data transformation
+- Example: `bun -e "console.log(JSON.parse(require('fs').readFileSync('data.json')).items.filter(x => x.active).length)"`
+- Can also run `.ts` files directly: `bun run script.ts`
+
+**Benchmarking (`hyperfine`):**
+- Compare command performance: `hyperfine 'command1' 'command2'`
+- Useful for verifying optimization claims
+
+**Codebase Statistics (`tokei`):**
+- Quick language breakdown and LOC counts: `tokei .`
+- Useful for understanding unfamiliar codebases
 
 ## Security & Error Handling
 

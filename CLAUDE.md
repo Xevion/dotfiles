@@ -66,6 +66,28 @@ When working in this repository, you're reading both the global AGENTS.md (gener
 - `encrypted_*.age` age-encrypted files (safe to commit)
 - `run_onchange_*` executable scripts that run during apply
 
+**Finding Files - Template Extension Patterns:**
+
+⚠️ **CRITICAL**: Most managed files have `.tmpl` extensions. Use wildcard patterns to find both base and `.tmpl` variants in one search.
+
+Common patterns where `.tmpl` is added to the FULL filename:
+- `config.md` → `config.md.tmpl` (NOT `config.tmpl`)
+- `settings.json` → `settings.json.tmpl` (NOT `settings.tmpl`)
+- `config.ts` → `config.ts.tmpl` (NOT `config.tmpl`)
+- `.bashrc` → `dot_bashrc.tmpl` (combines `dot_` and `.tmpl`)
+- `.config/opencode/opencode.jsonc` → `dot_config/opencode/opencode.jsonc.tmpl`
+
+**Search strategy - Use wildcards to catch both variants:**
+- Pattern: `**/filename*` (e.g., `**/CLAUDE.md*` finds both `CLAUDE.md` AND `CLAUDE.md.tmpl`)
+- Pattern: `**/*.ext.tmpl` for type-specific template files (e.g., `**/*.ts.tmpl`, `**/*.json.tmpl`)
+- Check both `home/` and `home/.chezmoitemplates/` directories
+
+**Examples:**
+- Looking for "CLAUDE.md"? → Search `**/CLAUDE.md*` (finds both base and `.tmpl`)
+- Looking for "config.nu"? → Search `**/config.nu*` (finds both variants)
+- Looking for all TypeScript templates? → Search `**/*.ts.tmpl`
+- Looking for all JSON configs? → Search `**/*.json*` (finds `.json` and `.json.tmpl`)
+
 **Template System:**
 - Uses Go templates with platform detection
 - Two types of templates with different variable access patterns:
