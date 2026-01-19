@@ -155,6 +155,11 @@ When a project uses `assert2`:
 
 ## Git Commits
 
+### Branch Configuration
+
+- **Default branch is `master`, not `main`** for all GitHub repos under `Xevion/` (e.g., `Xevion/Pac-man`)
+- When referencing branches or creating pull requests, assume `master` as the base branch
+
 ### Safety & Best Practices
 
 - **Do NOT add co-authoring or attribution to Claude Code/AI**
@@ -192,16 +197,39 @@ When a project uses `assert2`:
 
 ### Question Tool Usage
 
-- **Use for complex tasks and design decisions**:
-  - Architectural choices
-  - Multiple implementation approaches
-  - Feature design options
-  - Clarifying & confirming important requirements, especially vague or conflicting ones
-- **Do NOT use for trivial details**:
-  - Variable naming
-  - Minor formatting choices
+**CRITICAL: Use the Question tool proactively, especially during planning phases.**
+
+**When planning ANY non-trivial task, STRONGLY prefer asking questions to confirm:**
+- Which approach to take when multiple valid options exist
+- Whether assumptions about user intent are correct
+- Implementation strategy before writing code
+- Prioritization when multiple sub-tasks could be done
+- Design decisions that affect architecture or user experience
+
+**Use the Question tool for:**
+- **Planning & Task Breakdown** - Before starting work, confirm the approach:
+  - "I see 3 ways to implement this feature. Which approach do you prefer?"
+  - "Should I prioritize performance or readability for this refactor?"
+  - "Do you want me to update tests first, or implement the feature first?"
+- **Architectural choices** - Major design decisions that affect structure
+- **Multiple implementation approaches** - When there are valid alternatives
+- **Feature design options** - User-facing behavior and interface decisions
+- **Clarifying & confirming important requirements** - Especially vague or conflicting ones
+- **Ambiguous requests** - Any time you're guessing what the user meant
+
+**Do NOT use for trivial details:**
+- Variable naming (unless it's a public API)
+- Minor formatting choices
+- Implementation details that don't affect behavior
+
+**Best Practices:**
 - **Prefer multi-select when appropriate**, single-select when mutually exclusive
+- Ask questions EARLY in the workflow, not after you've already committed to an approach
+- Present options clearly with pros/cons when relevant
+- Don't ask multiple sequential question prompts - batch related questions together when possible
 - User appreciates being consulted on larger, more abstract decisions
+
+**Remember**: Asking questions during planning is NOT a sign of weakness - it's professional practice. Users prefer being consulted over having to fix wrong assumptions later.
 
 ### When NOT to Build/Run
 
