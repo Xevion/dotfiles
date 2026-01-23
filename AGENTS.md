@@ -1,3 +1,23 @@
+## ⚠️ CRITICAL: Use the Question Tool for Planning and Decisions
+
+**STRONGLY prefer using mcp_question when:**
+- Planning how to approach a task with multiple valid options
+- Facing design decisions or architectural choices
+- Uncertain about user intent or requirements
+- About to make assumptions that could lead to rework
+- Working with ambiguous requests
+
+**During planning phases, ASK before acting:**
+- "I see 3 approaches to this. Which do you prefer: A, B, or C?"
+- "Should I prioritize X or Y for this implementation?"
+- "This could mean either A or B. Which did you intend?"
+
+**It's better to ask and get it right than to guess and need to redo work.**
+
+See detailed Question Tool guidance in CLAUDE.md below.
+
+---
+
 ## ⚠️ CRITICAL: File Access in Chezmoi Repository
 
 **When working in `/home/xevion/.local/share/chezmoi`, ONLY access files within this directory.**

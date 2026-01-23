@@ -322,6 +322,50 @@ These are very different operations - which did you mean?"
 4. **Prefer explanations** over automated actions
 5. **Present options** when requests are ambiguous (direction, location, scope)
 6. **Show consequences** before destructive operations
+7. **USE THE QUESTION TOOL** - When planning or facing design decisions, use mcp_question to present options and get user input proactively
+
+## Question Tool Usage in Chezmoi Context
+
+**STRONGLY prefer using the Question tool when working in this repository, especially for:**
+
+**Planning & Ambiguity Resolution:**
+- **Direction questions** - Source→Target vs Target→Source operations
+  - "Should I apply changes from source to target, or import from target to source?"
+- **File location questions** - Which CLAUDE.md/AGENTS.md file to edit
+  - "Which file should I edit: project-level CLAUDE.md or user-level home/dot_claude/CLAUDE.md.tmpl?"
+- **Platform targeting** - Which OS/environment to optimize for
+  - "Should this template prioritize Windows, Linux, or work equally on both?"
+- **Template complexity** - How sophisticated the conditional logic should be
+  - "Should I add platform detection here, or keep it simple?"
+
+**Before Making Changes:**
+- **Encryption decisions** - Whether files should be encrypted
+  - "This file contains [type of data]. Should I encrypt it with age or leave it plain?"
+- **Permission choices** - Using `private_` prefix or standard permissions
+  - "Should this config file use private_ prefix (600 permissions)?"
+- **Template vs static** - Whether to use `.tmpl` suffix
+  - "Should this be a template file, or a static file?"
+
+**Examples of good question tool usage:**
+```
+User: "Add my GitHub token to the config"
+AI: *Uses Question tool* "How should I handle this token?
+  A. Store encrypted with age (encrypted_*.age)
+  B. Reference from Doppler ({{ dopplerProjectJson.GITHUB_TOKEN }})
+  C. Add to .chezmoiignore and manage manually"
+```
+
+```
+User: "Update the shell config"
+AI: *Uses Question tool* "Which file should I edit?
+  A. home/dot_bashrc.tmpl (bash configuration)
+  B. home/dot_config/nushell/config.nu.tmpl (nushell configuration)
+  C. home/dot_config/fish/config.fish (fish configuration)"
+```
+
+**When NOT to use:** Trivial clarifications that don't affect functionality or security.
+
+**Remember:** In a templating/dotfiles context, wrong assumptions lead to broken deployments. Always confirm when uncertain.
 
 # Extended Documentation
 

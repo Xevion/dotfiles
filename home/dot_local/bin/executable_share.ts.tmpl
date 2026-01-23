@@ -8,12 +8,6 @@
  *   share file.png           # Upload specific file
  *   cat file.txt | share     # Upload from stdin
  *   share -c video.mov       # Convert then upload
- *
- * Environment Variables:
- *   R2_ENDPOINT              S3-compatible endpoint URL
- *   R2_ACCESS_KEY_ID         Access key ID
- *   R2_SECRET_ACCESS_KEY     Secret access key
- *   R2_BUCKET                Bucket name
  */
 
 import { existsSync, fstatSync } from "fs";
@@ -65,12 +59,6 @@ type IntervalHandle = ReturnType<typeof setInterval>;
 
 const DOMAIN = "https://i.xevion.dev";
 
-const REQUIRED_ENV = [
-  "R2_ENDPOINT",
-  "R2_ACCESS_KEY_ID",
-  "R2_SECRET_ACCESS_KEY",
-  "R2_BUCKET",
-];
 const ENV = {
   endpoint: "{{ dopplerProjectJson.R2_ENDPOINT }}",
   accessKeyId: "{{ dopplerProjectJson.R2_ACCESS_KEY_ID }}",
@@ -591,6 +579,33 @@ async function hasCommand(cmd: string): Promise<boolean> {
   }
 }
 
+async function runMediaCommand(cmd: string[]): Promise<void> {
+  try {
+    const proc = Bun.spawn(cmd, {
+      stdout: "ignore",
+      stderr: "pipe",
+    });
+    
+    const exitCode = await proc.exited;
+    
+    if (exitCode !== 0) {
+      const stderr = await new Response(proc.stderr).text();
+      const errorLines = stderr
+        .split('\n')
+        .filter(line => line.trim())
+        .slice(-10) // Last 10 non-empty lines
+        .join('\n');
+      
+      throw new Error(`Command failed with exit code ${exitCode}\n${errorLines}`);
+    }
+  } catch (e) {
+    if (e instanceof Error) {
+      throw e;
+    }
+    throw new Error(`Command failed: ${String(e)}`);
+  }
+}
+
 async function writeTempFile(buffer: Buffer, ext = ""): Promise<string> {
   const path = join(tmpdir(), `share-probe-${nanoid(8)}${ext}`);
   await Bun.write(path, buffer);
@@ -824,8 +839,11 @@ async function remuxVideo(buffer: Buffer): Promise<Buffer> {
   const outputPath = join(tmpdir(), `share-remux-${nanoid(8)}.webm`);
 
   try {
-    // Remux without re-encoding, adding faststart for MP4
-    await $`ffmpeg -y -i ${inputPath} -c copy -fflags +genpts ${outputPath}`.quiet();
+    await runMediaCommand([
+      "ffmpeg", "-y", "-i", inputPath,
+      "-c", "copy", "-fflags", "+genpts",
+      outputPath
+    ]);
 
     const result = Buffer.from(await Bun.file(outputPath).arrayBuffer());
     spinner.stop();
@@ -833,9 +851,9 @@ async function remuxVideo(buffer: Buffer): Promise<Buffer> {
     return result;
   } catch (e) {
     spinner.stop();
-    throw new Error(
-      `Video remux failed: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    console.error(chalk.hex(COLORS.error)("\nRemux error:"));
+    console.error(chalk.hex(COLORS.dim)(e instanceof Error ? e.message : String(e)));
+    throw new Error("Video remux failed");
   } finally {
     await cleanupTempFiles(inputPath, outputPath);
   }
@@ -849,7 +867,11 @@ async function addFaststart(buffer: Buffer): Promise<Buffer> {
   const outputPath = join(tmpdir(), `share-faststart-${nanoid(8)}.mp4`);
 
   try {
-    await $`ffmpeg -y -i ${inputPath} -c copy -movflags +faststart ${outputPath}`.quiet();
+    await runMediaCommand([
+      "ffmpeg", "-y", "-i", inputPath,
+      "-c", "copy", "-movflags", "+faststart",
+      outputPath
+    ]);
 
     const result = Buffer.from(await Bun.file(outputPath).arrayBuffer());
     spinner.stop();
@@ -857,9 +879,9 @@ async function addFaststart(buffer: Buffer): Promise<Buffer> {
     return result;
   } catch (e) {
     spinner.stop();
-    throw new Error(
-      `Faststart optimization failed: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    console.error(chalk.hex(COLORS.error)("\nFaststart optimization error:"));
+    console.error(chalk.hex(COLORS.dim)(e instanceof Error ? e.message : String(e)));
+    throw new Error("Faststart optimization failed");
   } finally {
     await cleanupTempFiles(inputPath, outputPath);
   }
@@ -873,7 +895,13 @@ async function reencodeVideo(buffer: Buffer): Promise<Buffer> {
   const outputPath = join(tmpdir(), `share-reencode-${nanoid(8)}.mp4`);
 
   try {
-    await $`ffmpeg -y -i ${inputPath} -c:v libx264 -crf 23 -preset medium -c:a aac -b:a 128k -movflags +faststart ${outputPath}`.quiet();
+    await runMediaCommand([
+      "ffmpeg", "-y", "-i", inputPath,
+      "-c:v", "libx264", "-crf", "23", "-preset", "medium",
+      "-c:a", "aac", "-b:a", "128k",
+      "-movflags", "+faststart",
+      outputPath
+    ]);
 
     const result = Buffer.from(await Bun.file(outputPath).arrayBuffer());
     spinner.stop();
@@ -881,9 +909,9 @@ async function reencodeVideo(buffer: Buffer): Promise<Buffer> {
     return result;
   } catch (e) {
     spinner.stop();
-    throw new Error(
-      `Video re-encode failed: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    console.error(chalk.hex(COLORS.error)("\nRe-encode error:"));
+    console.error(chalk.hex(COLORS.dim)(e instanceof Error ? e.message : String(e)));
+    throw new Error("Video re-encode failed");
   } finally {
     await cleanupTempFiles(inputPath, outputPath);
   }
@@ -894,11 +922,14 @@ async function remuxAudio(buffer: Buffer): Promise<Buffer> {
   spinner.start("Fixing audio metadata...");
 
   const inputPath = await writeTempFile(buffer);
-  // Detect format and use same extension
   const outputPath = join(tmpdir(), `share-audio-${nanoid(8)}.mka`);
 
   try {
-    await $`ffmpeg -y -i ${inputPath} -c copy ${outputPath}`.quiet();
+    await runMediaCommand([
+      "ffmpeg", "-y", "-i", inputPath,
+      "-c", "copy",
+      outputPath
+    ]);
 
     const result = Buffer.from(await Bun.file(outputPath).arrayBuffer());
     spinner.stop();
@@ -906,9 +937,9 @@ async function remuxAudio(buffer: Buffer): Promise<Buffer> {
     return result;
   } catch (e) {
     spinner.stop();
-    throw new Error(
-      `Audio remux failed: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    console.error(chalk.hex(COLORS.error)("\nAudio remux error:"));
+    console.error(chalk.hex(COLORS.dim)(e instanceof Error ? e.message : String(e)));
+    throw new Error("Audio remux failed");
   } finally {
     await cleanupTempFiles(inputPath, outputPath);
   }
@@ -922,7 +953,9 @@ async function convertImageToJpeg(buffer: Buffer): Promise<Buffer> {
   const outputPath = join(tmpdir(), `share-convert-${nanoid(8)}.jpg`);
 
   try {
-    await $`convert ${inputPath} -quality 90 ${outputPath}`.quiet();
+    await runMediaCommand([
+      "convert", inputPath, "-quality", "90", outputPath
+    ]);
 
     const result = Buffer.from(await Bun.file(outputPath).arrayBuffer());
     spinner.stop();
@@ -930,9 +963,9 @@ async function convertImageToJpeg(buffer: Buffer): Promise<Buffer> {
     return result;
   } catch (e) {
     spinner.stop();
-    throw new Error(
-      `JPEG conversion failed: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    console.error(chalk.hex(COLORS.error)("\nJPEG conversion error:"));
+    console.error(chalk.hex(COLORS.dim)(e instanceof Error ? e.message : String(e)));
+    throw new Error("JPEG conversion failed");
   } finally {
     await cleanupTempFiles(inputPath, outputPath);
   }
@@ -946,7 +979,9 @@ async function convertImageToWebp(buffer: Buffer): Promise<Buffer> {
   const outputPath = join(tmpdir(), `share-convert-${nanoid(8)}.webp`);
 
   try {
-    await $`convert ${inputPath} -quality 85 ${outputPath}`.quiet();
+    await runMediaCommand([
+      "convert", inputPath, "-quality", "85", outputPath
+    ]);
 
     const result = Buffer.from(await Bun.file(outputPath).arrayBuffer());
     spinner.stop();
@@ -954,9 +989,9 @@ async function convertImageToWebp(buffer: Buffer): Promise<Buffer> {
     return result;
   } catch (e) {
     spinner.stop();
-    throw new Error(
-      `WebP conversion failed: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    console.error(chalk.hex(COLORS.error)("\nWebP conversion error:"));
+    console.error(chalk.hex(COLORS.dim)(e instanceof Error ? e.message : String(e)));
+    throw new Error("WebP conversion failed");
   } finally {
     await cleanupTempFiles(inputPath, outputPath);
   }
@@ -986,9 +1021,9 @@ async function convertImage(
     await Bun.write(inputPath, buffer);
 
     if (fromMime === "image/heic" || fromMime === "image/heif") {
-      await $`convert ${inputPath} -quality 90 ${outputPath}`.quiet();
+      await runMediaCommand(["convert", inputPath, "-quality", "90", outputPath]);
     } else {
-      await $`convert ${inputPath} ${outputPath}`.quiet();
+      await runMediaCommand(["convert", inputPath, outputPath]);
     }
 
     const converted = Buffer.from(await Bun.file(outputPath).arrayBuffer());
@@ -999,9 +1034,9 @@ async function convertImage(
     return converted;
   } catch (e) {
     spinner.stop();
-    throw new Error(
-      `Image conversion failed: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    console.error(chalk.hex(COLORS.error)("\nImage conversion error:"));
+    console.error(chalk.hex(COLORS.dim)(e instanceof Error ? e.message : String(e)));
+    throw new Error("Image conversion failed");
   } finally {
     await cleanupTempFiles(inputPath, outputPath);
   }
@@ -1017,7 +1052,14 @@ async function convertVideo(buffer: Buffer): Promise<Buffer> {
   try {
     await Bun.write(inputPath, buffer);
 
-    await $`ffmpeg -i ${inputPath} -c:v libx264 -crf 28 -preset slow -vf "scale=-2:min(720,ih)" -c:a aac -b:a 128k -movflags +faststart ${outputPath}`.quiet();
+    await runMediaCommand([
+      "ffmpeg", "-y", "-i", inputPath,
+      "-c:v", "libx264", "-crf", "28", "-preset", "slow",
+      "-vf", "scale=-2:'min(720,ih)'",
+      "-c:a", "aac", "-b:a", "128k",
+      "-movflags", "+faststart",
+      outputPath
+    ]);
 
     const converted = Buffer.from(await Bun.file(outputPath).arrayBuffer());
 
@@ -1027,9 +1069,9 @@ async function convertVideo(buffer: Buffer): Promise<Buffer> {
     return converted;
   } catch (e) {
     spinner.stop();
-    throw new Error(
-      `Video conversion failed: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    console.error(chalk.hex(COLORS.error)("\nConversion error:"));
+    console.error(chalk.hex(COLORS.dim)(e instanceof Error ? e.message : String(e)));
+    throw new Error("Video conversion failed");
   } finally {
     await cleanupTempFiles(inputPath, outputPath);
   }
@@ -1193,20 +1235,18 @@ ${chalk.hex(COLORS.label)("Examples:")}
   share -c large-video.mov   # Convert/re-encode then upload
   share -Fa video.webm       # Fix all issues automatically
 
-${chalk.hex(COLORS.label)("Environment Variables:")}
-  R2_ENDPOINT              S3-compatible endpoint URL
-  R2_ACCESS_KEY_ID         Access key ID
-  R2_SECRET_ACCESS_KEY     Secret access key
-  R2_BUCKET                Bucket name
-`);
+${chalk.hex(COLORS.label)("Note:")}
+  R2 credentials are embedded via chezmoi template from Doppler.
+  Use 'chezmoi apply' to update the deployed script with new credentials.
+ `);
     return;
   }
 
   VERBOSE = values.verbose || false;
 
-  const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
-  if (missing.length > 0) {
-    log(`Missing environment variables: ${missing.join(", ")}`, "error");
+  // Credentials are embedded via chezmoi template - check ENV object instead
+  if (!ENV.endpoint || !ENV.accessKeyId || !ENV.secretAccessKey || !ENV.bucket) {
+    log("Missing R2 credentials - chezmoi template may not have been processed correctly", "error");
     process.exit(1);
   }
 
