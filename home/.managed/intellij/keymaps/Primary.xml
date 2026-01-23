@@ -1,21 +1,64 @@
 <keymap version="1" name="Primary" parent="VSCode">
+  <action id="Annotate">
+    <keyboard-shortcut first-keystroke="ctrl g" second-keystroke="b" />
+  </action>
   <action id="Back">
     <mouse-shortcut keystroke="button4" />
+    <keyboard-shortcut first-keystroke="alt left" />
+    <keyboard-shortcut first-keystroke="alt open_bracket" />
   </action>
+  <action id="Diff.FocusOppositePane" />
   <action id="FileChooser.NewFile" />
+  <action id="FileStructurePopup">
+    <keyboard-shortcut first-keystroke="ctrl g" second-keystroke="o" />
+  </action>
+  <action id="FindUsages">
+    <keyboard-shortcut first-keystroke="ctrl g" second-keystroke="r" />
+  </action>
   <action id="Forward">
     <mouse-shortcut keystroke="button5" />
+    <keyboard-shortcut first-keystroke="alt right" />
+    <keyboard-shortcut first-keystroke="alt close_bracket" />
+  </action>
+  <action id="GotoDeclaration">
+    <keyboard-shortcut first-keystroke="ctrl g" second-keystroke="d" />
+  </action>
+  <action id="GotoImplementation">
+    <keyboard-shortcut first-keystroke="ctrl g" second-keystroke="i" />
+  </action>
+  <action id="GotoLine">
+    <keyboard-shortcut first-keystroke="ctrl g" second-keystroke="l" />
+  </action>
+  <action id="GotoSymbol">
+    <keyboard-shortcut first-keystroke="ctrl g" second-keystroke="s" />
+  </action>
+  <action id="GotoTypeDeclaration">
+    <keyboard-shortcut first-keystroke="ctrl g" second-keystroke="t" />
   </action>
   <action id="NextOccurence">
     <keyboard-shortcut first-keystroke="shift ctrl n" />
     <keyboard-shortcut first-keystroke="ctrl n" />
   </action>
   <action id="NextTab">
-    <keyboard-shortcut first-keystroke="ctrl page_down" />
-    <keyboard-shortcut first-keystroke="alt right" />
+    <keyboard-shortcut first-keystroke="ctrl tab" />
+  </action>
+  <action id="OpenInRightSplit">
+    <keyboard-shortcut first-keystroke="ctrl g" second-keystroke="shift d" />
   </action>
   <action id="PreviousTab">
-    <keyboard-shortcut first-keystroke="ctrl page_up" />
-    <keyboard-shortcut first-keystroke="alt left" />
+    <keyboard-shortcut first-keystroke="shift ctrl tab" />
+  </action>
+  <action id="QuickJavaDoc">
+    <keyboard-shortcut first-keystroke="alt q" />
+  </action>
+  <action id="RenameElement">
+    <keyboard-shortcut first-keystroke="shift ctrl r" />
+  </action>
+  <action id="Switcher" />
+  <action id="VcsShowNextChangeMarker">
+    <keyboard-shortcut first-keystroke="ctrl g" second-keystroke="h" />
+  </action>
+  <action id="VcsShowPrevChangeMarker">
+    <keyboard-shortcut first-keystroke="ctrl g" second-keystroke="shift h" />
   </action>
 </keymap>
