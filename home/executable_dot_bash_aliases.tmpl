@@ -164,6 +164,245 @@ alias gsts='git stash save'
 # Git log find by commit message
 function glf() { git log --all --grep="$1"; }
 
+# =============================================================================
+# Git Worktree Functions
+# =============================================================================
+
+# Helper: Sanitize branch name for directory (feature/foo -> feature-foo)
+_wt_sanitize() {
+    echo "$1" | tr '/' '-'
+}
+
+# Helper: Get the current branch's tip (not HEAD if detached)
+_wt_get_base() {
+    local branch
+    branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+    if [[ -n "$branch" ]]; then
+        echo "$branch"
+    else
+        # Detached HEAD - try to find which branch we're on
+        git rev-parse HEAD
+    fi
+}
+
+# Helper: Get git repo root
+_wt_root() {
+    git rev-parse --show-toplevel 2>/dev/null
+}
+
+# Helper: Clone gitignored files from source to destination worktree
+_wt_clone_ignored() {
+    local src_path="$1"
+    local dst_path="$2"
+    
+    # Find gitignored files (excluding .git and .worktrees)
+    local ignored_files
+    ignored_files=$(git -C "$src_path" ls-files --others --ignored --exclude-standard 2>/dev/null | \
+        grep -v "^\.git" | grep -v "^\.worktrees")
+    
+    if [[ -z "$ignored_files" ]]; then
+        return 0
+    fi
+
+    echo ""
+    echo "Found gitignored files to copy..."
+    
+    # Measure size with timeout
+    local size_output
+    local size_bytes=0
+    local size_human="unknown"
+    
+    if size_output=$(timeout 10s du -sb "$src_path" --exclude='.git' --exclude='.worktrees' 2>/dev/null | head -n1); then
+        size_bytes=$(echo "$size_output" | awk '{print $1}')
+        size_human=$(numfmt --to=iec --suffix=B "$size_bytes" 2>/dev/null || echo "$size_bytes bytes")
+    fi
+
+    local threshold=$((100 * 1024 * 1024))  # 100MB
+    
+    if [[ "$size_bytes" -gt "$threshold" ]] || [[ "$size_human" == "unknown" ]]; then
+        echo "Gitignored files size: $size_human"
+        read -p "Copy these files to new worktree? [y/N] " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Skipping gitignored file copy"
+            return 0
+        fi
+    fi
+
+    echo "Copying gitignored files..."
+    echo "$ignored_files" | while read -r file; do
+        local src="$src_path/$file"
+        local dst="$dst_path/$file"
+        if [[ -e "$src" ]]; then
+            mkdir -p "$(dirname "$dst")"
+            cp -r "$src" "$dst" 2>/dev/null
+        fi
+    done
+    
+    echo "Done copying gitignored files"
+}
+
+# wtl - List all worktrees
+function wtl() {
+    git worktree list "$@"
+}
+
+# wts - Show git status for all worktrees
+function wts() {
+    local root
+    root=$(_wt_root)
+    if [[ -z "$root" ]]; then
+        echo "Not in a git repository" >&2
+        return 1
+    fi
+
+    git worktree list --porcelain | grep '^worktree ' | cut -d' ' -f2- | while read -r wt_path; do
+        local branch
+        branch=$(git -C "$wt_path" symbolic-ref --short HEAD 2>/dev/null || echo "detached")
+        
+        # Print header
+        echo -e "\033[1;34m╭─────────────────────────────────────────────────────────────╮\033[0m"
+        echo -e "\033[1;34m│\033[0m \033[1;33m$wt_path\033[0m"
+        echo -e "\033[1;34m│\033[0m \033[0;36m[$branch]\033[0m"
+        echo -e "\033[1;34m╰─────────────────────────────────────────────────────────────╯\033[0m"
+        
+        # Run git status
+        git -C "$wt_path" status --short
+        echo ""
+    done
+}
+
+# wtr - FZF-based worktree remover (multi-select)
+function wtr() {
+    local root
+    root=$(_wt_root)
+    if [[ -z "$root" ]]; then
+        echo "Not in a git repository" >&2
+        return 1
+    fi
+
+    # Get worktrees excluding the main one
+    local main_wt
+    main_wt=$(git worktree list --porcelain | grep '^worktree ' | head -n1 | cut -d' ' -f2-)
+    
+    local selected
+    selected=$(git worktree list | grep -v "^$main_wt " | fzf --multi --height=40% --reverse \
+        --header="Select worktrees to remove (Tab to multi-select)" \
+        --preview="git -C {1} log --oneline -5 2>/dev/null || echo 'No commits'")
+    
+    if [[ -z "$selected" ]]; then
+        echo "No worktrees selected"
+        return 0
+    fi
+
+    echo "Will remove the following worktrees:"
+    echo "$selected" | awk '{print "  - " $1}'
+    echo ""
+    read -p "Confirm removal? [y/N] " -n 1 -r
+    echo ""
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "$selected" | while read -r line; do
+            local wt_path
+            wt_path=$(echo "$line" | awk '{print $1}')
+            echo "Removing $wt_path..."
+            git worktree remove "$wt_path"
+        done
+    else
+        echo "Cancelled"
+    fi
+}
+
+# wtb - Add worktree with new branch
+# Usage: wtb <branch-name> [base-ref]
+function wtb() {
+    if [[ -z "$1" ]]; then
+        echo "Usage: wtb <branch-name> [base-ref]" >&2
+        return 1
+    fi
+
+    local root
+    root=$(_wt_root)
+    if [[ -z "$root" ]]; then
+        echo "Not in a git repository" >&2
+        return 1
+    fi
+
+    local branch="$1"
+    local base="${2:-$(_wt_get_base)}"
+    local dir_name
+    dir_name=$(_wt_sanitize "$branch")
+    local wt_path="$root/.worktrees/$dir_name"
+
+    # Create .worktrees directory if needed
+    mkdir -p "$root/.worktrees"
+
+    # Add to .gitignore if not already there
+    if ! grep -q "^\.worktrees/?$" "$root/.gitignore" 2>/dev/null; then
+        echo ".worktrees/" >> "$root/.gitignore"
+        echo "Added .worktrees/ to .gitignore"
+    fi
+
+    echo "Creating worktree at $wt_path"
+    echo "  Branch: $branch"
+    echo "  Base: $base"
+    
+    if git worktree add -b "$branch" "$wt_path" "$base"; then
+        echo ""
+        echo "Worktree created: $wt_path"
+        
+        # Clone gitignored files from current worktree
+        local current_wt
+        current_wt=$(pwd)
+        _wt_clone_ignored "$current_wt" "$wt_path"
+        
+        cd "$wt_path"
+    fi
+}
+
+# wtf / wtfeature - Create feature branch worktree
+# Usage: wtf <name> [base-ref]
+function wtf() {
+    if [[ -z "$1" ]]; then
+        echo "Usage: wtf <feature-name> [base-ref]" >&2
+        return 1
+    fi
+    wtb "feature/$1" "${2:-}"
+}
+function wtfeature() { wtf "$@"; }
+
+# wth / wtfix - Create hotfix branch worktree
+# Usage: wth <name> [base-ref]
+function wth() {
+    if [[ -z "$1" ]]; then
+        echo "Usage: wth <hotfix-name> [base-ref]" >&2
+        return 1
+    fi
+    wtb "hotfix/$1" "${2:-}"
+}
+function wtfix() { wth "$@"; }
+
+# wtcd - FZF-based worktree picker - cd into selected
+function wtcd() {
+    local root
+    root=$(_wt_root)
+    if [[ -z "$root" ]]; then
+        echo "Not in a git repository" >&2
+        return 1
+    fi
+
+    local selected
+    selected=$(git worktree list | fzf --height=40% --reverse \
+        --header="Select worktree" \
+        --preview="git -C {1} log --oneline -5 2>/dev/null; echo ''; git -C {1} status --short 2>/dev/null")
+    
+    if [[ -n "$selected" ]]; then
+        local wt_path
+        wt_path=$(echo "$selected" | awk '{print $1}')
+        cd "$wt_path"
+    fi
+}
+
 # fzf abbreviation/alias search
 if command -v fzf-abbr-search.ts &> /dev/null && command -v fzf &> /dev/null; then
     fzf_search_abbr() {
