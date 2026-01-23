@@ -1,0 +1,21 @@
+<keymap version="1" name="Primary" parent="VSCode">
+  <action id="Back">
+    <mouse-shortcut keystroke="button4" />
+  </action>
+  <action id="FileChooser.NewFile" />
+  <action id="Forward">
+    <mouse-shortcut keystroke="button5" />
+  </action>
+  <action id="NextOccurence">
+    <keyboard-shortcut first-keystroke="shift ctrl n" />
+    <keyboard-shortcut first-keystroke="ctrl n" />
+  </action>
+  <action id="NextTab">
+    <keyboard-shortcut first-keystroke="ctrl page_down" />
+    <keyboard-shortcut first-keystroke="alt right" />
+  </action>
+  <action id="PreviousTab">
+    <keyboard-shortcut first-keystroke="ctrl page_up" />
+    <keyboard-shortcut first-keystroke="alt left" />
+  </action>
+</keymap>

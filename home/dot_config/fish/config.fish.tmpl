@@ -16,6 +16,9 @@ if status is-login
 end
 {{- end }}
 
+# Enable EXA for OpenCode
+set -gx OPENCODE_ENABLE_EXA true
+
 # Common shared configuration (environment variables, PATH, tool setup)
 {{ template "scripts/commonrc.fish.tmpl" dict "data" . }}
 

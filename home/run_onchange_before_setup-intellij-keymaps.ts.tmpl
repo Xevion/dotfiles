@@ -1,0 +1,41 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/usr/bin/env bun
+// Hash: {{ include ".managed/intellij/keymaps/Primary.xml" | sha256sum }}
+
+import { readdirSync, existsSync, mkdirSync, lstatSync, readlinkSync, unlinkSync, symlinkSync } from "node:fs";
+import { join } from "node:path";
+
+const JETBRAINS_DIR = join(process.env.HOME!, ".config/JetBrains");
+const SOURCE = "{{ .chezmoi.sourceDir }}/.managed/intellij/keymaps/Primary.xml";
+const IDE_PATTERNS = [/^IntelliJIdea/, /^IdeaIC/];
+
+const log = (msg: string) => console.log(`[intellij-keymaps] ${msg}`);
+
+if (!existsSync(JETBRAINS_DIR)) {
+  log("No JetBrains directory found");
+  process.exit(0);
+}
+
+for (const entry of readdirSync(JETBRAINS_DIR)) {
+  if (!IDE_PATTERNS.some((p) => p.test(entry))) continue;
+
+  const keymapsDir = join(JETBRAINS_DIR, entry, "keymaps");
+  const target = join(keymapsDir, "Primary.xml");
+
+  mkdirSync(keymapsDir, { recursive: true });
+
+  // Check if already correctly symlinked
+  if (existsSync(target)) {
+    try {
+      if (lstatSync(target).isSymbolicLink() && readlinkSync(target) === SOURCE) {
+        log(`${entry}: already linked`);
+        continue;
+      }
+    } catch {}
+    unlinkSync(target);
+  }
+
+  symlinkSync(SOURCE, target);
+  log(`${entry}: linked`);
+}
+{{ end -}}
