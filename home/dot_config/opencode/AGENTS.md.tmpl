@@ -1,0 +1,41 @@
+# OpenCode-Specific Guidelines
+
+## Question Tool Constraints
+
+**CRITICAL: The Question tool has strict character limits. Violating them causes tool failures.**
+
+| Field   | Max Length | Guidance                        |
+| ------- | ---------- | ------------------------------- |
+| `header`  | 30 chars   | Very short label only           |
+| `label`   | 30 chars   | 1-5 words, like button text     |
+| `description` | unlimited  | Put all detail here         |
+
+### Labels Are Button Text, Not Descriptions
+
+**WRONG** - these WILL fail:
+```
+"Simple perpendicular distance (Recommended)"  // 41 chars
+"Treat as failure then clearRoute()"           // 35 chars
+```
+
+**CORRECT** - terse labels, detail in description:
+```
+"Perpendicular distance"     // 22 chars - put "(Recommended)" in description instead
+"Fail and clear route"       // 20 chars
+```
+
+### The "(Recommended)" Trap
+
+The system prompt says to add "(Recommended)" to labels, but that's **14 characters** - leaving only 16 for actual content. Instead:
+
+1. **Put recommended option FIRST** in the list (as instructed)
+2. **Add "(Recommended)" to the description**, not the label
+3. Or use a short marker like `[Rec]` (5 chars) if you must mark the label
+
+### Before Submitting Questions
+
+Mentally count characters for each `header` and `label`. If it looks longer than a short button label, it's too long. Move the detail to `description`.
+
+---
+
+{{ template "common-rules.md.tmpl" . }}
