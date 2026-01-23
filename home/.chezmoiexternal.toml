@@ -1,2 +1,7 @@
 # External repositories managed by chezmoi
 # https://www.chezmoi.io/reference/special-files-and-directories/chezmoiexternal-format/
+
+[".config/opencode/superpowers"]
+    type = "git-repo"
+    url = "https://github.com/obra/superpowers.git"
+    refreshPeriod = "168h"
