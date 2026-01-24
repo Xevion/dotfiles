@@ -1,19 +1,131 @@
 {
   // .tmpl files are Go templates (see text/template pkg)
+  // Keep in sync with .zed/settings.json
   "files.associations": {
+    // Shell scripts
+    "*.sh.tmpl": "shellscript",
+    "*.bash.tmpl": "shellscript",
+    "*.zsh.tmpl": "shellscript",
     "dot_*rc": "shellscript",
     "dot_*rc.tmpl": "shellscript",
-    "*.sh.tmpl": "shellscript",
-    ".chezmoiignore": "ignore",
-    "*.nu.tmpl": "nushell",
-    "*.json.tmpl": "json",
-    "*.toml.tmpl": "toml",
-    "*.yaml.tmpl": "yaml",
-    "*.cfg.tmpl": "ini",
-    "*.fish.tmpl": "fish",
-    "*bash_aliases*": "shellscript",
     "*dot_profile*": "shellscript",
-    "*dot_gitconfig*": "ini"
+    "*dot_bash_profile*": "shellscript",
+    "*dot_bash_logout*": "shellscript",
+    "*bash_aliases*": "shellscript",
+    "*dot_zprofile*": "shellscript",
+    "*dot_zlogin*": "shellscript",
+    "*dot_zlogout*": "shellscript",
+
+    // Fish shell
+    "*.fish.tmpl": "fish",
+
+    // Nushell
+    "*.nu.tmpl": "nushell",
+
+    // Data formats
+    "*.json.tmpl": "json",
+    "*.jsonc.tmpl": "jsonc",
+    "*.yaml.tmpl": "yaml",
+    "*.yml.tmpl": "yaml",
+    "*.toml.tmpl": "toml",
+    "*.xml.tmpl": "xml",
+    "*.ini.tmpl": "ini",
+    "*.cfg.tmpl": "ini",
+    "*.conf.tmpl": "properties",
+
+    // Programming languages
+    "*.py.tmpl": "python",
+    "*.js.tmpl": "javascript",
+    "*.ts.tmpl": "typescript",
+    "*.lua.tmpl": "lua",
+    "*.rb.tmpl": "ruby",
+    "*.go.tmpl": "go",
+    "*.rs.tmpl": "rust",
+
+    // Web/styling
+    "*.html.tmpl": "html",
+    "*.css.tmpl": "css",
+    "*.scss.tmpl": "scss",
+    "*.less.tmpl": "less",
+
+    // Documentation
+    "*.md.tmpl": "markdown",
+    "*.rst.tmpl": "restructuredtext",
+    "*.txt.tmpl": "plaintext",
+
+    // Editor configs
+    "*.vim.tmpl": "viml",
+    "*.el.tmpl": "lisp",
+
+    // Git-related
+    "*dot_gitconfig*": "ini",
+    "dot_gitconfig.tmpl": "ini",
+    "*dot_gitignore*": "ignore",
+    "*dot_gitattributes*": "gitattributes",
+    ".chezmoiignore": "ignore",
+
+    // Chezmoi script prefixes (these are shell scripts)
+    "modify_*": "shellscript",
+    "run_*": "shellscript",
+    "run_once_*": "shellscript",
+    "run_onchange_*": "shellscript",
+    "run_before_*": "shellscript",
+    "run_after_*": "shellscript",
+
+    // Chezmoi data files
+    ".chezmoiexternal.yaml": "yaml",
+    ".chezmoiexternal.toml": "toml",
+    ".chezmoiexternal.json": "json",
+    ".chezmoidata.yaml": "yaml",
+    ".chezmoidata.toml": "toml",
+    ".chezmoidata.json": "json",
+
+    // SSH
+    "**/dot_ssh/**/config*": "ssh_config",
+    "**/private_dot_ssh/**/config*": "ssh_config",
+
+    // Systemd units
+    "*.service.tmpl": "systemd-unit",
+    "*.timer.tmpl": "systemd-unit",
+    "*.socket.tmpl": "systemd-unit",
+    "*.target.tmpl": "systemd-unit",
+    "*.path.tmpl": "systemd-unit",
+    "*.mount.tmpl": "systemd-unit",
+    "*.automount.tmpl": "systemd-unit",
+    "*.slice.tmpl": "systemd-unit",
+
+    // Desktop entries
+    "*.desktop.tmpl": "desktop",
+
+    // Docker
+    "Dockerfile.tmpl": "dockerfile",
+    "*.dockerfile.tmpl": "dockerfile",
+    "docker-compose*.tmpl": "yaml",
+
+    // Make/build
+    "Makefile.tmpl": "makefile",
+    "*.mk.tmpl": "makefile",
+    "Justfile.tmpl": "just",
+
+    // Environment files
+    "*.env.tmpl": "dotenv",
+    "*dot_env*": "dotenv",
+
+    // Editor/tool configs
+    ".editorconfig.tmpl": "editorconfig",
+    "dot_editorconfig*": "editorconfig",
+    "dot_curlrc*": "properties",
+    "dot_wgetrc*": "properties",
+    "dot_wakatime.cfg*": "ini",
+
+    // PowerShell
+    "*.ps1.tmpl": "powershell",
+    "*.psm1.tmpl": "powershell",
+
+    // Misc configs
+    "*.plist.tmpl": "xml",
+    "*dot_npmrc*": "ini",
+    "*dot_yarnrc*": "yaml",
   },
   // Since we're using the Go template syntax, we don't want formatters to mess with it (https://github.com/microsoft/vscode/issues/35350)
   "editor.formatOnSave": false,
@@ -21,5 +133,5 @@
   "editor.formatOnType": false,
   "notebook.formatOnSave.enabled": false,
   "deno.enable": false,
-  "files.simpleDialog.enable": true
+  "files.simpleDialog.enable": true,
 }

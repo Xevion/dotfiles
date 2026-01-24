@@ -1,0 +1,114 @@
+// Folder-specific settings
+// .tmpl files are Go templates (see text/template pkg)
+// Keep in sync with .vscode/settings.json
+//
+// For a full list of overridable settings, and general information on folder-specific settings,
+// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+{
+  "file_types": {
+    // Shell scripts (including chezmoi script prefixes)
+    "Shell Script": [
+      "*.sh.tmpl",
+      "*.bash.tmpl",
+      "*.zsh.tmpl",
+      "dot_*rc",
+      "dot_*rc.tmpl",
+      "*dot_profile*",
+      "*dot_bash_profile*",
+      "*dot_bash_logout*",
+      "*bash_aliases*",
+      "*dot_zprofile*",
+      "*dot_zlogin*",
+      "*dot_zlogout*",
+      "modify_*",
+      "run_*",
+      "run_once_*",
+      "run_onchange_*",
+      "run_before_*",
+      "run_after_*"
+    ],
+
+    // Fish shell
+    "Fish": ["*.fish.tmpl"],
+
+    // Nushell
+    "Nu": ["*.nu.tmpl"],
+
+    // Data formats
+    "JSON": ["*.json.tmpl", ".chezmoidata.json", ".chezmoiexternal.json"],
+    "JSONC": ["*.jsonc.tmpl"],
+    "YAML": ["*.yaml.tmpl", "*.yml.tmpl", ".chezmoidata.yaml", ".chezmoiexternal.yaml", "docker-compose*.tmpl", "*dot_yarnrc*"],
+    "TOML": ["*.toml.tmpl", ".chezmoidata.toml", ".chezmoiexternal.toml"],
+    "XML": ["*.xml.tmpl"],
+    "INI": ["*.ini.tmpl", "*.cfg.tmpl", "*dot_gitconfig*", "dot_gitconfig.tmpl"],
+    "Properties": ["*.conf.tmpl"],
+
+    // Programming languages
+    "Python": ["*.py.tmpl"],
+    "JavaScript": ["*.js.tmpl"],
+    "TypeScript": ["*.ts.tmpl"],
+    "Lua": ["*.lua.tmpl"],
+    "Ruby": ["*.rb.tmpl"],
+    "Go": ["*.go.tmpl"],
+    "Rust": ["*.rs.tmpl"],
+
+    // Web/styling
+    "HTML": ["*.html.tmpl"],
+    "CSS": ["*.css.tmpl"],
+    "SCSS": ["*.scss.tmpl"],
+    "Less": ["*.less.tmpl"],
+
+    // Documentation
+    "Markdown": ["*.md.tmpl"],
+    "reStructuredText": ["*.rst.tmpl"],
+    "Plain Text": ["*.txt.tmpl"],
+
+    // Editor configs
+    "Vim Script": ["*.vim.tmpl"],
+    "Emacs Lisp": ["*.el.tmpl"],
+
+    // Git-related
+    "Git Ignore": ["*dot_gitignore*", ".chezmoiignore"],
+    "Git Attributes": ["*dot_gitattributes*"],
+
+    // SSH
+    "SSH Config": ["**/dot_ssh/**/config*", "**/private_dot_ssh/**/config*"],
+
+    // Systemd units
+    "Systemd": [
+      "*.service.tmpl",
+      "*.timer.tmpl",
+      "*.socket.tmpl",
+      "*.target.tmpl",
+      "*.path.tmpl",
+      "*.mount.tmpl",
+      "*.automount.tmpl",
+      "*.slice.tmpl"
+    ],
+
+    // Desktop entries
+    "Desktop Entry": ["*.desktop.tmpl"],
+
+    // Docker
+    "Dockerfile": ["Dockerfile.tmpl", "*.dockerfile.tmpl"],
+
+    // Make/build
+    "Make": ["Makefile.tmpl", "*.mk.tmpl"],
+    "Just": ["Justfile.tmpl"],
+
+    // Environment files
+    "Dotenv": ["*.env.tmpl", "*dot_env*"],
+
+    // Editor/tool configs
+    "EditorConfig": [".editorconfig.tmpl", "dot_editorconfig*"],
+
+    // PowerShell
+    "PowerShell": ["*.ps1.tmpl", "*.psm1.tmpl"],
+
+    // Misc configs (as INI)
+    "INI": ["dot_wakatime.cfg*", "*dot_npmrc*", "dot_curlrc*", "dot_wgetrc*"]
+  },
+
+  // Disable formatting since Go templates can break formatters
+  "format_on_save": "off"
+}
