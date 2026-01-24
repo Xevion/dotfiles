@@ -7,6 +7,10 @@
 // custom settings, run `zed: open default settings` from the
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
+  "project_panel": {
+    "hide_hidden": true,
+    "hide_gitignore": false
+  },
   "agent": {
     "default_model": {
       "provider": "copilot_chat",
