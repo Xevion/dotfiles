@@ -1,0 +1,547 @@
+#!/usr/bin/env bun
+
+import { defineCommand, runMain } from "citty";
+import * as p from "@clack/prompts";
+import pc from "picocolors";
+import { execSync, spawnSync, spawn as cpSpawn } from "child_process";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type Backend = "claude" | "opencode";
+type ModelAlias = "haiku" | "sonnet" | "opus";
+
+interface CommitOption {
+  subject: string;
+  body?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function isCancel(value: unknown): value is symbol {
+  return p.isCancel(value);
+}
+
+function bail(msg?: string): never {
+  p.cancel(msg ?? "Cancelled.");
+  process.exit(1);
+}
+
+/** Run a shell command and return trimmed stdout, or null on failure. */
+function shell(cmd: string): string | null {
+  try {
+    return execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/** Check whether there are staged changes. */
+function hasStagedChanges(): boolean {
+  const result = spawnSync("git", ["diff", "--cached", "--quiet"], { stdio: "pipe" });
+  // exit code 1 = there ARE changes, 0 = no changes
+  return result.status === 1;
+}
+
+/** Gather context via commit-helper. */
+function gatherDiffContext(): string {
+  const out = shell("commit-helper --staged");
+  if (!out) {
+    p.log.error("Failed to gather staged changes via commit-helper.");
+    bail();
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// System prompt (embedded commit-style rules)
+// ---------------------------------------------------------------------------
+
+const SYSTEM_PROMPT = `You are a commit message generator. You will be given a diff of staged changes and optional context from the developer.
+
+Your task: produce exactly 3 commit message options.
+
+## CRITICAL: Match the existing commit style EXACTLY
+
+The input includes a "Recent Commit Style" section showing the repository's actual recent commits.
+This section is your PRIMARY source of truth. You MUST replicate the exact formatting conventions you see there.
+
+Before writing ANY option, analyze the recent commits and answer these questions internally:
+1. Do they use a prefix like "type: description"? If yes, EVERY option you generate MUST use a prefix.
+2. What prefix types appear? (e.g. feat, fix, config, refactor, docs) Use only prefixes that appear in the history or are semantically appropriate for the change.
+3. What comes after the prefix — lowercase or capitalized? Match it.
+4. How long are the messages? Match that level of detail.
+
+If the recent commits use conventional commit style (e.g. "feat:", "fix:", "config:"), then ALL 3 of your options MUST use a prefix. Never mix prefixed and unprefixed styles.
+
+## Formatting rules
+
+- Subject line under 72 characters
+- Imperative mood ("add", "fix", "refactor", not "added", "fixes")
+- No trailing periods on subject lines
+- Single-line subject for most commits
+- Add a body (separated by blank line) ONLY for genuinely complex changes
+- Focus on WHAT changed and WHY, not implementation details
+- NEVER mention: test results, lockfile changes, file counts, build status
+
+## Output format
+
+Respond with EXACTLY this format and nothing else — no commentary, no markdown fences, no preamble:
+
+1: <subject line>
+[optional body paragraph]
+
+2: <subject line>
+[optional body paragraph]
+
+3: <subject line>
+[optional body paragraph]
+
+Each option starts with its number prefix on a new line. The body, if present, is separated from the subject by one blank line and should be wrapped at 72 characters.`;
+
+// ---------------------------------------------------------------------------
+// AI invocation
+// ---------------------------------------------------------------------------
+
+/** Map model alias to the string each backend expects. */
+function modelFlag(backend: Backend, alias: ModelAlias): string {
+  if (backend === "claude") {
+    return alias; // claude CLI accepts "haiku", "sonnet", "opus" directly
+  }
+  // opencode wants "provider/model-version" format
+  const map: Record<ModelAlias, string> = {
+    haiku: "anthropic/claude-haiku-4-5",
+    sonnet: "anthropic/claude-sonnet-4-5",
+    opus: "anthropic/claude-opus-4-5",
+  };
+  return map[alias];
+}
+
+/** Build the user prompt from diff context + optional developer context. */
+function buildUserPrompt(diffContext: string, userContext: string): string {
+  let prompt = diffContext;
+  if (userContext.trim()) {
+    prompt += `\n\n## Developer Context\n\n${userContext.trim()}`;
+  }
+  prompt += "\n\nGenerate exactly 3 commit message options in the specified format.";
+  return prompt;
+}
+
+/** Write content to a temp file and return the path. */
+function writeTempFile(prefix: string, content: string): string {
+  const path = `/tmp/${prefix}-${Date.now()}.txt`;
+  require("fs").writeFileSync(path, content, "utf-8");
+  return path;
+}
+
+/** Clean up temp files, ignoring errors. */
+function removeTempFile(path: string): void {
+  try { require("fs").unlinkSync(path); } catch { /* ignore */ }
+}
+
+/** Invoke an AI backend asynchronously, returning stdout. */
+function invokeAI(
+  backend: Backend,
+  model: ModelAlias,
+  diffContext: string,
+  userContext: string,
+  variant?: string,
+): Promise<string> {
+  const userPrompt = buildUserPrompt(diffContext, userContext);
+  const m = modelFlag(backend, model);
+
+  if (backend === "claude") {
+    // Use JSON output to get clean text without thinking preamble
+    return spawnAsync(
+      "claude",
+      ["--print", "--model", m, "--output-format", "json", "--system-prompt", SYSTEM_PROMPT, "--tools", ""],
+      userPrompt,
+    ).then((raw) => {
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed.result ?? raw;
+      } catch {
+        return raw;
+      }
+    });
+  }
+
+  // opencode has no --system-prompt flag — combine system+user into a temp file
+  // and pass the instruction as a short positional message
+  const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\n${userPrompt}`;
+  const promptFile = writeTempFile("commit-prompt", fullPrompt);
+
+  const opencodeArgs = ["run", "--model", m, "--format", "json", "-f", promptFile];
+  if (variant) opencodeArgs.push("--variant", variant);
+
+  return spawnAsync(
+    "opencode",
+    opencodeArgs,
+    "Follow the attached file exactly. Generate 3 commit message options.",
+  ).then((raw) => {
+    // opencode JSON is NDJSON — extract text from "type":"text" events
+    try {
+      const textParts: string[] = [];
+      for (const line of raw.split("\n")) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line);
+        if (event.type === "text" && event.part?.text) {
+          textParts.push(event.part.text);
+        }
+      }
+      return textParts.join("") || raw;
+    } catch {
+      return raw;
+    }
+  }).finally(() => removeTempFile(promptFile));
+}
+
+/** Spawn a child process and collect stdout/stderr. Rejects on non-zero exit. */
+function spawnAsync(cmd: string, args: string[], stdin?: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = cpSpawn(cmd, args, { stdio: ["pipe", "pipe", "pipe"] });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
+    child.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+
+    child.on("error", (err) => reject(err));
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      if (code !== 0) {
+        reject(new Error(`${cmd} exited ${code}: ${stderr.trim() || "unknown error"}`));
+      } else {
+        resolve(stdout.trim());
+      }
+    });
+
+    if (stdin) {
+      child.stdin.write(stdin);
+      child.stdin.end();
+    } else {
+      child.stdin.end();
+    }
+
+    const timeout = setTimeout(() => {
+      child.kill("SIGTERM");
+      reject(new Error(`${cmd} timed out after 120s`));
+    }, 120_000);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Parsing AI output
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse the AI's numbered response into CommitOption[].
+ * Expected format:
+ *   1: subject line
+ *   optional body
+ *
+ *   2: subject line
+ *   ...
+ */
+function parseOptions(raw: string): CommitOption[] {
+  const options: CommitOption[] = [];
+
+  // Strip any preamble before the first numbered option
+  const firstOption = raw.search(/^[123]:\s/m);
+  if (firstOption === -1) return [];
+  const cleaned = raw.slice(firstOption);
+
+  // Split on lines starting with "N:" to get each option block
+  const parts = cleaned.split(/(?:^|\n)(?=[123]:\s)/);
+
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+
+    // Remove the leading "N: " prefix
+    const withoutPrefix = trimmed.replace(/^[123]:\s*/, "");
+    const lines = withoutPrefix.split("\n");
+    const subject = lines[0].trim();
+    if (!subject) continue;
+
+    // Everything after a blank line separator is the body
+    const blankIdx = lines.findIndex((l, i) => i > 0 && l.trim() === "");
+    let body: string | undefined;
+    if (blankIdx > 0 && blankIdx < lines.length - 1) {
+      body = lines
+        .slice(blankIdx + 1)
+        .join("\n")
+        .trim();
+    }
+
+    options.push({ subject, body });
+  }
+
+  return options;
+}
+
+/** Format a CommitOption for display in the selector (label only — subject line). */
+function formatOptionLabel(opt: CommitOption): string {
+  return opt.subject;
+}
+
+/** Format a CommitOption body as a hint string for clack select. */
+function formatOptionHint(opt: CommitOption): string | undefined {
+  if (!opt.body) return undefined;
+  // Show first line of body, truncated to fit terminal reasonably
+  const firstLine = opt.body.split("\n")[0].trim();
+  if (firstLine.length > 72) return firstLine.slice(0, 69) + "...";
+  return firstLine;
+}
+
+/** Convert a CommitOption to the full commit message string. */
+function toCommitMessage(opt: CommitOption): string {
+  if (opt.body) {
+    return `${opt.subject}\n\n${opt.body}`;
+  }
+  return opt.subject;
+}
+
+// ---------------------------------------------------------------------------
+// Git commit
+// ---------------------------------------------------------------------------
+
+function runCommit(message: string, dryRun: boolean): void {
+  if (dryRun) {
+    p.log.info(pc.yellow("Dry run — would commit with:"));
+    console.log();
+    console.log(pc.bold(message));
+    console.log();
+    return;
+  }
+
+  // Write message to a temp file to avoid shell escaping issues
+  const tmpFile = `/tmp/commit-msg-${Date.now()}.txt`;
+  Bun.write(tmpFile, message);
+
+  try {
+    const result = spawnSync("git", ["commit", "-F", tmpFile], {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    if (result.status !== 0) {
+      const stderr = result.stderr?.trim() || "";
+      const stdout = result.stdout?.trim() || "";
+      p.log.error("git commit failed:");
+      if (stderr) console.error(stderr);
+      if (stdout) console.log(stdout);
+      process.exit(result.status ?? 1);
+    }
+
+    const stdout = result.stdout?.trim() || "";
+    if (stdout) p.log.success(stdout);
+  } finally {
+    try {
+      require("fs").unlinkSync(tmpFile);
+    } catch { /* ignore cleanup errors */ }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Subcommands
+// ---------------------------------------------------------------------------
+
+const promptCmd = defineCommand({
+  meta: {
+    name: "prompt",
+    description: "Print the full prompt that would be sent to the AI",
+  },
+  args: {
+    context: {
+      type: "string",
+      alias: "c",
+      description: "Optional developer context to include",
+    },
+    system: {
+      type: "boolean",
+      alias: "s",
+      description: "Include the system prompt (off by default)",
+    },
+  },
+  run({ args }) {
+    if (!hasStagedChanges()) {
+      console.error("No staged changes. Stage files with `git add` first.");
+      process.exit(1);
+    }
+
+    const diffContext = gatherDiffContext();
+    const userPrompt = buildUserPrompt(diffContext, args.context ?? "");
+
+    if (args.system) {
+      console.log("=== SYSTEM PROMPT ===\n");
+      console.log(SYSTEM_PROMPT);
+      console.log("\n=== USER PROMPT ===\n");
+    }
+    console.log(userPrompt);
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Main TUI flow
+// ---------------------------------------------------------------------------
+
+const main = defineCommand({
+  meta: {
+    name: "commit",
+    description: "Interactive AI-powered commit message generator",
+  },
+  subCommands: {
+    prompt: promptCmd,
+  },
+  args: {
+    dryRun: {
+      type: "boolean",
+      alias: "n",
+      description: "Preview the commit message without actually committing",
+    },
+  },
+  async run({ args }) {
+    const dryRun = args.dryRun;
+
+    p.intro(pc.bgCyan(pc.black(" commit ")));
+
+    // 1. Check staged changes
+    if (!hasStagedChanges()) {
+      p.log.error("No staged changes. Stage files with " + pc.cyan("git add") + " first.");
+      bail();
+    }
+
+    // 2. Backend selection
+    const backend = await p.select({
+      message: "Backend",
+      options: [
+        { value: "opencode" as Backend, label: "OpenCode", hint: "opencode CLI" },
+        { value: "claude" as Backend, label: "Claude Code", hint: "claude CLI" },
+      ],
+    });
+    if (isCancel(backend)) bail();
+
+    // 3. Model selection
+    const model = await p.select({
+      message: "Model",
+      options: [
+        { value: "sonnet" as ModelAlias, label: "Sonnet", hint: "balanced" },
+        { value: "haiku" as ModelAlias, label: "Haiku", hint: "fast & cheap" },
+        { value: "opus" as ModelAlias, label: "Opus", hint: "strongest" },
+      ],
+    });
+    if (isCancel(model)) bail();
+
+    // 3b. Thinking variant (opencode only)
+    let variant: string | undefined;
+    if (backend === "opencode") {
+      const v = await p.select({
+        message: "Thinking level",
+        options: [
+          { value: "minimal", label: "Minimal" },
+          { value: "high", label: "High" },
+          { value: "max", label: "Max" },
+        ],
+      });
+      if (isCancel(v)) bail();
+      variant = v as string;
+    }
+
+    // 4. Optional context
+    const userContext = await p.text({
+      message: "Context for the AI " + pc.dim("(optional, Enter to skip)"),
+      placeholder: "e.g. refactored auth flow, fixed edge case in parser...",
+      defaultValue: "",
+    });
+    if (isCancel(userContext)) bail();
+
+    // 5. Gather diff context
+    const s = p.spinner();
+    s.start("Gathering staged changes...");
+    const diffContext = gatherDiffContext();
+    s.stop("Context gathered.");
+
+    // 6. Generate + select loop
+    let chosen: CommitOption | null = null;
+
+    while (!chosen) {
+      const genSpinner = p.spinner();
+      const backendLabel = `${pc.cyan(backend)}/${pc.yellow(model)}`;
+      const t0 = Date.now();
+      genSpinner.start(`Generating via ${backendLabel}...`);
+
+      // Update spinner with elapsed time every second
+      const timer = setInterval(() => {
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
+        genSpinner.message(`Generating via ${backendLabel}... ${pc.dim(`${elapsed}s`)}`);
+      }, 1000);
+
+      let raw: string;
+      try {
+        raw = await invokeAI(backend, model, diffContext, userContext, variant);
+      } catch (err) {
+        clearInterval(timer);
+        genSpinner.stop("Generation failed.");
+        p.log.error(
+          err instanceof Error ? err.message : "Unknown error from AI backend.",
+        );
+
+        const retry = await p.confirm({ message: "Retry?" });
+        if (isCancel(retry) || !retry) bail();
+        continue;
+      }
+
+      clearInterval(timer);
+      const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+      genSpinner.stop(`Options generated. ${pc.dim(`(${elapsed}s)`)}`);
+
+      const options = parseOptions(raw);
+
+      if (options.length === 0) {
+        p.log.warn("Could not parse AI response. Raw output:");
+        console.log(pc.dim(raw));
+        const retry = await p.confirm({ message: "Retry?" });
+        if (isCancel(retry) || !retry) bail();
+        continue;
+      }
+
+      // Build select options: each commit option + Regenerate
+      const selectOptions: Array<{ value: number; label: string; hint?: string }> =
+        options.map((opt, i) => ({
+          value: i,
+          label: formatOptionLabel(opt),
+          hint: formatOptionHint(opt),
+        }));
+      selectOptions.push({
+        value: -1,
+        label: pc.yellow("Regenerate"),
+      });
+
+      const pick = await p.select({
+        message: "Pick a commit message",
+        options: selectOptions,
+      });
+      if (isCancel(pick)) bail();
+
+      if (pick === -1) {
+        // Regenerate — loop continues
+        continue;
+      }
+
+      chosen = options[pick as number];
+    }
+
+    // 7. Commit
+    const message = toCommitMessage(chosen);
+    runCommit(message, dryRun);
+
+    p.outro(dryRun ? pc.yellow("Dry run complete.") : pc.green("Committed!"));
+  },
+});
+
+runMain(main);
