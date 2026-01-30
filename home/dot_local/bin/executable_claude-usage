@@ -13,6 +13,12 @@ import chalk from 'chalk';
 const CLAUDE_CODE_PATH = join(homedir(), '.claude', '.credentials.json');
 const OPENCODE_PATH = join(homedir(), '.local', 'share', 'opencode', 'auth.json');
 
+// Active hours model: 9 AM to 2 AM active, 2 AM to 9 AM sleep
+export const SLEEP_START_HOUR = 2;  // Sleep begins at 2:00 AM
+export const WAKE_HOUR = 9;         // Active period begins at 9:00 AM
+export const SLEEP_HOURS_PER_DAY = 7;   // 2 AM to 9 AM
+export const ACTIVE_HOURS_PER_DAY = 17; // 9 AM to 2 AM
+
 // Parse CLI flags
 const args = process.argv.slice(2);
 const VERBOSE = args.includes('-v') || args.includes('--verbose') || args.includes('-d') || args.includes('--debug');
@@ -432,45 +438,73 @@ function calculate5HourPace(utilization: number, resetTimestamp: number): PaceRe
 }
 
 /**
- * Calculate elapsed active hours for 7-day period
- * Active window: 10am-2am (14 hours per day)
- * 2am is the LAST active hour (2:00-2:59am is active)
+ * Compute the offset (in fractional hours) into the current day-cycle.
+ * A "cycle" runs from SLEEP_START_HOUR (2 AM) to the next SLEEP_START_HOUR.
+ * Offset 0 = exactly 2:00 AM, offset 7 = 9:00 AM, offset 24 = next 2:00 AM.
  */
-function calculateElapsedActiveHours(now: Date, reset: Date): number {
-  const totalPeriodSeconds = 7 * 24 * 3600;
-  const remainingSeconds = (reset.getTime() - now.getTime()) / 1000;
-  const elapsedSeconds = totalPeriodSeconds - remainingSeconds;
-  
-  const completeDays = Math.floor(elapsedSeconds / (24 * 3600));
-  
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
-  
-  let activeHoursToday = 0;
-  
-  if (currentHour >= 10 && currentHour <= 23) {
-    activeHoursToday = (currentHour - 10) + (currentMinute / 60);
-  } else if (currentHour >= 0 && currentHour <= 2) {
-    const hoursAfterMidnight = currentHour + (currentMinute / 60);
-    activeHoursToday = 14 + hoursAfterMidnight;
-  }
-  
-  const totalElapsedActiveHours = (completeDays * 14) + Math.min(activeHoursToday, 14);
-  
-  return totalElapsedActiveHours;
+export function offsetInCycle(t: Date): number {
+  const hours = t.getHours() + t.getMinutes() / 60 + t.getSeconds() / 3600;
+  if (hours >= SLEEP_START_HOUR) return hours - SLEEP_START_HOUR;
+  return hours + (24 - SLEEP_START_HOUR);
 }
 
 /**
- * Calculate pace for 7-day period (accounting for active hours)
+ * Compute the start of the current day-cycle (the most recent 2:00 AM).
+ */
+export function getCycleStart(t: Date): Date {
+  const result = new Date(t);
+  if (t.getHours() >= SLEEP_START_HOUR) {
+    result.setHours(SLEEP_START_HOUR, 0, 0, 0);
+  } else {
+    result.setDate(result.getDate() - 1);
+    result.setHours(SLEEP_START_HOUR, 0, 0, 0);
+  }
+  return result;
+}
+
+/**
+ * Compute active hours within a partial cycle given the offset from cycle start.
+ * Sleep occupies offsets [0, SLEEP_HOURS_PER_DAY), active occupies [SLEEP_HOURS_PER_DAY, 24).
+ * Returns a value in [0, ACTIVE_HOURS_PER_DAY].
+ */
+export function activeHoursInPartialCycle(offsetHours: number): number {
+  if (offsetHours <= SLEEP_HOURS_PER_DAY) return 0;
+  return Math.min(offsetHours - SLEEP_HOURS_PER_DAY, ACTIVE_HOURS_PER_DAY);
+}
+
+/**
+ * Compute total elapsed active hours between two timestamps.
+ * Uses a cycle-based model (2 AM to 2 AM) that is continuous and monotonically
+ * increasing. During sleep hours (2 AM - 9 AM), the value is flat.
+ * During active hours (9 AM - 2 AM), it increases linearly.
+ */
+export function elapsedActiveHoursBetween(start: Date, end: Date): number {
+  const startCycleStart = getCycleStart(start);
+  const endCycleStart = getCycleStart(end);
+
+  const completeCycles = Math.round(
+    (endCycleStart.getTime() - startCycleStart.getTime()) / 86_400_000
+  );
+
+  const startActiveInCycle = activeHoursInPartialCycle(offsetInCycle(start));
+  const endActiveInCycle = activeHoursInPartialCycle(offsetInCycle(end));
+
+  return completeCycles * ACTIVE_HOURS_PER_DAY + endActiveInCycle - startActiveInCycle;
+}
+
+/**
+ * Calculate pace for 7-day period (accounting for active hours).
+ * Uses cycle-based model: 9 AM to 2 AM active, 2 AM to 9 AM sleep.
  */
 function calculate7DayPace(utilization: number, resetTimestamp: number): PaceResult {
   const now = new Date();
   const resetDate = new Date(resetTimestamp * 1000);
+  const periodStart = new Date(resetDate.getTime() - 7 * 24 * 3600 * 1000);
   
-  const totalActiveHours = 7 * 14;
-  const elapsedActiveHours = calculateElapsedActiveHours(now, resetDate);
+  const totalActiveHours = 7 * ACTIVE_HOURS_PER_DAY;
+  const elapsed = elapsedActiveHoursBetween(periodStart, now);
   
-  const expectedUtil = elapsedActiveHours / totalActiveHours;
+  const expectedUtil = elapsed / totalActiveHours;
   const diff = (utilization - expectedUtil) * 100;
   
   return {
