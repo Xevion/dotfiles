@@ -337,5 +337,6 @@
     "editor.defaultFormatter": "svelte.svelte-vscode"
   },
   "claudeCode.preferredLocation": "panel",
-  "terminal.integrated.fontLigatures.enabled": true
+  "terminal.integrated.fontLigatures.enabled": true,
+  "gitlens.currentLine.enabled": false
 }
