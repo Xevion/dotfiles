@@ -195,6 +195,41 @@ When a project uses `assert2`:
 - Use existing tools (Read, Glob, Grep) to manually explore instead
 - Check for existing libraries, frameworks, and code patterns before creating new utilities/APIs
 
+### Using the Explore Agent
+
+**The Explore agent is designed for simple, straightforward tasks only.**
+
+**Use Explore for:**
+- Finding specific files or patterns in the codebase
+- Simple searches and content lookups
+- Sorting through large amounts of files/information
+- Producing formatted output of gathered information
+- Quick reconnaissance tasks that don't require reasoning
+
+**DO NOT use Explore for:**
+- Complex analysis requiring extensive logic or reasoning
+- Tasks that need multi-step problem solving
+- Interpreting or drawing conclusions from data
+- Making decisions or recommendations
+- Anything requiring domain expertise or judgment
+
+**Critical: Output Format**
+- Explore agent must return information **directly in the chat as a normal message**
+- **NEVER create documents, files, or write commands as output**
+- Format findings clearly (lists, tables, code blocks) but output them inline
+- The goal is immediate, readable information - not artifacts to process later
+
+**Example Good Uses:**
+- "Find all TypeScript files using the useAuth hook"
+- "List all config files in the project"
+- "Show me all TODO comments across the codebase"
+- "Find files modified in the last week"
+
+**Example Bad Uses:**
+- "Analyze the authentication flow and suggest improvements" (too complex)
+- "Figure out why this API call is failing" (requires reasoning)
+- "Determine the best approach for refactoring X" (requires judgment)
+
 ### Question Tool Usage
 
 **CRITICAL: Use the Question tool proactively, especially during planning phases.**
@@ -205,6 +240,23 @@ When a project uses `assert2`:
 - Implementation strategy before writing code
 - Prioritization when multiple sub-tasks could be done
 - Design decisions that affect architecture or user experience
+
+**CRITICAL: Multiple-Select vs Single-Select**
+
+**DEFAULT TO `multiple: true` UNLESS OPTIONS ARE MUTUALLY EXCLUSIVE.**
+
+- **Use `multiple: true` (the default)** when user might want more than one option:
+  - "Which of these features should I implement?" → User might want several
+  - "What should I validate?" → Multiple validation rules possible
+  - "Which files need updating?" → Often multiple files
+  - "What improvements should I make?" → Usually multiple improvements desired
+  
+- **Use `multiple: false` ONLY when options truly conflict:**
+  - "Which approach: async or sync?" → Cannot be both
+  - "Should I use A or B library?" → Mutually exclusive choice
+  - "Overwrite or merge?" → Different actions that conflict
+
+**If you present multiple options and don't set `multiple: true`, you're doing it wrong.**
 
 **Use the Question tool for:**
 - **Planning & Task Breakdown** - Before starting work, confirm the approach:
@@ -223,7 +275,6 @@ When a project uses `assert2`:
 - Implementation details that don't affect behavior
 
 **Best Practices:**
-- **Prefer multi-select when appropriate**, single-select when mutually exclusive
 - Ask questions EARLY in the workflow, not after you've already committed to an approach
 - Present options clearly with pros/cons when relevant
 - Don't ask multiple sequential question prompts - batch related questions together when possible

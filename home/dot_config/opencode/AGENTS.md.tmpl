@@ -36,6 +36,23 @@ The system prompt says to add "(Recommended)" to labels, but that's **14 charact
 
 Mentally count characters for each `header` and `label`. If it looks longer than a short button label, it's too long. Move the detail to `description`.
 
+## Multiple-Select Configuration
+
+**CRITICAL: Set `multiple: true` by default. Only use `multiple: false` when options are mutually exclusive.**
+
+When you ask a question with multiple options, the user should be able to pick more than one UNLESS the options fundamentally conflict. Most questions allow multiple selections.
+
+**Examples requiring `multiple: true` (DEFAULT):**
+- "Which features should I add?" → User might want several features
+- "What validations should I include?" → Multiple validations make sense
+- "Which files need this change?" → Often applies to multiple files
+
+**Examples requiring `multiple: false` (RARE):**
+- "Use sync or async approach?" → Cannot be both
+- "Overwrite file or merge changes?" → Conflicting actions
+
+**If you're presenting A, B, C options and don't set `multiple: true`, you're likely doing it wrong.**
+
 ---
 
 {{ template "common-rules.md.tmpl" . }}
