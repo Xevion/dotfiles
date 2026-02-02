@@ -28,9 +28,11 @@ set -gx OPENCODE_ENABLE_EXA true
 # VS Code / Cursor shell integration
 if test "$TERM_PROGRAM" = "vscode"
     if command -q code
-        string replace -r '^' '' (code --locate-shell-integration-path fish) | source
+        set -l vs_integration (code --locate-shell-integration-path fish)
+        test -f "$vs_integration"; and source "$vs_integration"
     else if command -q cursor
-        string replace -r '^' '' (cursor --locate-shell-integration-path fish) | source
+        set -l cursor_integration (cursor --locate-shell-integration-path fish)
+        test -f "$cursor_integration"; and source "$cursor_integration"
     end
 end
 
