@@ -5,8 +5,6 @@ SCRIPT=$(mktemp)
 trap "rm -f $SCRIPT" EXIT
 
 cat > "$SCRIPT" <<'TYPESCRIPT'
-import stableHash from "stable-hash@latest";
-
 interface ModelRef {
   providerID: string;
   modelID: string;
@@ -24,10 +22,16 @@ const REQUIRED_FAVORITES: ModelRef[] = [
   { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
 ];
 
+// Deterministic hash using Bun's built-in hash with sorted JSON
+function hashObject(obj: unknown): number {
+  const sortedJson = JSON.stringify(obj, Object.keys(obj as object).sort());
+  return Bun.hash(sortedJson);
+}
+
 const originalText = await Bun.stdin.text();
 const hasTrailingNewline = originalText.endsWith('\n');
 const originalState: ModelState = originalText.trim() ? JSON.parse(originalText) : {};
-const originalHash = stableHash(originalState);
+const originalHash = hashObject(originalState);
 
 const modifiedState: ModelState = JSON.parse(JSON.stringify(originalState));
 
@@ -44,7 +48,7 @@ for (const required of REQUIRED_FAVORITES) {
   }
 }
 
-const modifiedHash = stableHash(modifiedState);
+const modifiedHash = hashObject(modifiedState);
 
 // Only output changes if data actually changed
 if (originalHash === modifiedHash) {
