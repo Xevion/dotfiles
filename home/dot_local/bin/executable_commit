@@ -2,8 +2,10 @@
 
 import { defineCommand, runMain } from "citty";
 import * as p from "@clack/prompts";
+import { SelectPrompt } from "@clack/core";
 import pc from "picocolors";
 import { execSync, spawnSync, spawn as cpSpawn } from "child_process";
+import { readFileSync } from "fs";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -11,11 +13,30 @@ import { execSync, spawnSync, spawn as cpSpawn } from "child_process";
 
 type Backend = "claude" | "opencode";
 type ModelAlias = "haiku" | "sonnet" | "opus";
+type ThinkingLevel = "minimal" | "high" | "max";
+type PostAction = "commit" | "edit" | "tweak";
 
 interface CommitOption {
   subject: string;
   body?: string;
 }
+
+/** Default thinking level per model (opencode only). */
+const THINKING_DEFAULTS: Record<ModelAlias, ThinkingLevel> = {
+  haiku: "high",
+  sonnet: "minimal",
+  opus: "minimal",
+};
+
+/** Refinement presets for regeneration. */
+const REFINEMENT_PRESETS: Array<{ value: string; label: string }> = [
+  { value: "none", label: "Just regenerate (no guidance)" },
+  { value: "concise", label: "More concise" },
+  { value: "detailed", label: "More detailed" },
+  { value: "prefix", label: "Different prefix/scope" },
+  { value: "conventional", label: "More conventional style" },
+  { value: "custom", label: "Custom feedback..." },
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -60,9 +81,10 @@ function gatherDiffContext(): string {
 // System prompt (embedded commit-style rules)
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are a commit message generator. You will be given a diff of staged changes and optional context from the developer.
+function buildSystemPrompt(count: number): string {
+  return `You are a commit message generator. You will be given a diff of staged changes and optional context from the developer.
 
-Your task: produce exactly 3 commit message options.
+Your task: produce exactly ${count} commit message options.
 
 ## CRITICAL: Match the existing commit style EXACTLY
 
@@ -75,7 +97,7 @@ Before writing ANY option, analyze the recent commits and answer these questions
 3. What comes after the prefix — lowercase or capitalized? Match it.
 4. How long are the messages? Match that level of detail.
 
-If the recent commits use conventional commit style (e.g. "feat:", "fix:", "config:"), then ALL 3 of your options MUST use a prefix. Never mix prefixed and unprefixed styles.
+If the recent commits use conventional commit style (e.g. "feat:", "fix:", "config:"), then ALL ${count} of your options MUST use a prefix. Never mix prefixed and unprefixed styles.
 
 ## Formatting rules
 
@@ -97,10 +119,13 @@ Respond with EXACTLY this format and nothing else — no commentary, no markdown
 2: <subject line>
 [optional body paragraph]
 
-3: <subject line>
+...
+
+${count}: <subject line>
 [optional body paragraph]
 
 Each option starts with its number prefix on a new line. The body, if present, is separated from the subject by one blank line and should be wrapped at 72 characters.`;
+}
 
 // ---------------------------------------------------------------------------
 // AI invocation
@@ -120,13 +145,21 @@ function modelFlag(backend: Backend, alias: ModelAlias): string {
   return map[alias];
 }
 
-/** Build the user prompt from diff context + optional developer context. */
-function buildUserPrompt(diffContext: string, userContext: string): string {
+/** Build the user prompt from diff context + optional developer context + refinement. */
+function buildUserPrompt(
+  diffContext: string,
+  userContext: string,
+  count: number,
+  refinement?: string,
+): string {
   let prompt = diffContext;
   if (userContext.trim()) {
     prompt += `\n\n## Developer Context\n\n${userContext.trim()}`;
   }
-  prompt += "\n\nGenerate exactly 3 commit message options in the specified format.";
+  if (refinement) {
+    prompt += `\n\n## Refinement Request\n\n${refinement}`;
+  }
+  prompt += `\n\nGenerate exactly ${count} commit message options in the specified format.`;
   return prompt;
 }
 
@@ -148,16 +181,18 @@ function invokeAI(
   model: ModelAlias,
   diffContext: string,
   userContext: string,
+  count: number,
   variant?: string,
+  refinement?: string,
 ): Promise<string> {
-  const userPrompt = buildUserPrompt(diffContext, userContext);
+  const systemPrompt = buildSystemPrompt(count);
+  const userPrompt = buildUserPrompt(diffContext, userContext, count, refinement);
   const m = modelFlag(backend, model);
 
   if (backend === "claude") {
-    // Use JSON output to get clean text without thinking preamble
     return spawnAsync(
       "claude",
-      ["--print", "--model", m, "--output-format", "json", "--system-prompt", SYSTEM_PROMPT, "--tools", ""],
+      ["--print", "--model", m, "--output-format", "json", "--system-prompt", systemPrompt, "--tools", ""],
       userPrompt,
     ).then((raw) => {
       try {
@@ -170,8 +205,7 @@ function invokeAI(
   }
 
   // opencode has no --system-prompt flag — combine system+user into a temp file
-  // and pass the instruction as a short positional message
-  const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\n${userPrompt}`;
+  const fullPrompt = `${systemPrompt}\n\n---\n\n${userPrompt}`;
   const promptFile = writeTempFile("commit-prompt", fullPrompt);
 
   const opencodeArgs = ["run", "--model", m, "--format", "json", "-f", promptFile];
@@ -180,7 +214,7 @@ function invokeAI(
   return spawnAsync(
     "opencode",
     opencodeArgs,
-    "Follow the attached file exactly. Generate 3 commit message options.",
+    `Follow the attached file exactly. Generate ${count} commit message options.`,
   ).then((raw) => {
     // opencode JSON is NDJSON — extract text from "type":"text" events
     try {
@@ -251,19 +285,19 @@ function parseOptions(raw: string): CommitOption[] {
   const options: CommitOption[] = [];
 
   // Strip any preamble before the first numbered option
-  const firstOption = raw.search(/^[123]:\s/m);
+  const firstOption = raw.search(/^\d+:\s/m);
   if (firstOption === -1) return [];
   const cleaned = raw.slice(firstOption);
 
   // Split on lines starting with "N:" to get each option block
-  const parts = cleaned.split(/(?:^|\n)(?=[123]:\s)/);
+  const parts = cleaned.split(/(?:^|\n)(?=\d+:\s)/);
 
   for (const part of parts) {
     const trimmed = part.trim();
     if (!trimmed) continue;
 
     // Remove the leading "N: " prefix
-    const withoutPrefix = trimmed.replace(/^[123]:\s*/, "");
+    const withoutPrefix = trimmed.replace(/^\d+:\s*/, "");
     const lines = withoutPrefix.split("\n");
     const subject = lines[0].trim();
     if (!subject) continue;
@@ -284,26 +318,188 @@ function parseOptions(raw: string): CommitOption[] {
   return options;
 }
 
-/** Format a CommitOption for display in the selector (label only — subject line). */
-function formatOptionLabel(opt: CommitOption): string {
-  return opt.subject;
-}
-
-/** Format a CommitOption body as a hint string for clack select. */
-function formatOptionHint(opt: CommitOption): string | undefined {
-  if (!opt.body) return undefined;
-  // Show first line of body, truncated to fit terminal reasonably
-  const firstLine = opt.body.split("\n")[0].trim();
-  if (firstLine.length > 72) return firstLine.slice(0, 69) + "...";
-  return firstLine;
-}
-
 /** Convert a CommitOption to the full commit message string. */
 function toCommitMessage(opt: CommitOption): string {
   if (opt.body) {
     return `${opt.subject}\n\n${opt.body}`;
   }
   return opt.subject;
+}
+
+// ---------------------------------------------------------------------------
+// Clack visual constants (matching @clack/prompts style)
+// ---------------------------------------------------------------------------
+
+const S_STEP_ACTIVE = "◆";
+const S_STEP_SUBMIT = "◇";
+const S_STEP_CANCEL = "■";
+const S_BAR = "│";
+const S_BAR_END = "└";
+const S_RADIO_ACTIVE = "●";
+const S_RADIO_INACTIVE = "○";
+
+// ---------------------------------------------------------------------------
+// Custom multi-line select component
+// ---------------------------------------------------------------------------
+
+type CommitSelectValue = number | "regenerate";
+
+interface CommitSelectOption {
+  value: CommitSelectValue;
+  subject: string;
+  body?: string;
+  isAction?: boolean;
+}
+
+/**
+ * Custom select prompt that renders commit messages with full bodies visible.
+ * Uses @clack/core's SelectPrompt with a custom render() method.
+ */
+function commitSelect(
+  options: CommitOption[],
+): Promise<CommitSelectValue | symbol> {
+  const selectOptions: CommitSelectOption[] = [
+    ...options.map((opt, i) => ({
+      value: i as CommitSelectValue,
+      subject: opt.subject,
+      body: opt.body,
+    })),
+    { value: "regenerate" as const, subject: "Regenerate", isAction: true },
+  ];
+
+  return new SelectPrompt<CommitSelectOption & { disabled?: boolean }>({
+    options: selectOptions.map((o) => ({ ...o, disabled: false })),
+    initialValue: 0 as CommitSelectValue,
+    render() {
+      const state = this.state;
+
+      // Title line
+      const icon =
+        state === "submit"
+          ? pc.green(S_STEP_SUBMIT)
+          : state === "cancel"
+            ? pc.red(S_STEP_CANCEL)
+            : pc.cyan(S_STEP_ACTIVE);
+      const bar =
+        state === "cancel" ? pc.red(S_BAR) : state === "submit" ? pc.gray(S_BAR) : pc.cyan(S_BAR);
+
+      const title = `${pc.gray(S_BAR)}\n${icon}  Pick a commit message\n`;
+
+      if (state === "submit") {
+        const chosen = selectOptions[this.cursor];
+        return `${title}${pc.gray(S_BAR)}  ${pc.dim(chosen.subject)}`;
+      }
+
+      if (state === "cancel") {
+        const chosen = selectOptions[this.cursor];
+        return `${title}${pc.gray(S_BAR)}  ${pc.strikethrough(pc.dim(chosen.subject))}\n${pc.gray(S_BAR)}`;
+      }
+
+      // Active state — render all options
+      const lines: string[] = [];
+      for (let i = 0; i < selectOptions.length; i++) {
+        const opt = selectOptions[i];
+        const active = i === this.cursor;
+        const radio = active ? pc.green(S_RADIO_ACTIVE) : pc.dim(S_RADIO_INACTIVE);
+
+        if (opt.isAction) {
+          // Regenerate action — styled differently
+          const label = active ? pc.yellow(opt.subject) : pc.dim(pc.yellow(opt.subject));
+          lines.push(`${bar}  ${radio} ${label}`);
+        } else {
+          // Commit option — subject + optional body
+          const subject = active ? pc.bold(opt.subject) : pc.dim(opt.subject);
+          lines.push(`${bar}  ${radio} ${subject}`);
+
+          if (opt.body) {
+            // Render body lines indented under the subject
+            const bodyLines = opt.body.split("\n");
+            for (const bodyLine of bodyLines) {
+              lines.push(`${bar}    ${pc.dim(bodyLine)}`);
+            }
+          }
+
+          // Blank separator between commit options (not after the last one before Regenerate)
+          if (i < selectOptions.length - 2 || (opt.body && i < selectOptions.length - 1)) {
+            lines.push(`${bar}`);
+          }
+        }
+      }
+
+      return `${title}${lines.join("\n")}\n${pc.cyan(S_BAR_END)}\n`;
+    },
+  }).prompt() as Promise<CommitSelectValue | symbol>;
+}
+
+// ---------------------------------------------------------------------------
+// Refinement prompt
+// ---------------------------------------------------------------------------
+
+/** Show refinement sub-prompt. Returns a refinement string or undefined. */
+async function promptRefinement(): Promise<string | undefined> {
+  const picks = await p.multiselect({
+    message: "Refine the next generation?",
+    options: REFINEMENT_PRESETS.map((r) => ({ value: r.value, label: r.label })),
+    required: true,
+  });
+  if (isCancel(picks)) bail();
+
+  const selected = picks as string[];
+
+  // "none" means no refinement
+  if (selected.includes("none")) return undefined;
+
+  const parts: string[] = [];
+
+  for (const pick of selected) {
+    if (pick === "custom") continue;
+    const preset = REFINEMENT_PRESETS.find((r) => r.value === pick);
+    if (preset) parts.push(preset.label);
+  }
+
+  // Custom feedback
+  if (selected.includes("custom")) {
+    const feedback = await p.text({
+      message: "What should be different?",
+      placeholder: "e.g. focus on the API changes, shorter subject...",
+    });
+    if (isCancel(feedback)) bail();
+    if ((feedback as string).trim()) {
+      parts.push((feedback as string).trim());
+    }
+  }
+
+  if (parts.length === 0) return undefined;
+
+  return `The user wants the next set of options to be:\n${parts.map((p) => `- ${p}`).join("\n")}`;
+}
+
+// ---------------------------------------------------------------------------
+// Post-selection action prompt
+// ---------------------------------------------------------------------------
+
+/** Prompt user for what to do with the selected commit message. */
+async function promptPostAction(): Promise<PostAction> {
+  const action = await p.select({
+    message: "Action",
+    options: [
+      { value: "commit" as PostAction, label: "Commit", hint: "run git commit" },
+      { value: "edit" as PostAction, label: "Edit", hint: "open in $EDITOR" },
+      { value: "tweak" as PostAction, label: "Tweak with AI", hint: "use as baseline, regenerate" },
+    ],
+  });
+  if (isCancel(action)) bail();
+  return action as PostAction;
+}
+
+/** Open a message in $EDITOR and return the edited content. */
+function editInEditor(message: string): string {
+  const tmpFile = writeTempFile("commit-edit", message);
+  const editor = process.env.EDITOR || process.env.VISUAL || "vi";
+  spawnSync(editor, [tmpFile], { stdio: "inherit" });
+  const edited = readFileSync(tmpFile, "utf-8").trim();
+  removeTempFile(tmpFile);
+  return edited;
 }
 
 // ---------------------------------------------------------------------------
@@ -375,11 +571,12 @@ const promptCmd = defineCommand({
     }
 
     const diffContext = gatherDiffContext();
-    const userPrompt = buildUserPrompt(diffContext, args.context ?? "");
+    const count = 5;
+    const userPrompt = buildUserPrompt(diffContext, args.context ?? "", count);
 
     if (args.system) {
       console.log("=== SYSTEM PROMPT ===\n");
-      console.log(SYSTEM_PROMPT);
+      console.log(buildSystemPrompt(count));
       console.log("\n=== USER PROMPT ===\n");
     }
     console.log(userPrompt);
@@ -403,6 +600,11 @@ const main = defineCommand({
       type: "boolean",
       alias: "n",
       description: "Preview the commit message without actually committing",
+    },
+    count: {
+      type: "string",
+      alias: "N",
+      description: "Number of commit message options to generate",
     },
   },
   async run({ args }) {
@@ -437,22 +639,46 @@ const main = defineCommand({
     });
     if (isCancel(model)) bail();
 
-    // 3b. Thinking variant (opencode only)
+    // 3b. Thinking variant (opencode only, with model-aware default)
     let variant: string | undefined;
     if (backend === "opencode") {
+      const defaultThinking = THINKING_DEFAULTS[model as ModelAlias];
       const v = await p.select({
         message: "Thinking level",
+        initialValue: defaultThinking,
         options: [
-          { value: "minimal", label: "Minimal" },
-          { value: "high", label: "High" },
-          { value: "max", label: "Max" },
+          { value: "minimal" as ThinkingLevel, label: "Minimal" },
+          { value: "high" as ThinkingLevel, label: "High" },
+          { value: "max" as ThinkingLevel, label: "Max" },
         ],
       });
       if (isCancel(v)) bail();
       variant = v as string;
     }
 
-    // 4. Optional context
+    // 4. Option count
+    let count: number;
+    if (args.count) {
+      count = parseInt(args.count, 10);
+      if (isNaN(count) || count < 1 || count > 15) {
+        p.log.error("--count must be between 1 and 15.");
+        bail();
+      }
+    } else {
+      const countInput = await p.text({
+        message: "How many options?",
+        placeholder: "5",
+        defaultValue: "5",
+        validate(val) {
+          const n = parseInt(val, 10);
+          if (isNaN(n) || n < 1 || n > 15) return "Enter a number between 1 and 15";
+        },
+      });
+      if (isCancel(countInput)) bail();
+      count = parseInt(countInput as string, 10);
+    }
+
+    // 5. Optional context
     const userContext = await p.text({
       message: "Context for the AI " + pc.dim("(optional, Enter to skip)"),
       placeholder: "e.g. refactored auth flow, fixed edge case in parser...",
@@ -460,22 +686,35 @@ const main = defineCommand({
     });
     if (isCancel(userContext)) bail();
 
-    // 5. Gather diff context
+    // 6. Gather diff context
     const s = p.spinner();
     s.start("Gathering staged changes...");
     const diffContext = gatherDiffContext();
     s.stop("Context gathered.");
 
-    // 6. Generate + select loop
-    let chosen: CommitOption | null = null;
+    // 7. Generate → Select → Action loop
+    let refinement: string | undefined;
+    let tweakBaseline: string | undefined;
 
-    while (!chosen) {
+    mainLoop: while (true) {
+      // Build refinement context from tweak baseline if present
+      let currentRefinement = refinement;
+      if (tweakBaseline) {
+        const tweakFeedback = await p.text({
+          message: "How should the AI tweak this message?",
+          placeholder: "e.g. shorter subject, focus on the API changes...",
+        });
+        if (isCancel(tweakFeedback)) bail();
+
+        currentRefinement = `The user liked this message as a starting point:\n\n> ${tweakBaseline.replace(/\n/g, "\n> ")}\n\nTheir feedback: ${(tweakFeedback as string).trim()}\n\nGenerate ${count} new variations based on this baseline.`;
+        tweakBaseline = undefined;
+      }
+
       const genSpinner = p.spinner();
       const backendLabel = `${pc.cyan(backend)}/${pc.yellow(model)}`;
       const t0 = Date.now();
       genSpinner.start(`Generating via ${backendLabel}...`);
 
-      // Update spinner with elapsed time every second
       const timer = setInterval(() => {
         const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
         genSpinner.message(`Generating via ${backendLabel}... ${pc.dim(`${elapsed}s`)}`);
@@ -483,7 +722,7 @@ const main = defineCommand({
 
       let raw: string;
       try {
-        raw = await invokeAI(backend, model, diffContext, userContext, variant);
+        raw = await invokeAI(backend, model, diffContext, userContext, count, variant, currentRefinement);
       } catch (err) {
         clearInterval(timer);
         genSpinner.stop("Generation failed.");
@@ -507,38 +746,48 @@ const main = defineCommand({
         console.log(pc.dim(raw));
         const retry = await p.confirm({ message: "Retry?" });
         if (isCancel(retry) || !retry) bail();
+        refinement = undefined;
         continue;
       }
 
-      // Build select options: each commit option + Regenerate
-      const selectOptions: Array<{ value: number; label: string; hint?: string }> =
-        options.map((opt, i) => ({
-          value: i,
-          label: formatOptionLabel(opt),
-          hint: formatOptionHint(opt),
-        }));
-      selectOptions.push({
-        value: -1,
-        label: pc.yellow("Regenerate"),
-      });
-
-      const pick = await p.select({
-        message: "Pick a commit message",
-        options: selectOptions,
-      });
+      // Custom multi-line select
+      const pick = await commitSelect(options);
       if (isCancel(pick)) bail();
 
-      if (pick === -1) {
-        // Regenerate — loop continues
+      if (pick === "regenerate") {
+        // Refinement sub-prompt
+        refinement = await promptRefinement();
         continue;
       }
 
-      chosen = options[pick as number];
-    }
+      const chosen = options[pick as number];
 
-    // 7. Commit
-    const message = toCommitMessage(chosen);
-    runCommit(message, dryRun);
+      // Post-selection action
+      const action = await promptPostAction();
+
+      switch (action) {
+        case "commit": {
+          const message = toCommitMessage(chosen);
+          runCommit(message, dryRun);
+          break mainLoop;
+        }
+        case "edit": {
+          const draft = toCommitMessage(chosen);
+          const edited = editInEditor(draft);
+          if (!edited) {
+            p.log.warn("Empty message — aborting.");
+            bail();
+          }
+          runCommit(edited, dryRun);
+          break mainLoop;
+        }
+        case "tweak": {
+          tweakBaseline = toCommitMessage(chosen);
+          refinement = undefined;
+          continue mainLoop;
+        }
+      }
+    }
 
     p.outro(dryRun ? pc.yellow("Dry run complete.") : pc.green("Committed!"));
   },
