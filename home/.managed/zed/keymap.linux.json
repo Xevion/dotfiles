@@ -181,4 +181,28 @@
       "ctrl-alt-right": "pane::SwapItemRight",
     },
   },
+  {
+    "context": "(Editor && !agent_diff)",
+    "bindings": {
+      "alt-s": "git::StageAndNext"
+    }
+  },
+  {
+    "context": "(Editor && !agent_diff)",
+    "bindings": {
+      "alt-y": null
+    }
+  },
+  {
+    "context": "(Editor && !agent_diff)",
+    "bindings": {
+      "alt-shift-s": "git::UnstageAndNext"
+    }
+  },
+  {
+    "context": "(Editor && !agent_diff)",
+    "bindings": {
+      "alt-shift-y": null
+    }
+  }
 ]
