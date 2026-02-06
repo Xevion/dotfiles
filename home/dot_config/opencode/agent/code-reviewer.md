@@ -1,7 +1,7 @@
 ---
 description: Expert code review specialist. Proactively reviews code for quality, security, and maintainability. Use immediately after writing or modifying code.
 mode: subagent
-model: anthropic/claude-opus-4-5
+model: anthropic/claude-opus-4-6
 temperature: 0.2
 tools:
   write: false

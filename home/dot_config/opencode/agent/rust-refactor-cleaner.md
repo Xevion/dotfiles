@@ -1,7 +1,7 @@
 ---
 description: Dead code cleanup and consolidation specialist for Rust projects. Use PROACTIVELY for removing unused code, duplicates, and refactoring. Runs analysis tools (cargo clippy, cargo udeps, cargo-machete) to identify dead code and safely removes it.
 mode: subagent
-model: anthropic/claude-opus-4-5
+model: anthropic/claude-opus-4-6
 temperature: 0.2
 tools:
   write: true

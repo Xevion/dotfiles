@@ -1,7 +1,7 @@
 ---
 description: End-to-end testing specialist using Playwright. Use PROACTIVELY for generating, maintaining, and running E2E tests. Manages test journeys, quarantines flaky tests, and ensures critical user flows work.
 mode: subagent
-model: anthropic/claude-opus-4-5
+model: anthropic/claude-opus-4-6
 temperature: 0.2
 tools:
   write: true

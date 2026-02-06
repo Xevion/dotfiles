@@ -1,7 +1,7 @@
 ---
 description: Expert planning specialist for complex features and refactoring. Use PROACTIVELY when users request feature implementation, architectural changes, or complex refactoring.
 mode: subagent
-model: anthropic/claude-opus-4-5
+model: anthropic/claude-opus-4-6
 temperature: 0.3
 tools:
   write: false

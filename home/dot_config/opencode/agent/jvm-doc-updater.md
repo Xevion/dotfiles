@@ -1,7 +1,7 @@
 ---
 description: Documentation and codemap specialist for Kotlin/Java projects. Use PROACTIVELY for updating codemaps and documentation. Generates docs/CODEMAPS/*, updates READMEs and API docs using Dokka/KDoc.
 mode: subagent
-model: anthropic/claude-opus-4-5
+model: anthropic/claude-opus-4-6
 temperature: 0.3
 tools:
   write: true

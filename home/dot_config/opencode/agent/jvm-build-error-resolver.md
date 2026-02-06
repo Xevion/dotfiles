@@ -1,7 +1,7 @@
 ---
 description: Build and compilation error resolution specialist for Kotlin/Java/JVM projects. Use PROACTIVELY when Gradle/Maven builds fail or compiler errors occur. Fixes build/type errors only with minimal diffs, no architectural edits.
 mode: subagent
-model: anthropic/claude-opus-4-5
+model: anthropic/claude-opus-4-6
 temperature: 0.1
 tools:
   write: true

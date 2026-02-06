@@ -1,7 +1,7 @@
 ---
 description: General-purpose Kotlin/Java implementation specialist. Use for writing idiomatic JVM code, applying patterns, and solving implementation challenges. Favors Kotlin-first with clean Java interop.
 mode: subagent
-model: anthropic/claude-opus-4-5
+model: anthropic/claude-opus-4-6
 temperature: 0.2
 tools:
   write: true

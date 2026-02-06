@@ -1,7 +1,7 @@
 ---
 description: Build and compiler error resolution specialist for Rust projects. Use PROACTIVELY when cargo build fails or compiler errors occur. Fixes build/type errors only with minimal diffs, no architectural edits.
 mode: subagent
-model: anthropic/claude-opus-4-5
+model: anthropic/claude-opus-4-6
 temperature: 0.1
 tools:
   write: true

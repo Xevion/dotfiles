@@ -1,7 +1,7 @@
 ---
 description: Test-Driven Development specialist for Rust projects enforcing write-tests-first methodology. Use PROACTIVELY when writing new features, fixing bugs, or refactoring code. Ensures comprehensive test coverage with built-in test framework, proptest, and mockall.
 mode: subagent
-model: anthropic/claude-opus-4-5
+model: anthropic/claude-opus-4-6
 temperature: 0.2
 tools:
   write: true

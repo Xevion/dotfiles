@@ -1,7 +1,7 @@
 ---
 description: General-purpose Rust implementation specialist. Use for writing idiomatic Rust, applying patterns, and solving implementation challenges. Favors zero-cost abstractions with safe, expressive code.
 mode: subagent
-model: anthropic/claude-opus-4-5
+model: anthropic/claude-opus-4-6
 temperature: 0.2
 tools:
   write: true

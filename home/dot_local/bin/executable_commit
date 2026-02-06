@@ -140,7 +140,7 @@ function modelFlag(backend: Backend, alias: ModelAlias): string {
   const map: Record<ModelAlias, string> = {
     haiku: "anthropic/claude-haiku-4-5",
     sonnet: "anthropic/claude-sonnet-4-5",
-    opus: "anthropic/claude-opus-4-5",
+    opus: "anthropic/claude-opus-4-6",
   };
   return map[alias];
 }
