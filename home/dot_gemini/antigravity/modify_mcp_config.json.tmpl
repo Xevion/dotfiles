@@ -1,0 +1,110 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# Ensures required MCP servers exist in ~/.gemini/antigravity/mcp_config.json
+# Uses mcp-remote wrapper for HTTP→stdio bridge (Antigravity uses stdio)
+# Skips if ~/.gemini/ directory doesn't exist (Antigravity not installed)
+
+SCRIPT=$(mktemp)
+trap "rm -f $SCRIPT" EXIT
+
+cat > "$SCRIPT" <<'TYPESCRIPT'
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
+interface McpServerStdio {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
+interface AntigravityConfig {
+  mcpServers?: Record<string, McpServerStdio>;
+  [key: string]: unknown;
+}
+
+const HOME = process.env.HOME!;
+
+// Early exit if Antigravity not installed
+if (!existsSync(join(HOME, ".gemini"))) {
+  const originalText = await Bun.stdin.text();
+  process.stdout.write(originalText);
+  process.exit(0);
+}
+
+// Antigravity uses stdio/command-based MCP, so we use mcp-remote for HTTP servers
+const REQUIRED_SERVERS: Record<string, McpServerStdio> = {
+  context7: {
+    command: "npx",
+    args: [
+      "-y",
+      "mcp-remote",
+      "https://mcp.context7.com/mcp",
+      "--header",
+      "CONTEXT7_API_KEY: {{ dopplerProjectJson.CONTEXT7_API_KEY }}",
+    ],
+  },
+  gh_grep: {
+    command: "npx",
+    args: ["-y", "mcp-remote", "https://mcp.grep.app"],
+  },
+  linear: {
+    command: "npx",
+    args: ["-y", "mcp-remote", "https://mcp.linear.app/mcp"],
+  },
+};
+
+// Deep sort object keys for deterministic hashing
+function sortDeep(obj: unknown): unknown {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sortDeep);
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(obj as object).sort()) {
+    sorted[key] = sortDeep((obj as Record<string, unknown>)[key]);
+  }
+  return sorted;
+}
+
+function hashObject(obj: unknown): number {
+  return Bun.hash(JSON.stringify(sortDeep(obj)));
+}
+
+const originalText = await Bun.stdin.text();
+const hasTrailingNewline = originalText.endsWith('\n');
+const originalConfig: AntigravityConfig = originalText.trim() ? JSON.parse(originalText) : {};
+const originalHash = hashObject(originalConfig);
+
+const modifiedConfig: AntigravityConfig = JSON.parse(JSON.stringify(originalConfig));
+
+if (!modifiedConfig.mcpServers || typeof modifiedConfig.mcpServers !== 'object') {
+  modifiedConfig.mcpServers = {};
+}
+
+// Add/update required servers
+for (const [name, server] of Object.entries(REQUIRED_SERVERS)) {
+  modifiedConfig.mcpServers[name] = server;
+}
+
+const modifiedHash = hashObject(modifiedConfig);
+
+if (originalHash === modifiedHash) {
+  process.stdout.write(originalText);
+} else {
+  const isPrettified = originalText.trim().includes('\n');
+  const output = isPrettified
+    ? JSON.stringify(modifiedConfig, null, 2)
+    : JSON.stringify(modifiedConfig);
+
+  if (hasTrailingNewline) {
+    console.log(output);
+  } else {
+    process.stdout.write(output);
+  }
+}
+TYPESCRIPT
+
+exec bun "$SCRIPT"
+{{ else -}}
+#!/bin/bash
+# Windows/macOS: pass through unchanged
+cat
+{{ end -}}

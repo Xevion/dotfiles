@@ -1,0 +1,113 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# Ensures required MCP servers exist in ~/.cursor/mcp.json
+# Skips if ~/.cursor/ directory doesn't exist (Cursor not installed)
+
+SCRIPT=$(mktemp)
+trap "rm -f $SCRIPT" EXIT
+
+cat > "$SCRIPT" <<'TYPESCRIPT'
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
+interface McpServerHttp {
+  type: "http";
+  url: string;
+  headers?: Record<string, string>;
+}
+
+interface McpServerStdio {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
+type McpServer = McpServerHttp | McpServerStdio;
+
+interface CursorConfig {
+  mcpServers?: Record<string, McpServer>;
+  [key: string]: unknown;
+}
+
+const HOME = process.env.HOME!;
+
+// Early exit if Cursor not installed
+if (!existsSync(join(HOME, ".cursor"))) {
+  const originalText = await Bun.stdin.text();
+  process.stdout.write(originalText);
+  process.exit(0);
+}
+
+const REQUIRED_SERVERS: Record<string, McpServer> = {
+  context7: {
+    type: "http",
+    url: "https://mcp.context7.com/mcp",
+    headers: {
+      CONTEXT7_API_KEY: "{{ dopplerProjectJson.CONTEXT7_API_KEY }}",
+    },
+  },
+  gh_grep: {
+    type: "http",
+    url: "https://mcp.grep.app",
+  },
+  linear: {
+    type: "http",
+    url: "https://mcp.linear.app/mcp",
+  },
+};
+
+// Deep sort object keys for deterministic hashing
+function sortDeep(obj: unknown): unknown {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sortDeep);
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(obj as object).sort()) {
+    sorted[key] = sortDeep((obj as Record<string, unknown>)[key]);
+  }
+  return sorted;
+}
+
+function hashObject(obj: unknown): number {
+  return Bun.hash(JSON.stringify(sortDeep(obj)));
+}
+
+const originalText = await Bun.stdin.text();
+const hasTrailingNewline = originalText.endsWith('\n');
+const originalConfig: CursorConfig = originalText.trim() ? JSON.parse(originalText) : {};
+const originalHash = hashObject(originalConfig);
+
+const modifiedConfig: CursorConfig = JSON.parse(JSON.stringify(originalConfig));
+
+if (!modifiedConfig.mcpServers || typeof modifiedConfig.mcpServers !== 'object') {
+  modifiedConfig.mcpServers = {};
+}
+
+// Add/update required servers
+for (const [name, server] of Object.entries(REQUIRED_SERVERS)) {
+  modifiedConfig.mcpServers[name] = server;
+}
+
+const modifiedHash = hashObject(modifiedConfig);
+
+if (originalHash === modifiedHash) {
+  process.stdout.write(originalText);
+} else {
+  const isPrettified = originalText.trim().includes('\n');
+  const output = isPrettified
+    ? JSON.stringify(modifiedConfig, null, 2)
+    : JSON.stringify(modifiedConfig);
+
+  if (hasTrailingNewline) {
+    console.log(output);
+  } else {
+    process.stdout.write(output);
+  }
+}
+TYPESCRIPT
+
+exec bun "$SCRIPT"
+{{ else -}}
+#!/bin/bash
+# Windows/macOS: pass through unchanged
+cat
+{{ end -}}

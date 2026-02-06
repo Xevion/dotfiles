@@ -14,7 +14,7 @@
   "agent": {
     "default_model": {
       "provider": "copilot_chat",
-      "model": "gpt-5.1"
+      "model": "claude-sonnet-4.5"
     },
     "model_parameters": []
   },
@@ -30,7 +30,7 @@
   "auto_signature_help": false,
   "theme": {
     "mode": "dark",
-    "light": "One Light",
+    "light": "Min Light (Blurred)",
     "dark": "One Dark"
   },
   "terminal": {
