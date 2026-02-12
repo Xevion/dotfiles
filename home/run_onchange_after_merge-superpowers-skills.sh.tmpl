@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Merge upstream superpowers skills with chezmoi-managed custom overrides.
+#
+# Upstream skills are symlinked from the chezmoi-external superpowers repo.
+# Any skill directory already present (deployed by chezmoi as a custom override)
+# is left untouched — custom overrides always win.
+#
+# Re-runs when the upstream superpowers repo changes (commit hash below).
+# {{ output "git" "-C" (joinPath .chezmoi.homeDir ".config/opencode/superpowers") "rev-parse" "HEAD" | trim }}
+
+set -euo pipefail
+
+UPSTREAM_SKILLS="{{ .chezmoi.homeDir }}/.config/opencode/superpowers/skills"
+TARGET_DIR="{{ .chezmoi.homeDir }}/.config/opencode/skills/superpowers"
+
+if [ ! -d "$UPSTREAM_SKILLS" ]; then
+  echo "[warn] Superpowers repo not found at $UPSTREAM_SKILLS — skipping skill merge"
+  exit 0
+fi
+
+# Ensure target directory exists
+mkdir -p "$TARGET_DIR"
+
+# Symlink each upstream skill that doesn't already exist as a custom override
+for skill_dir in "$UPSTREAM_SKILLS"/*/; do
+  skill_name="$(basename "$skill_dir")"
+
+  # Skip if this skill already exists (chezmoi-managed custom override)
+  if [ -e "$TARGET_DIR/$skill_name" ] && [ ! -L "$TARGET_DIR/$skill_name" ]; then
+    echo "[skip] $skill_name (custom override exists)"
+    continue
+  fi
+
+  # Remove stale symlink if present, then create fresh one
+  rm -f "$TARGET_DIR/$skill_name"
+  ln -s "$UPSTREAM_SKILLS/$skill_name" "$TARGET_DIR/$skill_name"
+  echo "[link] $skill_name -> upstream"
+done
+
+# Clean up symlinks pointing to skills that no longer exist upstream
+for entry in "$TARGET_DIR"/*/; do
+  entry_name="$(basename "$entry")"
+  if [ -L "$TARGET_DIR/$entry_name" ] && [ ! -e "$UPSTREAM_SKILLS/$entry_name" ]; then
+    rm -f "$TARGET_DIR/$entry_name"
+    echo "[clean] $entry_name (removed from upstream)"
+  fi
+done
+
+echo "[ok] Superpowers skills merged"

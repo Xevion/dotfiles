@@ -53,6 +53,12 @@ When you ask a question with multiple options, the user should be able to pick m
 
 **If you're presenting A, B, C options and don't set `multiple: true`, you're likely doing it wrong.**
 
+## Explore Agent Override
+
+The `explore` subagent uses `anthropic/claude-haiku-4-5` (a fast but limited model). **Do NOT delegate anything requiring reasoning to it.** See the "Subagent and Tool Selection" decision matrix in the shared rules below for when to use which tool/agent.
+
+**Reinforcement:** If you can answer a question with Read, Glob, or Grep in 1-3 calls, do that directly. Only use Explore for bulk operations across many files where formatting the output is the main value.
+
 ---
 
 {{ template "common-rules.md.tmpl" . }}
