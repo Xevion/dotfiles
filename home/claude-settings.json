@@ -182,7 +182,21 @@
       "Bash(cd:*)",
       "WebFetch(domain:acegikmo.com)",
       "WebFetch(domain:commons.apache.org)",
-      "WebFetch(domain:bashtage.github.io)"
+      "WebFetch(domain:bashtage.github.io)",
+      "Bash(psql:*)",
+      "Bash(sqlite3:*)",
+      "Bash(opencode:*)",
+      "Bash(sed:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(diff:*)",
+      "Bash(sort:*)",
+      "Bash(echo:*)",
+      "Bash(xargs:*)",
+      "Bash(du:*)",
+      "Bash(df:*)",
+      "Bash(jar:*)",
+      "Bash(zip:*)"
     ],
     "deny": [
       "Bash(git push --force:*)",
@@ -205,13 +219,14 @@
       "Bash(cargo uninstall --all:*)",
       "Bash(wrangler delete:*)",
       "Bash(wrangler secret delete:*)",
-      "Bash(rm -rf:*)",
+
       "Bash(rmdir /s:*)",
       "Bash(rd /s:*)",
       "Bash(Remove-Item -Recurse -Force:*)",
       "Bash(del /s:*)"
     ],
     "ask": [
+      "Bash(rm -rf:*)",
       "Bash(cargo uninstall:*)",
       "Bash(cargo update:*)",
       "Bash(npm install:*)",

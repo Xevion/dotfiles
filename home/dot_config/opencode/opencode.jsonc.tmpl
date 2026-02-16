@@ -19,6 +19,237 @@
       "disabled": true,
     },
   },
+  "permission": {
+    // -- Bash: last matching rule wins --
+    "bash": {
+      "*": "ask",
+
+      // Version / info (read-only, always safe)
+      "cargo --version*": "allow",
+      "rustc --version*": "allow",
+      "sccache --version*": "allow",
+      "node --version*": "allow",
+      "npm --version*": "allow",
+      "pnpm --version*": "allow",
+      "bun --version*": "allow",
+      "just --version*": "allow",
+      "make --version*": "allow",
+      "git --version*": "allow",
+      "gh --version*": "allow",
+      "docker --version*": "allow",
+      "wrangler --version*": "allow",
+
+      // Cargo
+      "cargo build*": "allow",
+      "cargo check*": "allow",
+      "cargo clippy*": "allow",
+      "cargo test*": "allow",
+      "cargo nextest run*": "allow",
+      "cargo tree*": "allow",
+      "cargo doc*": "allow",
+      "cargo llvm-cov*": "allow",
+      "cargo add*": "allow",
+      "cargo machete*": "allow",
+      "cargo udeps*": "allow",
+      "cargo audit*": "allow",
+      "cargo deny*": "allow",
+      "cargo outdated*": "allow",
+      "cargo search*": "allow",
+      "cargo fmt*": "allow",
+
+      // Node / Bun
+      "npm run*": "allow",
+      "npm audit*": "allow",
+      "pnpm run*": "allow",
+      "pnpm list*": "allow",
+      "pnpm exec*": "allow",
+      "pnpm audit*": "allow",
+      "pnpm outdated*": "allow",
+      "bun*": "allow",
+      "bunx*": "allow",
+
+      // Build tools
+      "just*": "allow",
+      "make run*": "allow",
+      "make build*": "allow",
+      "./gradlew*": "allow",
+
+      // Git (safe read/stage operations)
+      "git status*": "allow",
+      "git log*": "allow",
+      "git show*": "allow",
+      "git diff*": "allow",
+      "git fetch*": "allow",
+      "git add*": "allow",
+      "git commit*": "allow",
+      "git rm*": "allow",
+      "git mv*": "allow",
+      "git restore*": "allow",
+      "git ls-tree*": "allow",
+
+      // GitHub CLI
+      "gh run list*": "allow",
+      "gh run view*": "allow",
+      "gh pr list*": "allow",
+      "gh api*": "allow",
+      "gh pr comment*": "allow",
+
+      // Docker (inspect/build)
+      "docker ps*": "allow",
+      "docker logs*": "allow",
+      "docker inspect*": "allow",
+      "docker exec*": "allow",
+      "docker port*": "allow",
+      "docker build*": "allow",
+
+      // General CLI
+      "ls*": "allow",
+      "tree*": "allow",
+      "cat*": "allow",
+      "rg*": "allow",
+      "find*": "allow",
+      "mkdir*": "allow",
+      "cloc*": "allow",
+      "tokei*": "allow",
+      "curl*": "allow",
+      "netstat*": "allow",
+      "awk*": "allow",
+      "timeout*": "allow",
+      "chmod*": "allow",
+      "jq*": "allow",
+      "grep*": "allow",
+      "cd*": "allow",
+      "wc*": "allow",
+      "javap*": "allow",
+      "tee*": "allow",
+      "unzip*": "allow",
+      "rsync*": "allow",
+
+      // DB / query tools
+      "psql*": "allow",
+      "sqlite3*": "allow",
+      "opencode*": "allow",
+
+      // Text processing
+      "sed*": "allow",
+      "head*": "allow",
+      "tail*": "allow",
+      "diff*": "allow",
+      "sort*": "allow",
+      "echo*": "allow",
+      "xargs*": "allow",
+
+      // System info / archives
+      "du*": "allow",
+      "df*": "allow",
+      "jar*": "allow",
+      "zip*": "allow",
+
+      // WSL
+      "wsl*": "allow",
+
+      // Windows
+      "tasklist*": "allow",
+      "Select-String*": "allow",
+      "Select-Object*": "allow",
+      "findstr*": "allow",
+      "dir*": "allow",
+
+      // Mise / Claude CLI
+      "mise install*": "allow",
+      "mise exec*": "allow",
+      "claude mcp add*": "allow",
+
+      // --- Ask: potentially destructive (override allows above) ---
+      "rm -rf*": "ask",
+      "cargo uninstall*": "ask",
+      "cargo update*": "ask",
+      "npm install*": "ask",
+      "npm update*": "ask",
+      "pnpm install*": "ask",
+      "pnpm add*": "ask",
+      "pnpm remove*": "ask",
+      "pnpm uninstall*": "ask",
+      "pnpm update*": "ask",
+      "pnpm store prune*": "ask",
+      "bun install*": "ask",
+      "bun add*": "ask",
+      "bun remove*": "ask",
+      "git checkout*": "ask",
+      "git pull*": "ask",
+      "git merge*": "ask",
+      "git branch -d*": "ask",
+      "git rebase*": "ask",
+      "git push*": "ask",
+      "gh pr close*": "ask",
+      "gh issue close*": "ask",
+      "gh run cancel*": "ask",
+      "wrangler publish*": "ask",
+      "wrangler deploy*": "ask",
+      "pnpm run deploy*": "ask",
+      "pnpm run build --production*": "ask",
+      "npm run deploy*": "ask",
+      "bun run deploy*": "ask",
+      "mv*": "ask",
+      "Move-Item*": "ask",
+      "rm*": "ask",
+      "del*": "ask",
+
+      // --- Deny: dangerous / irreversible (override everything above) ---
+      "git push --force*": "deny",
+      "git push -f*": "deny",
+      "git push --force-with-lease*": "deny",
+      "git reset --hard*": "deny",
+      "git branch -D*": "deny",
+      "git clean -fd*": "deny",
+      "git clean -f*": "deny",
+      "git filter-branch*": "deny",
+      "git push --delete*": "deny",
+      "git push origin --delete*": "deny",
+      "git push origin :*": "deny",
+      "gh repo delete*": "deny",
+      "gh repo archive*": "deny",
+      "gh secret delete*": "deny",
+      "gh release delete*": "deny",
+      "cargo clean*": "deny",
+      "cargo yank*": "deny",
+      "cargo uninstall --all*": "deny",
+      "wrangler delete*": "deny",
+      "wrangler secret delete*": "deny",
+      "rmdir /s*": "deny",
+      "rd /s*": "deny",
+      "Remove-Item -Recurse -Force*": "deny",
+      "del /s*": "deny",
+    },
+
+    // -- External directory access --
+    "external_directory": {
+      "*": "ask",
+      "/tmp/**": "allow",
+      "/home/xevion/projects/**": "allow",
+      "/home/xevion/.cargo/registry/**": "allow",
+      "/home/xevion/.local/bin/**": "allow",
+      "/home/xevion/.local/share/fonts/**": "allow",
+      "/home/xevion/.local/share/opencode/**": "allow",
+      "/home/xevion/.local/share/chezmoi/**": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+    },
+
+    // -- Web / search --
+    "webfetch": "allow",
+    "websearch": "allow",
+    "codesearch": "allow",
+
+    // -- MCP servers --
+    "context7_*": "allow",
+    "gh_grep_*": "allow",
+    "linear_*": "allow",
+
+    // -- Safety --
+    "doom_loop": "ask",
+  },
   "mcp": {
     "context7": {
       "type": "remote",
