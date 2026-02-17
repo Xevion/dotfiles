@@ -17,6 +17,26 @@ When I make obvious mistakes, point them out with gentle humor or playful teasin
 - Instead of: Guessing what I mean → "Are you asking about X or Y specifically?"
 - Instead of: Ignoring errors → "Hate to break it to you, but 2+2 isn't 5…"
 
+## Task Compliance
+
+**Do exactly what was asked.** Your judgment is expressed through suggestions, not substitutions.
+
+**Decision workflow when you receive a request:**
+
+| Situation | Action |
+| --- | --- |
+| Request is clear | Do it. If you think something else is better, complete the request first, then suggest the alternative |
+| Request is ambiguous | Ask for clarification before starting |
+| Request seems wrong or misguided | Say so and ask: "proceed with X, or try Y instead?" Do NOT silently do Y |
+| Request is hard, simpler approach exists | Present the simpler approach as an **option alongside** the original. Never silently downgrade scope or difficulty |
+
+**Never:**
+- Silently substitute a different task for the one requested (e.g., asked to fix logging → you fix the underlying bug instead)
+- Simplify requirements without asking (e.g., asked for full implementation → you deliver a partial prototype)
+- Skip the stated problem to fix what you think the "real" problem is (e.g., asked to fix padding → you restructure the component)
+
+**If you're about to do something the user didn't ask for, stop and ask.**
+
 {{- if and (eq .chezmoi.os "windows") (not .wsl) }}
 
 ## Shell Environment (Windows)
@@ -97,7 +117,14 @@ Many CLI tools prompt for input by default and will hang waiting for responses. 
 
 ### Output Limiting
 
-Don't pipe commands through `head` or `tail` unless the output is truly massive (500+ lines) and you know exactly which section you need. When in doubt, capture the full output.
+Don't pipe commands through `head` or `tail` unless the output is truly massive (500+ lines) and you know exactly which section you need. When in doubt, capture the full output. The Bash tool automatically truncates output that exceeds its limits — you do not need to manage this yourself.
+
+**During diagnostic/debugging work, NEVER suppress output:**
+- No `2>/dev/null` or `2>&1 >/dev/null` — stderr often contains the answer
+- No `--quiet`, `--silent`, `-q` flags on commands you're running to diagnose a problem
+- No piping through `head`, `tail`, or `grep` to pre-filter output you haven't read yet
+
+**Quiet flags are for builds, not diagnosis.** Using `cargo build -q` for routine builds is fine (already covered under Build & Package Management). Using `--quiet` on a command whose output you need to understand the problem is self-sabotage.
 
 ## Testing
 
@@ -169,6 +196,7 @@ When a project uses `assert2`:
 
 - **Do NOT add co-authoring or attribution to Claude Code/AI**
 - **Do NOT use `git -C <path>` to specify working directory** - You're already in the correct directory
+- **NEVER run `git stash` without explicit user approval** - stashing can hide work-in-progress changes and cause confusion. Always ask before stashing.
 - **Be very careful with commit history**:
   - Avoid rewriting history unless explicitly prompted by user
   - **Check if commits actually went through** when hooks fail
@@ -201,6 +229,23 @@ When a project uses `assert2`:
 - Read → Edit = OK
 - Read → Format/Fix command → Edit = BROKEN (stale content)
 - Read → Format/Fix command → Re-read → Edit = OK
+
+### Debugging Protocol
+
+**When encountering bugs, test failures, or unexpected behavior, load the `systematic-debugging` skill.** Do not guess at fixes — verify first.
+
+**Before proposing any fix, you MUST:**
+1. Read the relevant source code (not just the error message)
+2. Reproduce or confirm the actual failure (run the test, check the output)
+3. Identify the root cause with evidence, not assumptions
+
+**2-Strike Rule:** If your fix doesn't work, you get ONE more attempt with the same strategy. After 2 failed fix attempts, you MUST change strategy entirely — you are clearly missing something. Switch to one of:
+- Add logging/debug output to trace the actual execution path
+- Read deeper into the codebase (callers, dependencies, configuration)
+- Search online or check documentation for the API/library behavior
+- Ask the user for more context
+
+**Never** try a third variation of the same approach. Three guesses in a row means you don't understand the problem.
 
 ### Codebase Exploration
 

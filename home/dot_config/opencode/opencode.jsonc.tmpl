@@ -155,12 +155,39 @@
       "findstr*": "allow",
       "dir*": "allow",
 
+      // Chezmoi CLI (core dotfiles tool)
+      "chezmoi status*": "allow",
+      "chezmoi diff*": "allow",
+      "chezmoi managed*": "allow",
+      "chezmoi data*": "allow",
+      "chezmoi source-path*": "allow",
+      "chezmoi target-path*": "allow",
+      "chezmoi cat*": "allow",
+      "chezmoi execute-template*": "allow",
+      "chezmoi doctor*": "allow",
+      "chezmoi dump*": "allow",
+      "chezmoi verify*": "allow",
+      "chezmoi help*": "allow",
+      "chezmoi --help*": "allow",
+      "chezmoi apply*": "allow",
+
+      // Utility (read-only)
+      "which*": "allow",
+      "hyperfine*": "allow",
+      "script*": "allow",
+      "xxd*": "allow",
+      "fc-cache*": "allow",
+
       // Mise / Claude CLI
       "mise install*": "allow",
       "mise exec*": "allow",
       "claude mcp add*": "allow",
 
       // --- Ask: potentially destructive (override allows above) ---
+      "chezmoi add*": "ask",
+      "chezmoi init*": "ask",
+      "chezmoi update*": "ask",
+      "cp*": "ask",
       "rm -rf*": "ask",
       "cargo uninstall*": "ask",
       "cargo update*": "ask",
@@ -211,7 +238,7 @@
       "gh repo archive*": "deny",
       "gh secret delete*": "deny",
       "gh release delete*": "deny",
-      "cargo clean*": "deny",
+      "cargo clean*": "ask",
       "cargo yank*": "deny",
       "cargo uninstall --all*": "deny",
       "wrangler delete*": "deny",
@@ -232,6 +259,8 @@
       "/home/xevion/.local/share/fonts/**": "allow",
       "/home/xevion/.local/share/opencode/**": "allow",
       "/home/xevion/.local/share/chezmoi/**": "allow",
+      "/home/xevion/.config/opencode/**": "allow",
+      "/home/xevion/.config/Claude/**": "allow",
       "*.env": "deny",
       "*.env.*": "deny",
       "*.env.example": "allow",
