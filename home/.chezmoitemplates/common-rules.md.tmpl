@@ -258,35 +258,7 @@ When a project uses `assert2`:
 
 **CRITICAL: Do NOT delegate to subagents when a direct tool call suffices.**
 
-### Pre-Dispatch Gate (MANDATORY)
-
-**Before spawning ANY Explore subagent, answer these three questions:**
-
-1. **Can I do this with 1-3 Read/Glob/Grep calls?** → If yes, do that instead.
-2. **Does this require reasoning or judgment?** → If yes, Explore CANNOT do it (Haiku model). Use a General subagent or do it directly.
-3. **Is this truly bulk work across 20+ files?** → If no, do it directly.
-
-**All three must pass to justify an Explore dispatch.** If you catch yourself about to spawn Explore for reading a file, finding a file, or searching file contents — stop. Use Read, Glob, or Grep directly. It's faster AND cheaper.
-
-### Decision Matrix
-
-| What you need | Use this | NOT this |
-| --- | --- | --- |
-| Read a file you know the path of | **Read tool** directly | Explore subagent |
-| Find files by name/glob pattern | **Glob tool** directly | Explore subagent |
-| Search file contents by regex | **Grep tool** directly | Explore subagent |
-| Find symbol definition (with LSP) | **LSP find_definition** | Grep + manual filtering |
-| Find all usages of a symbol | **LSP find_references** | Grep (noisy, false positives) |
-| Bulk reconnaissance (20+ files) | **Explore subagent** | Sequential Read calls |
-| Complex code analysis/reasoning | **General subagent** | Explore subagent |
-| Code review | **Code-reviewer subagent** | Explore subagent |
-| Multi-step debugging | **Direct investigation** | Explore subagent |
-
-### The Explore Agent
-
-Explore runs on Haiku — a fast, lightweight model that **cannot reason**. It is for simple, mechanical, bulk tasks ONLY: listing many files, counting occurrences, formatting search results across 20+ files.
-
-Explore agent output must be returned **directly in chat** — never as documents or files.
+If you can accomplish the task with 1-3 Read/Glob/Grep calls, do that directly. Subagents add overhead — only dispatch them when the task genuinely benefits from delegation (bulk work, deep reasoning across many files, or specialized expertise).
 
 ### Code Review Subagent Protocol
 

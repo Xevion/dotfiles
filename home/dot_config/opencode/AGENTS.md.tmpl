@@ -53,11 +53,53 @@ When you ask a question with multiple options, the user should be able to pick m
 
 **If you're presenting A, B, C options and don't set `multiple: true`, you're likely doing it wrong.**
 
-## Explore Agent Override
+## Subagent Selection
 
-The `explore` subagent uses `anthropic/claude-haiku-4-5` (a fast but limited model). **Do NOT delegate anything requiring reasoning to it.** See the "Subagent and Tool Selection" decision matrix in the shared rules below for when to use which tool/agent.
+The `explore` agent is **disabled**. Use these three purpose-built agents instead. Each has a narrow scope — pick the right one.
 
-**Reinforcement:** If you can answer a question with Read, Glob, or Grep in 1-3 calls, do that directly. Only use Explore for bulk operations across many files where formatting the output is the main value.
+### Do it directly (no subagent) when:
+
+- You need 1 file, symbol, or pattern → use Glob, Grep, or Read
+- You need a quick API lookup → use context7 directly
+- You already know where to look → Read the file
+- The task is a single tool call → just do it
+
+**Dispatching a subagent to do what you could do in 1-3 tool calls is a waste of tokens.**
+
+### Find (Haiku 4.5) — Locate things
+
+Dispatch when you need to locate **2-5 related items** across the codebase. Files, symbols, patterns, configurations. Returns paths and localized context — no analysis.
+
+- **Batch ~5 items per dispatch.** 10 items = 2 dispatches. 1 item = do it yourself.
+- Returns structured lists with `file:line` references and snippets
+- Cannot reason or analyze — if you need "why" or "how", use Investigate
+
+### Investigate (Opus 4.6) — Answer questions about code
+
+Dispatch when you need to **understand how code works**, trace execution paths, or prove/disprove a hypothesis. Handles 1-3 related questions per dispatch.
+
+- **Sharpen prompts before dispatching** — Opus tokens are expensive. "Explore the auth system" wastes tokens. "Does `validateToken()` run before `createSession()` in the login flow?" doesn't.
+- Returns conclusion-first answers with `file:line` citations
+- Read-only — never suggests implementations
+- If the question is just "where is X?", use Find instead
+
+### Research (Sonnet 4.6) — Explore external resources
+
+Dispatch when the answer is **outside the codebase** — library docs, community patterns, dependency evaluation, alternative approaches.
+
+- Use for genuine exploration: evaluating options, understanding breaking changes, comparing libraries
+- Don't dispatch for a single API lookup — use context7 directly
+- Returns summaries with source URLs, code examples, and trade-off analysis
+- If the answer is in the local code, use Investigate instead
+
+### Caller Responsibilities
+
+When dispatching any of these agents:
+
+1. **Write a specific prompt.** Vague prompts produce vague results. Include what you're looking for and why.
+2. **Don't ask for files.** These agents return their findings as response text. They never write documents or reports to disk.
+3. **Split large tasks.** If a task would require reading 20+ files, dispatch multiple agents in parallel with focused scopes rather than one overloaded agent.
+4. **Don't over-split.** If 3 related questions share context, one Investigate dispatch with all 3 is better than 3 separate dispatches.
 
 ---
 

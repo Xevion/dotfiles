@@ -218,6 +218,7 @@
       "Bash(zip:*)"
     ],
     "deny": [
+      "Task(Explore)",
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
       "Bash(git push --force-with-lease:*)",
@@ -238,7 +239,6 @@
       "Bash(cargo uninstall --all:*)",
       "Bash(wrangler delete:*)",
       "Bash(wrangler secret delete:*)",
-
       "Bash(rmdir /s:*)",
       "Bash(rd /s:*)",
       "Bash(Remove-Item -Recurse -Force:*)",
