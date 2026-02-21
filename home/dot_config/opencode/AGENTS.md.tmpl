@@ -59,12 +59,14 @@ The `explore` agent is **disabled**. Use these three purpose-built agents instea
 
 ### Do it directly (no subagent) when:
 
-- You need 1 file, symbol, or pattern → use Glob, Grep, or Read
+- You need to read files → use parallel Read calls (scales fine to 10+)
+- You need to find files/symbols → use Glob or Grep
 - You need a quick API lookup → use context7 directly
-- You already know where to look → Read the file
-- The task is a single tool call → just do it
+- The task is mechanical (read, search, fetch) with no reasoning required → just do it
 
-**Dispatching a subagent to do what you could do in 1-3 tool calls is a waste of tokens.**
+**If the task doesn't require reasoning across files, do it directly — regardless of how many tool calls it takes.** Subagents exist for tasks that need judgment, not for bulk fetching.
+
+**Anti-pattern: subagent as file-reading proxy.** Never dispatch a subagent to read N files and relay their contents back to you. That's what parallel Read calls are for. Subagents add overhead and token doubling (the agent reads the files, then serializes them back to you). Direct reads are faster, cheaper, and more reliable.
 
 ### Find (Haiku 4.5) — Locate things
 
@@ -73,6 +75,7 @@ Dispatch when you need to locate **2-5 related items** across the codebase. File
 - **Batch ~5 items per dispatch.** 10 items = 2 dispatches. 1 item = do it yourself.
 - Returns structured lists with `file:line` references and snippets
 - Cannot reason or analyze — if you need "why" or "how", use Investigate
+- **Find locates, it does not read.** Never ask Find to return full file contents. If you already know the paths, use parallel Read calls directly
 
 ### Investigate (Opus 4.6) — Answer questions about code
 

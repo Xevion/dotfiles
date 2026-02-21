@@ -94,9 +94,9 @@ Many CLI tools prompt for input by default and will hang waiting for responses. 
 - `apt install -y package`
 - `npm init -y`
 
-### Output Limiting
+### Output Handling
 
-Don't pipe commands through `head` or `tail` unless the output is truly massive (500+ lines) and you know exactly which section you need. When in doubt, capture the full output.
+The Bash tool automatically truncates output that exceeds its limits. Do not manually truncate output with `head`, `tail`, or piping — let the tool handle it.
 
 ## Testing
 

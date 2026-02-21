@@ -115,14 +115,13 @@ Many CLI tools prompt for input by default and will hang waiting for responses. 
 - `apt install -y package`
 - `npm init -y`
 
-### Output Limiting
+### Output Handling
 
-Don't pipe commands through `head` or `tail` unless the output is truly massive (500+ lines) and you know exactly which section you need. When in doubt, capture the full output. The Bash tool automatically truncates output that exceeds its limits — you do not need to manage this yourself.
+The Bash tool automatically truncates output that exceeds its limits. Do not manually truncate output with `head`, `tail`, or piping — let the tool handle it. If the full output is needed after truncation, use Read with offset/limit on the saved output file, or Grep to search it.
 
 **During diagnostic/debugging work, NEVER suppress output:**
 - No `2>/dev/null` or `2>&1 >/dev/null` — stderr often contains the answer
 - No `--quiet`, `--silent`, `-q` flags on commands you're running to diagnose a problem
-- No piping through `head`, `tail`, or `grep` to pre-filter output you haven't read yet
 
 **Quiet flags are for builds, not diagnosis.** Using `cargo build -q` for routine builds is fine (already covered under Build & Package Management). Using `--quiet` on a command whose output you need to understand the problem is self-sabotage.
 
@@ -256,9 +255,9 @@ When a project uses `assert2`:
 
 ## Subagent and Tool Selection
 
-**CRITICAL: Do NOT delegate to subagents when a direct tool call suffices.**
+**CRITICAL: Do NOT delegate to subagents when direct tool calls suffice.**
 
-If you can accomplish the task with 1-3 Read/Glob/Grep calls, do that directly. Subagents add overhead — only dispatch them when the task genuinely benefits from delegation (bulk work, deep reasoning across many files, or specialized expertise).
+If the task is mechanical — reading files, searching for patterns, fetching content — do it directly with parallel tool calls, even if it takes 10+ calls. Subagents add overhead and token doubling. Only dispatch them when the task genuinely benefits from delegation (reasoning across files, analysis, or specialized expertise).
 
 ### Code Review Subagent Protocol
 
