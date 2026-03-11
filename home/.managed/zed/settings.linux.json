@@ -7,19 +7,19 @@
 // custom settings, run `zed: open default settings` from the
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
+  "edit_predictions": {
+    "provider": "copilot",
+  },
   "project_panel": {
     "hide_hidden": true,
-    "hide_gitignore": false
+    "hide_gitignore": false,
   },
   "agent": {
     "default_model": {
       "provider": "copilot_chat",
-      "model": "claude-sonnet-4.5"
+      "model": "claude-sonnet-4.5",
     },
-    "model_parameters": []
-  },
-  "features": {
-    "edit_prediction_provider": "copilot"
+    "model_parameters": [],
   },
   "vim_mode": false,
   "icon_theme": "Material Icon Theme",
@@ -30,10 +30,10 @@
   "auto_signature_help": false,
   "theme": {
     "mode": "dark",
-    "light": "Min Light (Blurred)",
-    "dark": "One Dark"
+    "light": "One Light",
+    "dark": "Ayu Dark",
   },
   "terminal": {
-    "font_family": "ZedMono Nerd Font"
-  }
+    "font_family": "ZedMono Nerd Font",
+  },
 }

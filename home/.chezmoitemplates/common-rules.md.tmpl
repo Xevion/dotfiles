@@ -259,6 +259,8 @@ When a project uses `assert2`:
 
 If the task is mechanical — reading files, searching for patterns, fetching content — do it directly with parallel tool calls, even if it takes 10+ calls. Subagents add overhead and token doubling. Only dispatch them when the task genuinely benefits from delegation (reasoning across files, analysis, or specialized expertise).
 
+**NEVER dispatch a subagent just to read files and return their contents.** This is an absurd waste — the subagent reads the files, then serializes them back to you, doubling the token cost for zero benefit. Use parallel Read calls directly. There is no exception to this rule. If your subagent prompt contains "read," "return the contents," or "tell me what's in," you are doing it wrong.
+
 ### Code Review Subagent Protocol
 
 **When dispatching the code-reviewer subagent, NEVER re-feed the entire diff.**

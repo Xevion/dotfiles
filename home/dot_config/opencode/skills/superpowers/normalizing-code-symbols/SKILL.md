@@ -1,6 +1,6 @@
 ---
 name: normalizing-code-symbols
-description: Use when finding or fixing non-ASCII typographic symbols in source code, comments, docs, or strings. Covers em dashes, unicode arrows, box-drawing tree chars, ellipsis, smart quotes, and similar. Also covers detecting and removing banner/decorative divider comments.
+description: Use when finding or fixing non-ASCII typographic symbols in source code, comments, docs, or strings. Covers em dashes, unicode arrows, box-drawing tree chars, ellipsis, smart quotes, and similar. Also covers detecting and removing banner/decorative divider comments and bare section-label comments.
 ---
 
 # Normalizing Code Symbols
@@ -180,6 +180,48 @@ visual separators or section headers. Keep any contextual description; drop the 
 ```
 
 Standalone divider lines with no meaningful adjacent label can simply be deleted.
+
+### Section Labels
+
+Bare section-label comments -- standalone comment lines containing only a short title-case phrase,
+used to divide code into named regions -- are also in scope. They provide no information the code
+structure doesn't already express and should be removed.
+
+**Detection scan (produces candidates for review):**
+
+```bash
+rg \
+    --context 2 \
+    --heading \
+    -e '^\s*(//[/!]?|#)\s+(?:MARK:\s*-?\s*)?[A-Z][a-zA-Z]*(?:\s+[A-Za-z]+){0,3}\s*$' \
+    --glob '!*.lock' \
+    --glob '!*.min.*' \
+    --glob '!node_modules' \
+    --glob '!*.md'
+```
+
+This regex is a heuristic -- it finds candidates. Verify each match is genuinely an organizational
+label (surrounded by blank lines or code blocks, no explanatory content) before removing.
+
+```rust
+// Before
+fn handle_connection() { ... }
+
+// Handlers
+
+fn on_request() { ... }
+fn on_response() { ... }
+
+// After (label removed)
+fn handle_connection() { ... }
+
+fn on_request() { ... }
+fn on_response() { ... }
+```
+
+Common forms to recognize: `// Handlers`, `// Private`, `// Helpers`, `// MARK: - Section`,
+`# Utilities`, `// Public API`. If the label carries context not obvious from the code, convert
+it to a real doc comment (`///` or `/** */`) instead of deleting it outright.
 
 ## What's Allowed
 

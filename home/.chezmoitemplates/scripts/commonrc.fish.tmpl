@@ -42,6 +42,8 @@ end
 # Homebrew
 if test -f /home/linuxbrew/.linuxbrew/bin/brew
     /home/linuxbrew/.linuxbrew/bin/brew shellenv fish | source
+    # brew shellenv overwrites PKG_CONFIG_PATH, dropping system paths
+    set -gx PKG_CONFIG_PATH $PKG_CONFIG_PATH /usr/lib/x86_64-linux-gnu/pkgconfig /usr/share/pkgconfig
 end
 
 set -gx PYENV_ROOT $HOME/.pyenv

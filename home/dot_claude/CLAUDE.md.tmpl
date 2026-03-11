@@ -11,7 +11,15 @@ The `explore` agent is **disabled**. Use these three purpose-built agents instea
 
 **If the task doesn't require reasoning across files, do it directly — regardless of how many tool calls it takes.** Subagents exist for tasks that need judgment, not for bulk fetching.
 
-**Anti-pattern: subagent as file-reading proxy.** Never dispatch a subagent to read N files and relay their contents back to you. That's what parallel Read calls are for. Subagents add overhead and token doubling (the agent reads the files, then serializes them back to you). Direct reads are faster, cheaper, and more reliable.
+**NEVER use a subagent to read files.** This is the single most wasteful anti-pattern. When you dispatch a subagent to "read these files and tell me what's in them," you pay for the file contents TWICE — once when the subagent reads them, and again when it serializes them back to you. You also pay the subagent's system prompt overhead, tool-call latency, and context-switching cost. All to do something that a single parallel batch of Read tool calls accomplishes instantly with zero overhead.
+
+There is NO scenario where dispatching a subagent to relay file contents is justified:
+- "I need to read 5 files" → 5 parallel Read calls. Done.
+- "I need to read 15 files" → 15 parallel Read calls. Still faster and cheaper than a subagent.
+- "I need to read files and summarize them" → Read them yourself, summarize yourself. You ARE the language model.
+- "I need to gather context from multiple files" → Read them in parallel. You have the tool. Use it.
+
+If you catch yourself writing a subagent prompt that includes phrases like "read the contents of," "return the contents," "tell me what's in," or "gather the content from" — STOP. You are about to waste tokens. Use Read directly.
 
 ### Find (Haiku 4.5) — Locate things
 
