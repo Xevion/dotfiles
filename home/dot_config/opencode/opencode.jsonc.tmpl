@@ -5,7 +5,8 @@
     // "@tarquinen/opencode-dcp@latest",
     "@franlol/opencode-md-table-formatter@0.0.3",
     "@mohak34/opencode-notifier@latest",
-    "opencode-anthropic-auth",
+    // "opencode-anthropic-auth",
+    "opencode-claude-auth",
   ],
   "agent": {
     "explore": {
@@ -16,9 +17,13 @@
     "model_cycle_favorite": "ctrl+f",
   },
   "lsp": {
-    "jdtls": {
-      "disabled": true,
-    },
+    "typescript": { "disabled": true },
+    "rust": { "disabled": true },
+    "gopls": { "disabled": true },
+    "pyright": { "disabled": true },
+    "jdtls": { "disabled": true },
+    "svelte": { "disabled": true },
+    "eslint": { "disabled": true },
   },
   "permission": {
     // Bash permissions generated from meta/permissions.ts

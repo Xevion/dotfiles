@@ -1,5 +1,17 @@
 **Note**: Project-specific CLAUDE.md files take precedence for project-specific patterns.
 
+## Default Behavior
+
+**These apply to every session. Non-negotiable.**
+
+1. **Question-first**: For any task with ambiguity, design decisions, or multiple valid approaches — use the Question tool BEFORE starting work. Batch related questions into a single call (up to 4). Put your recommended option first with reasoning in the description. Include options that expand scope beyond what was explicitly asked — related concerns, better approaches, risks the user might not see. Skip only for completely unambiguous, single-step tasks.
+
+2. **Research before guessing**: When the task involves APIs, libraries, framework patterns, or configuration you're not certain about — look it up first. Use context7, WebSearch, or dispatch a Research subagent. Never generate code from stale training data when current docs are available.
+
+3. **Detect the project's tooling**: Before running package manager commands, build tools, or test runners — check what the project actually uses. Read lockfiles, config files, and scripts. Never default to any package manager without evidence.
+
+4. **Simple commands, run sequentially**: One simple command per Bash call. No complex inline scripts, no unnecessary piping, no `cd path && command`. See [Bash Command Discipline](#bash-command-discipline) for specifics.
+
 ## Communication Style
 
 Skip affirmations and compliments. No "great question!" or "you're absolutely right!" - just respond directly
@@ -77,9 +89,14 @@ When I make obvious mistakes, point them out with gentle humor or playful teasin
 
 ### Dependency Management
 
-- **Always use package manager commands** over manually editing manifest files:
-  - Rust: `cargo add`, `cargo remove`
-  - Node.js: `pnpm add`, `pnpm remove` (or npm/yarn as appropriate)
+- **Always use package manager commands** over manually editing manifest files
+- **Detect the project's package manager FIRST** — never assume. Check for:
+  - `bun.lockb` or `bun.lock` → use `bun add`, `bun remove`
+  - `pnpm-lock.yaml` → use `pnpm add`, `pnpm remove`
+  - `yarn.lock` → use `yarn add`, `yarn remove`
+  - `package-lock.json` → use `npm install`, `npm uninstall`
+  - `Cargo.toml` / `Cargo.lock` → use `cargo add`, `cargo remove`
+  - If no lockfile exists, check `package.json` for a `packageManager` field
 - This ensures lockfiles are updated correctly and consistently
 - **Get the latest compatible version** unless there's a specific reason not to
   - You can specify versions, but prefer letting the tool grab the latest
@@ -124,6 +141,33 @@ The Bash tool automatically truncates output that exceeds its limits. Do not man
 - No `--quiet`, `--silent`, `-q` flags on commands you're running to diagnose a problem
 
 **Quiet flags are for builds, not diagnosis.** Using `cargo build -q` for routine builds is fine (already covered under Build & Package Management). Using `--quiet` on a command whose output you need to understand the problem is self-sabotage.
+
+### Bash Command Discipline
+
+**Default**: One simple command per Bash call. Run multiple calls sequentially.
+
+**NEVER do these:**
+- Re-running the same command with increasing `| head -N` or `| tail -N` to see more output — use the Read tool on the output, or get it right in one shot
+- Piping through `grep`/`awk`/`sed` to filter Bash output when the Grep/Read tools do this better
+- Inline scripts (`bun -e "..."`, `python3 -c "..."`) for data manipulation — use `jq` for JSON, or write a temp file if it's complex
+- `cd path && command` — use the Bash tool's working directory / `cwd` parameter instead
+- Chaining 4+ commands with `&&` in a single call — split into sequential Bash calls
+- Running a command, then re-running it with `| grep pattern` to find something in the output — use the Grep tool on the output instead
+
+**ALSO NEVER do these — use the dedicated tool instead:**
+- `grep pattern file` or `grep -E pattern file` → use the **Grep** tool
+- `head -N file` or `tail -N file` → use the **Read** tool with offset/limit
+- `cat file` → use the **Read** tool
+- `ls path` or `ls path 2>/dev/null` to check if a file exists → use **Glob**
+- `find . -name "pattern"` → use **Glob**
+- `2>/dev/null` or `|| echo "not found"` to suppress errors — let the tool fail and handle it; error suppression makes commands unrecognizable to the permission system and triggers manual approval prompts
+
+**Acceptable:**
+- Simple pipe: `command | jq '.field'`
+- Tightly coupled pair: `mkdir -p dir && touch dir/file`
+- Output redirect: `command > file.txt`
+- Environment prefix: `ENV_VAR=value command`
+- Two commands where the second genuinely depends on the first succeeding
 
 ## Testing
 

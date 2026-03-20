@@ -1,6 +1,19 @@
 {
   "includeCoAuthoredBy": false,
   "permissions": {{ output "bun" (joinPath .chezmoi.sourceDir "../meta/permissions.ts") "claude" }},
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/bash-discipline.py"
+          }
+        ]
+      }
+    ]
+  },
   "statusLine": {
     "type": "command",
     "command": "bunx -y ccstatusline@latest",

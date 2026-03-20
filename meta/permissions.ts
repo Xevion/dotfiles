@@ -131,7 +131,7 @@ allow(
 // -- Node / Bun --
 allow(
   ...subs("npm", ["run", "audit", "ci", "list", "outdated"]),
-  ...subs("pnpm", ["run", "list", "exec", "audit", "outdated"]),
+  ...subs("pnpm", ["run", "list", "exec", "audit", "outdated", "install", "add", "remove", "uninstall"]),
   "bun",
   "bunx",
 );
@@ -341,8 +341,7 @@ allow(
 // -- Package managers (ask — lifecycle scripts, lockfile changes) --
 ask(
   ...subs("npm", ["install", "update"]),
-  ...subs("pnpm", ["install", "add", "remove", "uninstall", "update", "store prune"]),
-  ...subs("bun", ["install", "add", "remove"]),
+  ...subs("pnpm", ["update", "store prune"]),
   "cargo uninstall",
   "cargo update",
 );
@@ -403,6 +402,7 @@ const claudeExtras = {
     "Read",
     "Grep",
     "WebSearch",
+    "WebFetch",
     "Skill(superpowers:*)",
     // MCP servers
     "mcp__context7__*",
@@ -417,61 +417,6 @@ const claudeExtras = {
     "mcp__linear-server__create_issue",
     "mcp__linear-server__get_issue",
     "mcp__linear-server__list_issue_statuses",
-    // WebFetch domains
-    ...[
-      "github.com",
-      "raw.githubusercontent.com",
-      "gist.github.com",
-      "docs.github.com",
-      "gitlab.com",
-      "docs.rs",
-      "lib.rs",
-      "crates.io",
-      "npmjs.com",
-      "pypi.org",
-      "stackoverflow.com",
-      "developer.mozilla.org",
-      // Cloud providers
-      "developers.cloudflare.com",
-      "aws.amazon.com",
-      "cloud.google.com",
-      "azure.microsoft.com",
-      "learn.microsoft.com",
-      "devblogs.microsoft.com",
-      // Frontend
-      "typst.app",
-      "pixijs.com",
-      "svelte.dev",
-      "kit.svelte.dev",
-      "tailwindcss.com",
-      "biomejs.dev",
-      "www.shadcn-svelte.com",
-      "mdsvex.pngwn.io",
-      "vite.dev",
-      "vitest.dev",
-      // JVM / Minecraft modding
-      "fabricmc.net",
-      "maven.fabricmc.net",
-      "wiki.vg",
-      "logging.apache.org",
-      "commons.apache.org",
-      "docs.gradle.org",
-      "gradleup.com",
-      "mvnrepository.com",
-      "jar-download.com",
-      "www.jetbrains.com",
-      "docs.architectury.dev",
-      "docs.neoforged.net",
-      "modrinth.com",
-      "minecraft.fandom.com",
-      // Academic / misc
-      "slowli.github.io",
-      "acegikmo.com",
-      "bashtage.github.io",
-      "www.cs.unh.edu",
-      "www.cs.cmu.edu",
-      "theory.stanford.edu",
-    ].map((d) => `WebFetch(domain:${d})`),
   ],
   deny: [
     "Task(Explore)",
