@@ -11,6 +11,16 @@
             "command": "python3 ~/.claude/hooks/bash-discipline.py"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/approve-compound-bash.sh",
+            "timeout": 3000
+          }
+        ]
       }
     ],
     "PostToolUse": [

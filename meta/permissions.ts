@@ -276,6 +276,7 @@ allow(
   "tail",
   "diff",
   "sort",
+  "uniq",
   "echo",
   "xargs",
   "du",
