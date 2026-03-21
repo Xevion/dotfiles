@@ -217,6 +217,34 @@ When a project uses `assert2`:
   - TypeScript: functional patterns, modern ES6+ features
   - Check existing code patterns before implementing
 
+### Formatting
+
+**Use the project's auto-formatter. Do NOT manually fix formatting with Edit/Write.**
+
+Before writing any code, detect the project's formatter:
+- `rustfmt.toml` or `cargo fmt` → `cargo fmt`
+- `.prettierrc*` or `prettier` in devDeps → `npx prettier --write`
+- `biome.json` or `@biomejs/biome` in devDeps → `npx biome check --write`
+- `.eslintrc*` / `eslint.config.*` with formatting rules → `npx eslint --fix`
+- `go.mod` → `gofmt` or `goimports`
+- `.clang-format` → `clang-format -i`
+- `Justfile` with `fmt` or `format` recipe → use that recipe
+- `deno.json` → `deno fmt`
+- `ruff.toml` / `pyproject.toml` with `[tool.ruff]` → `ruff format`
+- `black` in dev dependencies → `black`
+
+**Workflow:**
+1. Write code focusing on correctness and logic — don't waste tokens on whitespace, trailing commas, or import ordering
+2. Run the project's formatter
+3. Re-read any files you need to edit further (formatter invalidates your in-context content — see [File Content Invalidation](#file-content-invalidation))
+
+**Why this matters:** Manually fixing formatting with Edit is slow, error-prone, and fights the formatter. The formatter will rewrite your manual fixes on the next run anyway. Worse, manually formatting code burns tokens on something a tool does instantly and perfectly.
+
+**Never:**
+- Hand-edit whitespace, indentation, or import order to match a style guide
+- Make multiple Edit calls to fix lint/format warnings one by one
+- Skip running the formatter because "the code looks right"
+
 ## Comments & Documentation
 
 - Write comments that explain **WHY**, not **WHAT**
