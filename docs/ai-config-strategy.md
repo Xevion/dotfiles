@@ -47,12 +47,12 @@ project/
 ## Global config
 
 - `~/.claude/CLAUDE.md` — Claude Code global rules (chezmoi-managed via `home/dot_claude/CLAUDE.md.tmpl`)
-- `~/.config/opencode/AGENTS.md` — OpenCode global rules (symlinked to `~/.claude/CLAUDE.md`)
-
-## `setup-ai-configs` script
-
-The `setup-ai-configs` script (`~/.local/bin/setup-ai-configs`) creates symlinks for tools that need files in non-standard locations (e.g., `.cursorrules`, `.antigravity/rules.md`). It should point these to `CLAUDE.md`, not `AGENTS.md`.
+- `~/.config/opencode/AGENTS.md` — OpenCode global rules (chezmoi-managed via `home/dot_config/opencode/AGENTS.md.tmpl`)
+- Both files share rules by including `home/.chezmoitemplates/common-rules.md.tmpl` via Go template
+- OpenCode's `AGENTS.md.tmpl` has its own preamble (Question tool character limits, multiple-select defaults) before the shared rules
 
 ## History
 
-The original pattern was `AGENTS.md` as source of truth with `CLAUDE.md` containing `@AGENTS.md`. This was reversed in March 2026 after confirming that `CLAUDE.md` has sufficient cross-tool support and is required by the primary tool (Claude Code).
+1. **Original**: `AGENTS.md` as source of truth, `CLAUDE.md` containing `@AGENTS.md`
+2. **March 2026**: Reversed — `CLAUDE.md` became canonical since Claude Code (primary tool) can't read `AGENTS.md`
+3. **March 2026 (later)**: Migrated to template-include model — shared rules in `common-rules.md.tmpl`, both `CLAUDE.md.tmpl` and `AGENTS.md.tmpl` include it with tool-specific preambles. Agents and skills consolidated under `home/dot_claude/` (previously split across `home/dot_config/opencode/agent/` and `home/dot_config/opencode/skills/`).

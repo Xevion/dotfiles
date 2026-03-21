@@ -268,7 +268,7 @@
 
 ### 16. Cleanup & Maintenance
 
-- [x] Commit deletion of removed files (nushell/env.nu, dot_gitconfig, etc.) - Converted to templates instead
+- [x] Convert removed files to templates (nushell/env.nu → env.nu.tmpl, dot_gitconfig → dot_gitconfig.tmpl)
 - [x] Clean up commented-out code in commonrc.sh.tmpl (removed dead zsh/xset/todoist code)
 - [ ] Review and update `.chezmoiignore` patterns
 - [ ] Audit and remove unused templates
