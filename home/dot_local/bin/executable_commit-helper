@@ -228,44 +228,55 @@ function getFileSummary(files: FileChange[]): string {
  * Get filtered diff output (excluding ignored files)
  */
 async function getFilteredDiff(staged: boolean): Promise<string> {
+  // Determine diff args based on mode
+  let rangeArgs: string[];
+  if (staged) {
+    rangeArgs = ['--staged'];
+  } else {
+    const hasParent = await $`git rev-parse HEAD~1`.quiet().then(() => true).catch(() => false);
+    rangeArgs = hasParent ? ['HEAD~1..HEAD'] : ['--root', 'HEAD'];
+  }
+
   // Get list of files to exclude
-  const numstat = staged
-    ? await $`git diff --staged --numstat`.text()
-    : await $`git diff HEAD~1..HEAD --numstat`.text();
-  
+  const numstatArgs = ['diff', ...rangeArgs, '--numstat'];
+  const numstatProc = Bun.spawn(['git', ...numstatArgs], { cwd: process.cwd(), stdout: 'pipe', stderr: 'pipe' });
+  const numstat = await new Response(numstatProc.stdout).text();
+  await numstatProc.exited;
+
   const files = parseNumstat(numstat);
   const filesToExclude = files
     .filter(f => f.shouldIgnore || f.isBinary)
     .map(f => f.path);
-  
+
+  const diffBaseArgs = ['diff', ...rangeArgs];
+
   // Build diff command with exclusions
   if (filesToExclude.length === 0) {
-    return staged
-      ? await $`git diff --staged`.text()
-      : await $`git diff HEAD~1..HEAD`.text();
+    const proc = Bun.spawn(['git', ...diffBaseArgs], { cwd: process.cwd(), stdout: 'pipe', stderr: 'pipe' });
+    const output = await new Response(proc.stdout).text();
+    await proc.exited;
+    return output;
   }
-  
-  // Git diff with pathspec exclusions - construct as array to avoid shell quoting issues
+
+  // Git diff with pathspec exclusions
   try {
-    const baseArgs = staged ? ['diff', '--staged'] : ['diff', 'HEAD~1..HEAD'];
-    const args = [...baseArgs, '--', '.', ...filesToExclude.map(f => `:(exclude)${f}`)];
-    
-    // Use Bun.spawn to call git with proper argument handling
+    const args = [...diffBaseArgs, '--', '.', ...filesToExclude.map(f => `:(exclude)${f}`)];
     const proc = Bun.spawn(['git', ...args], {
       cwd: process.cwd(),
       stdout: 'pipe',
       stderr: 'pipe',
     });
-    
+
     const output = await new Response(proc.stdout).text();
     await proc.exited;
-    
+
     return output;
   } catch {
     // If exclusion fails, return diff without exclusions
-    return staged
-      ? await $`git diff --staged`.text()
-      : await $`git diff HEAD~1..HEAD`.text();
+    const proc = Bun.spawn(['git', ...diffBaseArgs], { cwd: process.cwd(), stdout: 'pipe', stderr: 'pipe' });
+    const output = await new Response(proc.stdout).text();
+    await proc.exited;
+    return output;
   }
 }
 
@@ -478,7 +489,7 @@ async function stagedContext(maxLines: number): Promise<string> {
   const [status, numstat, recentCommits] = await Promise.all([
     $`git status`.text(),
     $`git diff --staged --numstat`.text(),
-    $`git log --format='%h %s' -10`.text(),
+    $`git log --format='%h %s' -10`.text().catch(() => '(initial commit — no history yet)'),
   ]);
   
   const files = parseNumstat(numstat);
@@ -569,10 +580,17 @@ async function amendContext(maxLines: number): Promise<string> {
  */
 async function main() {
   const args = Bun.argv.slice(2);
-  
+
   if (args.length === 0 || (!args[0].startsWith('--staged') && !args[0].startsWith('--amend'))) {
     console.error('Usage: commit-helper --staged [maxLines] | --amend [maxLines]');
     console.error('  Default maxLines: 1000');
+    process.exit(1);
+  }
+
+  // Verify we're in a git repository
+  const gitCheck = Bun.spawnSync(['git', 'rev-parse', '--is-inside-work-tree'], { stdout: 'pipe', stderr: 'pipe' });
+  if (gitCheck.exitCode !== 0) {
+    console.error('Error: Not inside a git repository.');
     process.exit(1);
   }
   

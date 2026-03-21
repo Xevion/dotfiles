@@ -13,7 +13,7 @@ import { readFileSync } from "fs";
 
 type Backend = "claude" | "opencode";
 type ModelAlias = "haiku" | "sonnet" | "opus";
-type ThinkingLevel = "minimal" | "high" | "max";
+type ThinkingLevel = "none" | "low" | "medium" | "high" | "max";
 type PostAction = "commit" | "edit" | "tweak";
 
 interface CommitOption {
@@ -29,19 +29,38 @@ interface Settings {
 }
 
 const DEFAULTS: Settings = {
-  backend: "opencode",
+  backend: "claude",
   model: "sonnet",
-  thinking: "minimal",
+  thinking: "low",
   count: 5,
 };
 
 const MAX_AI_RETRIES = 3;
 
-/** Default thinking level per model (opencode only). */
+const COMMIT_OPTIONS_SCHEMA = {
+  type: "object",
+  properties: {
+    options: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          subject: { type: "string", description: "Commit message subject line, under 72 characters, imperative mood" },
+          body: { type: "string", description: "Optional commit message body, wrapped at 72 characters" },
+        },
+        required: ["subject"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["options"],
+  additionalProperties: false,
+};
+
 const THINKING_DEFAULTS: Record<ModelAlias, ThinkingLevel> = {
-  haiku: "high",
-  sonnet: "minimal",
-  opus: "minimal",
+  haiku: "none",
+  sonnet: "low",
+  opus: "low",
 };
 
 // ---------------------------------------------------------------------------
@@ -73,7 +92,9 @@ const OPTION_COLORS: Record<string, Record<string, ColorFn>> = {
     opus: (t) => pc.bgMagenta(pc.white(t)),
   },
   thinking: {
-    minimal: (t) => pc.bgGreen(pc.black(t)),
+    none: (t) => pc.bgGray(pc.white(t)),
+    low: (t) => pc.bgGreen(pc.black(t)),
+    medium: (t) => pc.bgBlue(pc.white(t)),
     high: (t) => pc.bgYellow(pc.black(t)),
     max: (t) => pc.bgRed(pc.white(t)),
   },
@@ -102,6 +123,16 @@ function shell(cmd: string): string | null {
   }
 }
 
+function isGitRepo(): boolean {
+  const result = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { stdio: "pipe" });
+  return result.status === 0;
+}
+
+function hasAnyCommits(): boolean {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], { stdio: "pipe" });
+  return result.status === 0;
+}
+
 function hasStagedChanges(): boolean {
   const result = spawnSync("git", ["diff", "--cached", "--quiet"], { stdio: "pipe" });
   return result.status === 1;
@@ -110,7 +141,8 @@ function hasStagedChanges(): boolean {
 function gatherDiffContext(): string {
   const out = shell("commit-helper --staged");
   if (!out) {
-    p.log.error("Failed to gather staged changes via commit-helper.");
+    p.log.error("Failed to gather staged changes.");
+    p.log.info("Is " + pc.cyan("commit-helper") + " installed and on PATH?");
     bail();
   }
   return out;
@@ -139,8 +171,8 @@ function editInEditor(message: string): string {
 // System prompt
 // ---------------------------------------------------------------------------
 
-function buildSystemPrompt(count: number): string {
-  return `You are a commit message generator. You will be given a diff of staged changes and optional context from the developer.
+function buildSystemPrompt(count: number, structured: boolean = false): string {
+  const base = `You are a commit message generator. You will be given a diff of staged changes and optional context from the developer.
 
 Your task: produce exactly ${count} commit message options.
 
@@ -165,7 +197,17 @@ If the recent commits use conventional commit style (e.g. "feat:", "fix:", "conf
 - Single-line subject for most commits
 - Add a body (separated by blank line) ONLY for genuinely complex changes
 - Focus on WHAT changed and WHY, not implementation details
-- NEVER mention: test results, lockfile changes, file counts, build status
+- NEVER mention: test results, lockfile changes, file counts, build status`;
+
+  if (structured) {
+    return base + `
+
+## Output format
+
+Respond with a JSON object containing an "options" array with exactly ${count} objects. Each object has a "subject" field (required, string) and an optional "body" field (string). Do not include any text outside the JSON.`;
+  }
+
+  return base + `
 
 ## Output format
 
@@ -227,23 +269,26 @@ function invokeAI(
   variant?: string,
   refinement?: string,
 ): Promise<string> {
-  const systemPrompt = buildSystemPrompt(count);
+  const useStructured = backend === "claude";
+  const systemPrompt = buildSystemPrompt(count, useStructured);
   const userPrompt = buildUserPrompt(diffContext, userContext, count, refinement);
   const m = modelFlag(backend, model);
 
   if (backend === "claude") {
-    return spawnAsync(
-      "claude",
-      ["--print", "--model", m, "--output-format", "json", "--system-prompt", systemPrompt, "--tools", ""],
-      userPrompt,
-    ).then((raw) => {
-      try {
-        const parsed = JSON.parse(raw);
-        return parsed.result ?? raw;
-      } catch {
-        return raw;
-      }
-    });
+    const claudeArgs = [
+      "--print", "--model", m,
+      "--output-format", "json",
+      "--system-prompt", systemPrompt,
+      "--tools", "",
+      "--json-schema", JSON.stringify(COMMIT_OPTIONS_SCHEMA),
+    ];
+
+    if (variant) {
+      claudeArgs.push("--effort", variant);
+    }
+
+    // Return raw output — parseStructuredOptions() handles all JSON unwrapping
+    return spawnAsync("claude", claudeArgs, userPrompt);
   }
 
   const fullPrompt = `${systemPrompt}\n\n---\n\n${userPrompt}`;
@@ -301,7 +346,7 @@ function spawnAsync(cmd: string, args: string[], stdin?: string): Promise<string
 
     const timeout = setTimeout(() => {
       child.kill("SIGTERM");
-      reject(new Error(`${cmd} timed out after 120s`));
+      reject(new Error(`${cmd} timed out after 120s. Try a faster model or smaller diff.`));
     }, 120_000);
   });
 }
@@ -343,6 +388,41 @@ function parseOptions(raw: string): CommitOption[] {
   return options;
 }
 
+function parseStructuredOptions(raw: string): CommitOption[] {
+  let data: any;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+
+  // Claude CLI --output-format json wraps structured output:
+  // { "structured_output": { "options": [...] }, "result": "", ... }
+  let options: any;
+  if (data.structured_output?.options) {
+    options = data.structured_output.options;
+  } else if (Array.isArray(data.options)) {
+    options = data.options;
+  } else if (typeof data.result === "string" && data.result) {
+    // Fallback: result contains JSON string
+    try {
+      const inner = JSON.parse(data.result);
+      options = inner.options;
+    } catch {
+      return [];
+    }
+  }
+
+  if (!Array.isArray(options)) return [];
+
+  return options
+    .filter((opt: any) => opt.subject && typeof opt.subject === "string")
+    .map((opt: any) => ({
+      subject: opt.subject.trim(),
+      body: opt.body?.trim() || undefined,
+    }));
+}
+
 function toCommitMessage(opt: CommitOption): string {
   return opt.body ? `${opt.subject}\n\n${opt.body}` : opt.subject;
 }
@@ -368,8 +448,8 @@ function buildSettingRows(defaults: Settings): SettingRow[] {
     {
       key: "backend",
       label: "Backend",
-      options: ["opencode", "claude"] as const,
-      idx: indexOf(["opencode", "claude"], defaults.backend),
+      options: ["claude", "opencode"] as const,
+      idx: indexOf(["claude", "opencode"], defaults.backend),
     },
     {
       key: "model",
@@ -380,9 +460,9 @@ function buildSettingRows(defaults: Settings): SettingRow[] {
     {
       key: "thinking",
       label: "Thinking",
-      options: ["minimal", "high", "max"] as const,
-      idx: indexOf(["minimal", "high", "max"], defaults.thinking),
-      visibleWhen: (s) => s.backend === "opencode",
+      options: ["none", "low", "medium", "high", "max"] as const,
+      idx: indexOf(["none", "low", "medium", "high", "max"], defaults.thinking),
+      visibleWhen: (s) => s.model !== "haiku",
     },
     {
       key: "count",
@@ -598,6 +678,11 @@ async function promptPostAction(): Promise<PostAction> {
 // AI generation with auto-retry
 // ---------------------------------------------------------------------------
 
+interface GenerateResult {
+  options: CommitOption[];
+  rawFallback?: string;
+}
+
 async function generateOptions(
   backend: Backend,
   model: ModelAlias,
@@ -606,8 +691,9 @@ async function generateOptions(
   count: number,
   variant?: string,
   refinement?: string,
-): Promise<CommitOption[]> {
+): Promise<GenerateResult> {
   const label = `${pc.cyan(backend)}/${pc.yellow(model)}`;
+  let lastRawOutput: string | undefined;
 
   for (let attempt = 0; attempt < MAX_AI_RETRIES; attempt++) {
     const s = p.spinner();
@@ -625,9 +711,14 @@ async function generateOptions(
       clearInterval(timer);
       const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
       s.stop(`Generated. ${pc.dim(`(${elapsed}s)`)}`);
+      lastRawOutput = raw;
 
-      const opts = parseOptions(raw);
-      if (opts.length > 0) return opts;
+      // Try structured JSON parsing first (Claude CLI with --json-schema), fall back to regex
+      let opts = backend === "claude" ? parseStructuredOptions(raw) : [];
+      if (opts.length === 0) {
+        opts = parseOptions(raw);
+      }
+      if (opts.length > 0) return { options: opts };
 
       p.log.warn("Could not parse AI response — retrying...");
     } catch (err) {
@@ -640,7 +731,7 @@ async function generateOptions(
     }
   }
 
-  return [];
+  return { options: [], rawFallback: lastRawOutput };
 }
 
 // ---------------------------------------------------------------------------
@@ -656,10 +747,17 @@ async function runCommit(message: string, dryRun: boolean): Promise<boolean> {
     return true;
   }
 
+  // Always print the commit message for scrollback safety
+  p.log.info("Commit message:");
+  console.log(pc.dim("─".repeat(60)));
+  console.log(message);
+  console.log(pc.dim("─".repeat(60)));
+
   const tmpFile = `/tmp/commit-msg-${Date.now()}.txt`;
   await Bun.write(tmpFile, message);
+  let currentMessage = message;
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  while (true) {
     const result = spawnSync("git", ["commit", "-F", tmpFile], {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
@@ -668,24 +766,75 @@ async function runCommit(message: string, dryRun: boolean): Promise<boolean> {
     if (result.status === 0) {
       const stdout = result.stdout?.trim() || "";
       if (stdout) p.log.success(stdout);
-      try { require("fs").unlinkSync(tmpFile); } catch { /* ignore */ }
+      removeTempFile(tmpFile);
       return true;
     }
 
+    // Commit failed — show error details
     const stderr = result.stderr?.trim() || "";
     const stdout = result.stdout?.trim() || "";
-    p.log.error(`git commit failed${attempt > 0 ? ` (attempt ${attempt + 1})` : ""}:`);
+    p.log.error("git commit failed:");
     if (stderr) console.error(stderr);
     if (stdout) console.log(stdout);
 
-    if (attempt < 2) {
-      const retry = await p.confirm({ message: "Retry commit?" });
-      if (isCancel(retry) || !retry) break;
-    }
-  }
+    // Detect hook failure
+    const isHookFailure = stderr.includes("hook") ||
+      stderr.includes("pre-commit") ||
+      stderr.includes("commit-msg") ||
+      result.status === 1;
 
-  try { require("fs").unlinkSync(tmpFile); } catch { /* ignore */ }
-  return false;
+    type RecoveryAction = "retry" | "force" | "edit" | "copy" | "abort";
+    const recoveryOptions: { value: RecoveryAction; label: string; hint: string }[] = [
+      { value: "retry", label: "Retry", hint: "run git commit again" },
+      ...(isHookFailure ? [{ value: "force" as RecoveryAction, label: "Force", hint: "git commit --no-verify" }] : []),
+      { value: "edit", label: "Edit message", hint: "$EDITOR" },
+      { value: "copy", label: "Copy & abort", hint: "message printed above" },
+      { value: "abort", label: "Abort", hint: "exit" },
+    ];
+
+    const action = await p.select({
+      message: isHookFailure ? "Pre-commit hook failed. What now?" : "Commit failed. What now?",
+      options: recoveryOptions,
+    });
+
+    if (isCancel(action) || action === "abort") {
+      p.log.warn("Commit message preserved at: " + pc.cyan(tmpFile));
+      return false;
+    }
+
+    if (action === "copy") {
+      p.log.info("Message printed above. Temp file: " + pc.cyan(tmpFile));
+      return false;
+    }
+
+    if (action === "force") {
+      const forceResult = spawnSync("git", ["commit", "--no-verify", "-F", tmpFile], {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      if (forceResult.status === 0) {
+        const out = forceResult.stdout?.trim() || "";
+        if (out) p.log.success(out);
+        removeTempFile(tmpFile);
+        return true;
+      }
+      p.log.error("Force commit also failed:");
+      if (forceResult.stderr?.trim()) console.error(forceResult.stderr.trim());
+      continue;
+    }
+
+    if (action === "edit") {
+      currentMessage = editInEditor(currentMessage);
+      if (!currentMessage) {
+        p.log.warn("Empty message. Temp file: " + pc.cyan(tmpFile));
+        return false;
+      }
+      await Bun.write(tmpFile, currentMessage);
+      continue;
+    }
+
+    // action === "retry" — just loop
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -710,6 +859,10 @@ const promptCmd = defineCommand({
     },
   },
   run({ args }) {
+    if (!isGitRepo()) {
+      console.error("Not inside a git repository. Run `git init` first.");
+      process.exit(1);
+    }
     if (!hasStagedChanges()) {
       console.error("No staged changes. Stage files with `git add` first.");
       process.exit(1);
@@ -771,9 +924,18 @@ const main = defineCommand({
 
     p.intro(pc.bgCyan(pc.black(" commit ")));
 
+    if (!isGitRepo()) {
+      p.log.error("Not inside a git repository. Run " + pc.cyan("git init") + " first.");
+      bail();
+    }
+
     if (!hasStagedChanges()) {
       p.log.error("No staged changes. Stage files with " + pc.cyan("git add") + " first.");
       bail();
+    }
+
+    if (!hasAnyCommits()) {
+      p.log.info(pc.dim("Initial commit — no prior history for style reference."));
     }
 
     // Parse CLI flag overrides (pre-seed the settings navigator)
@@ -790,7 +952,7 @@ const main = defineCommand({
     if (!settings) bail();
 
     const { backend, model, thinking, count } = settings;
-    const variant = backend === "opencode" ? thinking : undefined;
+    const variant = thinking !== "none" ? thinking : undefined;
 
     // Gather diff context
     const s = p.spinner();
@@ -798,7 +960,8 @@ const main = defineCommand({
     const diffContext = shell("commit-helper --staged");
     if (!diffContext) {
       s.stop("Failed to gather changes.");
-      p.log.error("commit-helper --staged returned nothing.");
+      p.log.error("commit-helper returned nothing.");
+      p.log.info("Is " + pc.cyan("commit-helper") + " installed and on PATH?");
       bail();
     }
     s.stop("Context gathered.");
@@ -821,15 +984,22 @@ const main = defineCommand({
         tweakBaseline = undefined;
       }
 
-      const options = await generateOptions(backend, model, diffContext, userContext, count, variant, currentRefinement);
+      const result = await generateOptions(backend, model, diffContext, userContext, count, variant, currentRefinement);
       refinement = undefined;
 
-      if (options.length === 0) {
+      if (result.options.length === 0) {
         p.log.error("Failed to generate commit options after all retries.");
+        if (result.rawFallback) {
+          p.log.warn("Last raw AI output:");
+          console.log(pc.dim("─".repeat(60)));
+          console.log(result.rawFallback.slice(0, 3000));
+          if (result.rawFallback.length > 3000) console.log(pc.dim(`... (${result.rawFallback.length - 3000} chars truncated)`));
+          console.log(pc.dim("─".repeat(60)));
+        }
         bail();
       }
 
-      const pick = await commitSelect(options);
+      const pick = await commitSelect(result.options);
       if (isCancel(pick)) bail();
 
       if (pick === "regenerate") {
@@ -837,7 +1007,7 @@ const main = defineCommand({
         continue mainLoop;
       }
 
-      const chosen = options[pick as number];
+      const chosen = result.options[pick as number];
       const action = await promptPostAction();
 
       switch (action) {
