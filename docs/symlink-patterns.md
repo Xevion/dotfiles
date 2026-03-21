@@ -55,7 +55,7 @@ Build/validation scripts in hooks/ directory
 **Examples**:
 ```
 ~/.config/opencode/command/commit-staged.md → ~/.claude/commands/commit-staged.md
-~/.config/opencode/AGENTS.md → ~/.claude/CLAUDE.md
+~/.config/opencode/AGENTS.md → ~/.claude/CLAUDE.md  (OpenCode reads AGENTS.md natively)
 ```
 
 **Why**: Single source of truth for shared commands/documentation. Changes in one location automatically reflected in all symlinked locations.

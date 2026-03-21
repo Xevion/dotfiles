@@ -2,11 +2,11 @@
 /**
  * setup-ai-configs - Configure AI tool symlinks for Cursor and Antigravity
  *
- * Creates symlinks so Cursor and Antigravity read from the project's AGENTS.md file.
+ * Creates symlinks so Cursor and Antigravity read from the project's CLAUDE.md file.
  *
  * Usage:
- *   setup-ai-configs --cursor        # Create .cursorrules → AGENTS.md
- *   setup-ai-configs --antigravity   # Create .antigravity/rules.md → AGENTS.md
+ *   setup-ai-configs --cursor        # Create .cursorrules → CLAUDE.md
+ *   setup-ai-configs --antigravity   # Create .antigravity/rules.md → CLAUDE.md
  *   setup-ai-configs --all           # Create both
  */
 
@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, symlinkSync, lstatSync, readlinkSync } from "fs"
 import { join, resolve } from "path";
 import { parseArgs } from "util";
 
-const MINIMAL_AGENTS_TEMPLATE = `# Project Guidelines
+const MINIMAL_CLAUDE_TEMPLATE = `# Project Guidelines
 
 ## Overview
 
@@ -66,8 +66,8 @@ Usage:
   setup-ai-configs [options]
 
 Options:
-  --cursor        Create .cursorrules symlink pointing to AGENTS.md
-  --antigravity   Create .antigravity/rules.md symlink pointing to AGENTS.md
+  --cursor        Create .cursorrules symlink pointing to CLAUDE.md
+  --antigravity   Create .antigravity/rules.md symlink pointing to CLAUDE.md
   --all           Create both Cursor and Antigravity configs
   -h, --help      Show this help message
 
@@ -77,7 +77,7 @@ Examples:
   setup-ai-configs --antigravity   # Set up Antigravity only
 
 The script will:
-  1. Check if AGENTS.md exists in the current directory
+  1. Check if CLAUDE.md exists in the current directory
   2. Offer to create a minimal template if missing
   3. Create the appropriate symlinks for the selected tools
 `);
@@ -94,16 +94,16 @@ async function promptYesNo(question: string): Promise<boolean> {
 }
 
 function checkAgentsMd(cwd: string): boolean {
-  return existsSync(join(cwd, "AGENTS.md"));
+  return existsSync(join(cwd, "CLAUDE.md"));
 }
 
 async function offerCreateAgentsMd(cwd: string): Promise<boolean> {
-  console.log("No AGENTS.md found in current directory.");
+  console.log("No CLAUDE.md found in current directory.");
   const create = await promptYesNo("Would you like to create a minimal template?");
 
   if (create) {
-    const path = join(cwd, "AGENTS.md");
-    await Bun.write(path, MINIMAL_AGENTS_TEMPLATE);
+    const path = join(cwd, "CLAUDE.md");
+    await Bun.write(path, MINIMAL_CLAUDE_TEMPLATE);
     console.log(`Created ${path}`);
     return true;
   }
@@ -148,7 +148,7 @@ function createSymlink(target: string, linkPath: string, description: string): b
 
 function setupCursor(cwd: string): boolean {
   const linkPath = join(cwd, ".cursorrules");
-  return createSymlink("AGENTS.md", linkPath, ".cursorrules");
+  return createSymlink("CLAUDE.md", linkPath, ".cursorrules");
 }
 
 function setupAntigravity(cwd: string): boolean {
@@ -166,8 +166,8 @@ function setupAntigravity(cwd: string): boolean {
   }
 
   const linkPath = join(antigravityDir, "rules.md");
-  // Symlink needs to go up one directory to reach AGENTS.md
-  return createSymlink("../AGENTS.md", linkPath, ".antigravity/rules.md");
+  // Symlink needs to go up one directory to reach CLAUDE.md
+  return createSymlink("../CLAUDE.md", linkPath, ".antigravity/rules.md");
 }
 
 async function main(): Promise<void> {
@@ -187,11 +187,11 @@ async function main(): Promise<void> {
   const cwd = process.cwd();
   console.log(`Working directory: ${cwd}\n`);
 
-  // Check for AGENTS.md
+  // Check for CLAUDE.md
   if (!checkAgentsMd(cwd)) {
     const created = await offerCreateAgentsMd(cwd);
     if (!created) {
-      console.log("\nCannot create symlinks without AGENTS.md. Exiting.");
+      console.log("\nCannot create symlinks without CLAUDE.md. Exiting.");
       process.exit(1);
     }
     console.log();
