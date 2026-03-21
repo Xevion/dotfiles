@@ -171,10 +171,12 @@ Relations: [blocks/blockedBy/relatedTo if any]
 [Full description markdown]
 ```
 
-Then immediately use the Question tool (`multiSelect: false`):
+Then **immediately use the Question tool** (`multiSelect: false`) — do NOT present this as plain text options:
 - "Create this issue" (Recommended)
 - "Edit before creating" — let the user specify what to change
 - "Cancel"
+
+**If you skip the Question tool here and just ask in prose, you are violating this skill's core requirement.**
 
 **Assignment logic:**
 - Status Todo or In Progress → assign to "me"

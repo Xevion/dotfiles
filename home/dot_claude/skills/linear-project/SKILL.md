@@ -98,6 +98,7 @@ Question 3: **Milestones** (`multiSelect: true`)
 - Suggest 1-2 obvious phase milestones based on the project scope (e.g., "MVP", "Alpha", "v1.0")
 - Keep it lean: 1-2 for new projects, 3 max
 - Include target date suggestions in descriptions if reasonable
+- **Name milestones with short descriptive names only** — e.g., "Ingest MVP", "Alpha", "v1.0". Do NOT prefix with version numbers or use separators like "v0.1 -- Ingest MVP". The milestone name IS the label.
 
 ### Description Generation
 
@@ -155,10 +156,12 @@ DESCRIPTION
   [full markdown description]
 ```
 
-Then immediately use the Question tool (`multiSelect: false`):
+Then **immediately use the Question tool** (`multiSelect: false`) — do NOT present this as plain text options:
 - "Create everything as shown" (Recommended)
 - "Edit before creating" — let the user specify what to change
 - "Cancel"
+
+**If you skip the Question tool here and just ask in prose, you are violating this skill's core requirement.**
 
 ## Step 4: Execute
 
@@ -170,9 +173,17 @@ Execute in order:
 
 Report results with URLs after each step.
 
-## Step 5: Generate CLAUDE.md Section
+## Step 5: Write CLAUDE.md Section
 
-Output a concise Linear integration section for the project's CLAUDE.md. Follow this template:
+Write a concise Linear integration section directly into the project's CLAUDE.md. **Do NOT present it as text for the user to paste — use the Edit tool to add it to the file immediately.**
+
+### Finding the target file
+
+1. Check if a `CLAUDE.md` exists in the current working directory
+2. If yes, append the section to it (find an appropriate location — after existing content, or before a specific section if logical)
+3. If no `CLAUDE.md` exists, ask the user where to put it using the Question tool
+
+### Section template
 
 ```markdown
 ## Linear Issue Tracking
@@ -199,9 +210,6 @@ Use the `linear-issue` skill for creating issues, or reference issues directly (
 - Keep it concise — reference the `linear-issue` skill for detailed workflows instead of duplicating instructions
 - Include project-specific details (domain labels, project name) that the skill can't auto-detect
 - Don't include full MCP call syntax — the skill handles that
-- The section should be copy-pasteable into the project's CLAUDE.md
-
-**Present the section to the user** — don't write it to a file automatically. The user decides where and how to integrate it.
 
 ## Label Color Guidelines
 
