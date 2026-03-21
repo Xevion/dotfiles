@@ -249,7 +249,8 @@ Before writing any code, detect the project's formatter:
 
 - Write comments that explain **WHY**, not **WHAT**
 - **Never reference old implementations, migrations, or refactoring history**
-- **Never add banner comments** (`===`, `-----`, etc.)
+- **Never add banner comments** (`===`, `-----`, etc.) — decorative dividers composed of repeated symbols add noise without information
+- **Never add bare section-label comments** (`// Handlers`, `// Utilities`, `// Private`) — if a label adds real context, use a doc comment (`///` or `/** */`) instead
 - Update project CLAUDE.md when making architectural decisions
 - Examples of bad comments to avoid:
   - "Refactored from previous version that used X approach." (never mention past implementations)
