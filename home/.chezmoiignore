@@ -6,6 +6,68 @@ hooks
 
 claude-settings.json
 
+# Claude Code runtime state (managed: CLAUDE.md, settings.json, agents/, skills/, hooks/, commands/)
+.claude/.credentials.json
+.claude/backups
+.claude/cache
+.claude/chrome
+.claude/debug
+.claude/file-history
+.claude/history.jsonl
+.claude/ide
+.claude/keybindings.json
+.claude/paste-cache
+.claude/plans
+.claude/plugins
+.claude/projects
+.claude/security_warnings_state_*
+.claude/session-env
+.claude/sessions
+.claude/settings.json.bak
+.claude/settings.json.orig
+.claude/settings.local.json
+.claude/shell-snapshots
+.claude/stats-cache.json
+.claude/statsig
+.claude/tasks
+.claude/telemetry
+.claude/todos
+.claude/transcripts
+.claude/usage-data
+
+# Cursor runtime state (managed: mcp.json)
+.cursor/ai-tracking
+.cursor/argv.json
+.cursor/chats
+.cursor/cli-config.json
+.cursor/extensions
+.cursor/ide_state.json
+.cursor/plans
+.cursor/projects
+
+# Gemini runtime state (managed: GEMINI.md, antigravity/mcp_config.json)
+.gemini/annotations
+.gemini/antigravity-browser-profile
+.gemini/brain
+.gemini/code_tracker
+.gemini/context_state
+.gemini/conversations
+.gemini/antigravity/implicit
+.gemini/antigravity/installation_id
+.gemini/antigravity/knowledge
+.gemini/antigravity/playground
+
+# Fish runtime state (managed: config.fish, fish_plugins, conf.d/*, functions/*)
+# Fisher plugin manager and its installed plugin files
+.config/fish/completions
+.config/fish/fish_variables
+
+# Kitty auto-generated theme files (managed: kitty.conf, diff.conf, dracula.conf, etc.)
+.config/kitty/*.auto.conf
+
+# Micro runtime state (managed: bindings.json, settings.json)
+.config/micro/buffers
+
 {{/* WSL Only Files */}}
 {{ if (not .wsl) }}
 

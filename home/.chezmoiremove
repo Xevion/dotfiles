@@ -1,0 +1,13 @@
+# Stale fish shell files (sources deleted/renamed, targets left behind)
+.config/fish/conf.d/fzf.fish
+.config/fish/conf.d/sdk.fish
+.config/fish/functions/sdk.fish
+.config/fish/functions/z.fish
+
+# fontconfig: fonts.toml replaced by fonts.conf
+.config/fontconfig/fonts.toml
+
+# opencode: agents/skills migrated to ~/.claude/, dirs left empty
+.config/opencode/agent/**
+.config/opencode/skill/**
+.config/opencode/superpowers/**

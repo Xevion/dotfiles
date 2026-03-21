@@ -12,4 +12,10 @@
 .config/opencode/package.json
 .config/opencode/.gitignore
 .config/opencode/.claude/
-.config/opencode/plugin/
+
+# Opencode runtime state files
+.config/opencode/oh-my-opencode.json
+.config/opencode/opencode-notifier-state.json
+.config/opencode/opencode.json
+.config/opencode/opencode.jsonc.tui-migration.bak
+.config/opencode/tui.json

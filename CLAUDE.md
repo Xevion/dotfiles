@@ -164,6 +164,15 @@ Common patterns where `.tmpl` is added to the FULL filename:
 - Doppler integration for API keys/tokens
 - Encryption key bootstrapped via hooks from Doppler
 
+**Stale File Cleanup (`.chezmoiremove`):**
+- Chezmoi does NOT automatically remove target files when a source file is deleted or renamed
+- `home/.chezmoiremove` lists target paths that should be removed on `chezmoi apply`
+- Supports glob patterns (e.g., `.config/opencode/agent/**`)
+- **REQUIRED**: When deleting or renaming a source file, add the old target path to `.chezmoiremove`
+- Use the Question tool to confirm with the user before adding entries (removal is destructive)
+- To preview: `chezmoi diff` will show files marked for removal
+- Reference: [chezmoi docs on .chezmoiremove](https://www.chezmoi.io/reference/target-types/#remove)
+
 **Hooks:**
 - `home/hooks/.init_pre.ts` and `home/hooks/.update_pre.ts` (TypeScript via Bun)
 - Bootstrap encryption key from Doppler before apply
@@ -276,6 +285,12 @@ chezmoi add --encrypt ~/.ssh/config
 - Locate source: `home/dot_config/nushell/config.nu.tmpl`
 - Make changes to source file
 - User runs: `chezmoi apply` or `chezmoi apply ~/.config/nushell/config.nu`
+
+**Delete or rename a managed file:**
+1. Delete/rename the source file in `home/`
+2. Add the OLD target path to `home/.chezmoiremove` so chezmoi cleans up the stale target
+3. Confirm with user before adding to `.chezmoiremove` (removal is destructive)
+4. Example: renaming `dot_config/fish/functions/z.fish` → add `.config/fish/functions/z.fish` to `.chezmoiremove`
 
 ## Platform Coverage
 
