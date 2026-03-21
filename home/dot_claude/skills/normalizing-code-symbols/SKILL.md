@@ -1,6 +1,6 @@
 ---
 name: normalizing-code-symbols
-description: Use when finding or fixing non-ASCII typographic symbols in source code, comments, docs, or strings. Covers em dashes, unicode arrows, box-drawing tree chars, ellipsis, smart quotes, and similar. Also covers detecting and removing banner/decorative divider comments and bare section-label comments.
+description: Use when finding or fixing non-ASCII typographic symbols in source code, comments, docs, or strings. Covers em dashes, unicode arrows, box-drawing tree chars, ellipsis, smart quotes, and similar. Also covers detecting and removing banner/decorative divider comments and bare section-label comments. Auto-invoke when the banner-comment-lint PostToolUse hook reports a banner, or when doing a cleanup pass across multiple files.
 ---
 
 # Normalizing Code Symbols
