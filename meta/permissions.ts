@@ -407,21 +407,28 @@ const claudeExtras = {
     // MCP servers
     "mcp__context7__*",
     "mcp__grep__searchGitHub",
-    "mcp__linear-server__list_issues",
-    "mcp__linear-server__list_issue_labels",
-    "mcp__linear-server__create_issue_label",
-    "mcp__linear-server__update_issue",
-    "mcp__linear-server__list_teams",
-    "mcp__linear-server__list_projects",
-    "mcp__linear-server__create_project",
-    "mcp__linear-server__create_issue",
-    "mcp__linear-server__get_issue",
-    "mcp__linear-server__list_issue_statuses",
+    // Linear: read-only + issue/label creation (batch-friendly)
+    "mcp__linear__list_*",
+    "mcp__linear__get_*",
+    "mcp__linear__search_*",
+    "mcp__linear__extract_*",
+    "mcp__linear__save_issue",
+    "mcp__linear__create_issue_label",
   ],
   deny: [
     "Task(Explore)",
   ],
-  ask: [] as string[],
+  ask: [
+    // Linear: one-off mutations that deserve confirmation
+    "mcp__linear__save_project",
+    "mcp__linear__save_milestone",
+    "mcp__linear__save_comment",
+    "mcp__linear__delete_comment",
+    "mcp__linear__create_attachment",
+    "mcp__linear__delete_attachment",
+    "mcp__linear__create_document",
+    "mcp__linear__update_document",
+  ] as string[],
 };
 
 function formatClaude(): object {

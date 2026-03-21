@@ -11,58 +11,82 @@ Create well-structured Linear issues with automatic project detection, contextua
 
 **Always preview before creating. Never fire-and-forget.**
 
+**Workspace note:** Issue prefixes are **team-level** in Linear's data model. `XEV-` is the key for the "Xevion's Personal" team. Each workspace typically has one team, so the prefix is effectively per-workspace. `MOT-` is a different workspace with its own team. The prefix comes from whichever Linear MCP is configured, not from the project.
+
+## CRITICAL: Use the Question Tool for ALL Decisions
+
+**Every decision point in this skill MUST use the Question tool.** Do not present options as plain text, bullet lists, or inline prose. If you're asking the user to choose, confirm, or weigh in — use the Question tool. Always.
+
+**This includes:**
+- Project selection (when not auto-detected)
+- Issue type and priority
+- Label selection
+- Parent/relation linking
+- Whether to batch-create sub-issues
+- Final confirmation before creating
+
+**The only exception** is when the user's initial request is so specific that no questions are needed (e.g., "create bug XEV: ladder facing is wrong in ladderDown test" — title, type, and project are all explicit). Even then, use the Question tool for priority and labels.
+
+**Default to `multiSelect: true`** unless options are mutually exclusive. Labels, relations, and scope questions almost always allow multiple selections.
+
 ## Step 1: Detect Project Context
 
 Check for Linear configuration in order:
 
 1. **CLAUDE.md in current project** — look for a `## Linear Issue Tracking` section containing project name, team, domain labels
-2. **If not found** — list existing Linear projects using `list_projects` and present them:
-   - Show project names with summaries
+2. **If not found** — use the Question tool to present existing Linear projects:
+   - Query `list_projects` first
+   - Present project names with summaries as options
    - Include a "No project (standalone)" option
    - Include a "Create new project" option (suggest the `linear-project` skill)
-   - If the git repo name or directory name closely matches a project, highlight that suggestion
+   - If the git repo name or directory name closely matches a project, put that option first with "(Recommended)" in the label
 
 **Cache the detected project for the session** — don't re-detect on every issue.
 
 ## Step 2: Gather Issue Details
 
-Use the Question tool to interview the user. Scale the interview depth to the task:
+**Use the Question tool to interview the user.** Batch related questions into a single Question tool call (up to 4 questions). Do NOT ask one question, wait, then ask another — batch them.
 
-### Quick mode (user provides a clear, specific request)
+### What to ask (batch into 1-2 Question tool calls)
 
-If the user says something like "create a bug: X is broken" or "track this feature: Y", skip to drafting. Extract:
-- Title from their description
-- Type (Bug/Feature/Improvement) from context
-- Description from conversation context
+**Round 1 — Core identity (always ask):**
 
-### Standard mode (needs refinement)
+Question 1: **Issue type** (`multiSelect: false`)
+- Suggest the most likely type first based on the user's description
+- Options: Bug, Feature, Improvement, Refactoring, Spike/Investigation
+- Put your reasoning in each option's description
 
-Ask 2-3 questions using the Question tool. Focus on:
+Question 2: **Priority** (`multiSelect: false`)
+- Suggest priority with natural language reasoning in descriptions:
+  - "Medium — it's an improvement that isn't blocking anything, but it touches a core system"
+  - "High — data integrity bug that could silently corrupt state"
+  - "Low — nice-to-have cleanup, batch with similar items"
+- Always include at least one alternative with counter-reasoning
+- Present as: Urgent, High, Medium (Recommended), Low — with reasoning in descriptions
 
-**What's the issue?**
-- Get a specific, scannable title (~10 words max)
-- Understand the problem or desired behavior
+Question 3: **Labels** (`multiSelect: true`)
+- Query existing labels for the target project with `list_issue_labels` BEFORE asking
+- Present relevant labels as options (type label pre-selected via recommendation, domain labels as choices)
+- Group by type vs domain in descriptions
+- 1-3 labels is the sweet spot — don't present more than 6-8 options
 
-**What type and priority?**
-- Suggest a type label (Bug/Feature/Improvement/Refactoring) based on description
-- Suggest priority with natural language reasoning:
-  - "This feels Medium — it's an improvement that isn't blocking anything, but it touches a core system."
-  - "I'd suggest High — this is a data integrity bug that could silently corrupt state."
-  - Present an alternative: "Could argue Low if you want to batch this with the other cleanup items."
-- Let the user confirm or adjust
+Question 4 (if applicable): **Relations and hierarchy** (`multiSelect: true`)
+- Only include this question if the user mentioned related issues, or the issue sounds like it could be a sub-task
+- Options: "Sub-issue of [XEV-###]", "Blocks [XEV-###]", "Blocked by [XEV-###]", "Standalone (no relations)"
 
-**Labels and relations?**
-- Query existing labels for the target project with `list_issue_labels`
-- Auto-suggest 1-3 labels: one type label + relevant domain labels
-- If the user mentions related issues, offer to set `blockedBy`, `blocks`, or `relatedTo`
-- If this is a sub-task of a larger effort, offer to set `parentId`
+**Round 2 — Only if needed:**
+
+If the user's description was vague, ask a follow-up round:
+- Scope clarification (what's in/out)
+- Reproduction details (for bugs)
+- Whether to decompose into sub-issues (for large features)
 
 ### Batch mode (decomposing a large feature)
 
-When the user describes a large feature that naturally breaks into pieces:
-1. Draft a parent issue (overview + scope)
-2. Draft 2-5 sub-issues with individual titles, descriptions, and labels
-3. Show the full tree for review before creating anything
+When the user describes a large feature that naturally breaks into pieces, use the Question tool to confirm:
+1. Present the proposed decomposition as options (`multiSelect: true`): "Create parent + these sub-issues: [list]"
+2. Let the user select which sub-issues to include, add new ones, or reject the decomposition
+3. Draft the full tree, then show preview before creating anything
 4. Create parent first, then sub-issues with `parentId` set
 
 ## Step 3: Draft the Issue
@@ -130,8 +154,9 @@ A focused paragraph or two. No section headers needed unless the scope is large.
 
 ## Step 4: Preview and Confirm
 
-**Always show the full issue before creating it:**
+**Show the full issue, then use the Question tool to confirm:**
 
+Present the preview as text:
 ```
 Title: [title]
 Project: [project name]
@@ -146,12 +171,15 @@ Relations: [blocks/blockedBy/relatedTo if any]
 [Full description markdown]
 ```
 
+Then immediately use the Question tool (`multiSelect: false`):
+- "Create this issue" (Recommended)
+- "Edit before creating" — let the user specify what to change
+- "Cancel"
+
 **Assignment logic:**
 - Status Todo or In Progress → assign to "me"
 - Status Backlog → leave unassigned (it's an idea, not a commitment)
 - Default status: Backlog for new issues unless the user indicates they're starting work
-
-**Wait for explicit confirmation before calling `save_issue`.**
 
 ## Step 5: Create
 
@@ -178,4 +206,4 @@ Never default to High. The scale should feel meaningful:
 | **Medium** | Important improvement, non-blocking bug, planned feature work |
 | **Low** | Nice-to-have, cleanup, investigation spikes, future considerations |
 
-**Always explain your reasoning** in 1-2 sentences. Present the suggested priority AND one alternative with its reasoning. Let the user pick what resonates.
+**Always explain your reasoning** in 1-2 sentences in the option description. Present the suggested priority AND one alternative with its reasoning. Let the user pick what resonates.

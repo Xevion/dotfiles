@@ -9,41 +9,104 @@ description: Scaffold new Linear projects with label taxonomies, milestones, and
 
 Create fully configured Linear projects with domain-specific labels, optional milestones, and a CLAUDE.md integration section. Audits existing workspace state to prevent duplication.
 
+## CRITICAL: Use the Question Tool for ALL Decisions
+
+**Every decision point in this skill MUST use the Question tool.** Do not present options as plain text, bullet lists, or inline prose. If you're asking the user to choose, confirm, or weigh in — use the Question tool. Always.
+
+**This includes:**
+- Whether to create a new project or update an existing one
+- Project name, priority, and scope
+- Which existing labels to reuse vs which new labels to create
+- Label colors and descriptions
+- Whether to add milestones and what they should be
+- Final confirmation before executing
+
+**Default to `multiSelect: true`** unless options are mutually exclusive. Label selection, milestone inclusion, and scope questions almost always allow multiple selections.
+
+**Batch related questions** into a single Question tool call (up to 4 questions). Do NOT ask one question, wait, then ask another — batch them.
+
+## Workspace Context
+
+- Issue prefixes are **team-level** in Linear's data model. `XEV-` is the key for the "Xevion's Personal" team. Each workspace typically has one team, so the prefix is effectively per-workspace — all projects within the team share it.
+- `MOT-` is a different workspace with its own team (configured as a project-level MCP server), not a project under XEV-.
+- The team name (e.g., "Xevion's Personal") may match the workspace name. Don't confuse them — `list_teams` returns teams, not workspaces.
+- When the Linear MCP is configured at the project level, it connects to a specific workspace. Don't assume all projects use the same workspace.
+
 ## Step 1: Reuse Audit
 
 **Before creating anything, understand what already exists.**
 
-1. Query `list_projects` — show existing projects with their status and priority
+1. Query `list_projects` — get existing projects with their status and priority
 2. Query `list_issue_labels` — catalog all workspace and team labels
 3. Query `list_issue_statuses` for the team — confirm the status workflow
 
-Present a summary:
-```
-Existing projects: [list with statuses]
-Workspace labels: [grouped by type vs domain]
-Status workflow: Backlog → Todo → In Progress → Done (+Canceled, Duplicate)
-```
+Present a brief summary of what exists, then use the Question tool (`multiSelect: false`):
 
-**If an existing project already matches what the user wants**, say so and offer to update it instead of creating a new one.
+- "Create new project" (Recommended) — with the proposed name in the description
+- "Update existing project: [name]" — if an existing project closely matches what the user described
+- "This belongs in [existing project] — add labels/milestones instead" — if the request sounds like extending, not creating
+- "Cancel"
 
 ## Step 2: Project Interview
 
-Use the Question tool to gather project details. Ask 2-3 rounds:
+**Batch questions into 1-2 Question tool calls.** Query Linear data first, then ask informed questions.
 
-### Round 1: Identity
+### Round 1 — Identity and Priority (batch into one Question tool call)
 
-- **Project name** — suggest based on repo name or user's description
-- **Summary** — one sentence, max 255 chars (Linear's limit)
-- **Priority** — suggest Medium unless the user indicates urgency
+Question 1: **Project name** (`multiSelect: false`)
+- Suggest based on repo name or user's description — put it first with "(Recommended)"
+- Include 1-2 alternatives if the name is ambiguous
+- Include "Other" implicitly (the Question tool always provides this)
 
-### Round 2: Architecture and Description
+Question 2: **Priority** (`multiSelect: false`)
+- Options: Urgent, High, Medium (Recommended), Low
+- Put reasoning in descriptions: "Medium — new personal project, no external deadlines or dependencies"
 
-Guide the user through a structured project description following the established pattern:
+Question 3: **Project scope / architecture** (`multiSelect: true`)
+- Present component types the project might have based on the user's description:
+  - "Backend API" — with tech stack guess in description
+  - "Web Frontend" — with framework guess
+  - "CLI tool"
+  - "Library/SDK"
+  - "Discord/Slack bot"
+  - "Minecraft mod"
+  - etc. — tailor to what the user described
+- This informs the description template AND the domain labels
+
+Question 4: **Start date** (`multiSelect: false`)
+- "Today" (Recommended)
+- "Custom date"
+- "No start date"
+
+### Round 2 — Labels and Milestones (batch into one Question tool call)
+
+**Before asking, cross-reference the reuse audit results.**
+
+Question 1: **Reuse existing labels** (`multiSelect: true`)
+- Present existing workspace labels that are relevant to this project type
+- Group by category in descriptions: "Type label — workspace-wide", "Domain label — already exists"
+- Type labels (Bug, Feature, Improvement, Refactoring) are workspace-wide — always suggest reusing, never recreating
+
+Question 2: **New domain labels to create** (`multiSelect: true`)
+- Suggest project-specific labels based on the components selected in Round 1
+- Each option includes: name, suggested color (that doesn't clash), and one-line description
+- Example: "Capture (#E91E63) — Screenshot capture system and orchestration"
+- Only suggest labels that are genuinely project-specific and don't already exist
+
+Question 3: **Milestones** (`multiSelect: true`)
+- "No milestones for now" — first option if the project is early-stage
+- Suggest 1-2 obvious phase milestones based on the project scope (e.g., "MVP", "Alpha", "v1.0")
+- Keep it lean: 1-2 for new projects, 3 max
+- Include target date suggestions in descriptions if reasonable
+
+### Description Generation
+
+After both rounds, generate the project description following the established pattern. **Do not ask the user to write the description** — draft it from their answers:
 
 ```markdown
 # [Project Name]
 
-[1-2 sentence elevator pitch]
+[1-2 sentence elevator pitch derived from their scope answers]
 
 ## Architecture
 
@@ -58,32 +121,11 @@ Guide the user through a structured project description following the establishe
 * **Deploy**: [infrastructure]
 ```
 
-Don't force all sections — only include what's relevant. A single-component project doesn't need an Architecture section with one bullet.
+Don't force all sections — only include what's relevant. A single-component project doesn't need an Architecture section with one bullet. **Omit any section that would be empty or generic** — no "Dependencies: None" or "Risks: N/A".
 
-### Round 3: Labels and Milestones
+## Step 3: Preview and Confirm
 
-**Domain labels:**
-- Ask what the project's major subsystems or concern areas are
-- Cross-reference with existing workspace labels — reuse where applicable
-- For new labels, ask about:
-  - Name (short, noun-based: "Frontend", "Capture", "Pathfinding")
-  - Color (suggest one that doesn't clash with existing labels)
-  - Description (one sentence explaining scope)
-
-**Highlight reusable labels:**
-- Type labels (Bug, Feature, Improvement, Refactoring) are workspace-wide — never recreate
-- Common domain labels (Frontend, Backend, Database, Infrastructure, Testing, Documentation, Security) may already exist — suggest reusing
-- Only create labels that are genuinely project-specific
-
-**Milestones (optional):**
-- Ask if the user wants to define initial milestones
-- Keep it lean: 1-2 for new projects, 3 max
-- Each milestone needs: name, description (optional), target date (optional)
-- If the user doesn't have clear phases, skip milestones entirely
-
-## Step 3: Preview Everything
-
-Show the full plan before executing:
+Show the full plan as text:
 
 ```
 PROJECT
@@ -113,7 +155,10 @@ DESCRIPTION
   [full markdown description]
 ```
 
-**Wait for explicit confirmation before creating anything.**
+Then immediately use the Question tool (`multiSelect: false`):
+- "Create everything as shown" (Recommended)
+- "Edit before creating" — let the user specify what to change
+- "Cancel"
 
 ## Step 4: Execute
 
@@ -136,7 +181,7 @@ Output a concise Linear integration section for the project's CLAUDE.md. Follow 
 
 - **Team:** `Xevion's Personal`
 - **Project:** `[Project name]` — filter by this when querying issues
-- **Issue prefix:** `XEV-` (e.g. `XEV-###`)
+- **Issue prefix:** `XEV-` (team-level — all projects under this team share it)
 
 ### Labels
 
@@ -160,17 +205,12 @@ Use the `linear-issue` skill for creating issues, or reference issues directly (
 
 ## Label Color Guidelines
 
-When creating new labels, avoid clashing with existing colors. Use this as a reference:
+When creating new labels, **query existing labels first** with `list_issue_labels` to see what colors are already in use. Then:
 
-- Red spectrum: Bug (#EB5757), Combat (#F44336), Security (#FF0000)
-- Orange spectrum: Error Handling (#FF9800), Coordination (#FF9800), Refactoring (#FFA500)
-- Yellow: Performance (#F59E0B)
-- Green spectrum: Movement (#4CAF50), SEO (#10B981)
-- Blue spectrum: Rendering (#2196F3), Feature (#BB87FC), Improvement (#4EA7FC), Docker (#2496ED)
-- Purple spectrum: Pathfinding (#9C27B0), Analytics (#8B5CF6), Bot AI (#9C27B0)
-- Neutral: Infrastructure (#6B7280), Exploits (#9E9E9E), Documentation (#95A2B3), Configuration (#795548)
-
-Pick colors that are visually distinct from existing labels in the workspace. When in doubt, ask the user.
+- Pick colors that are visually distinct from existing labels
+- Avoid reusing the exact hex of an existing label for a different domain
+- Stick to saturated, easily distinguishable colors — avoid pastels that blend together
+- When in doubt, include color as an option in the Question tool
 
 ## When NOT to Create a New Project
 
@@ -179,4 +219,4 @@ Sometimes the user wants to track work that belongs in an existing project:
 - Temporary spike or investigation → create issues in the relevant project
 - Cross-cutting concern → may belong in multiple projects as individual issues
 
-If the request sounds like it fits an existing project, say so and ask before proceeding with scaffolding.
+If the request sounds like it fits an existing project, surface this in the Step 1 Question tool call — present "extend existing project" as an option alongside "create new".
