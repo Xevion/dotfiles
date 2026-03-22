@@ -1,2 +1,7 @@
 # External repositories managed by chezmoi
 # https://www.chezmoi.io/reference/special-files-and-directories/chezmoiexternal-format/
+
+[".claude/skills/recall/SKILL.md"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/Xevion/recall/refs/heads/master/.claude/skills/recall/SKILL.md"
+    refreshPeriod = "24h"
