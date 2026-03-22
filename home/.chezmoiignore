@@ -6,6 +6,9 @@ hooks
 
 claude-settings.json
 
+# Claude Code modify_ script workers (source-only, not deployed)
+.claude/.modify_settings.ts
+
 # Claude Code runtime state (managed: CLAUDE.md, settings.json, agents/, skills/, hooks/, commands/)
 .claude/.credentials.json
 .claude/backups
