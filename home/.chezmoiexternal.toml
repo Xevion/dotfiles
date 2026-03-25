@@ -5,3 +5,8 @@
     type = "file"
     url = "https://raw.githubusercontent.com/Xevion/recall/refs/heads/master/.claude/skills/recall/SKILL.md"
     refreshPeriod = "24h"
+
+[".claude/skills/tempo-config/SKILL.md"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/Xevion/tempo/refs/heads/master/.claude/skills/tempo-config/SKILL.md"
+    refreshPeriod = "24h"

@@ -1,3 +1,2 @@
 #!/bin/bash
-SOURCE_DIR="$(chezmoi source-path)"
-exec bun "$SOURCE_DIR/dot_claude/dot_modify_settings.ts" "$SOURCE_DIR"
+exec bun "$CHEZMOI_SOURCE_DIR/dot_claude/dot_modify_settings.ts" "$CHEZMOI_SOURCE_DIR"
