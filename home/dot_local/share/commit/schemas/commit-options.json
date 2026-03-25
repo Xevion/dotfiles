@@ -1,0 +1,30 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"required": ["options"],
+	"additionalProperties": false,
+	"properties": {
+		"options": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["subject"],
+				"additionalProperties": false,
+				"properties": {
+					"subject": {
+						"type": "string",
+						"maxLength": 72,
+						"description": "Commit message subject line, under 72 characters, imperative mood, no trailing period"
+					},
+					"body": {
+						"type": "string",
+						"description": "Optional commit message body, wrapped at 72 characters. Separated from subject by blank line."
+					}
+				}
+			},
+			"minItems": 1,
+			"maxItems": 15,
+			"description": "Array of commit message options for the user to choose from"
+		}
+	}
+}

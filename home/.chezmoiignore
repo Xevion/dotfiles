@@ -71,6 +71,10 @@ claude-settings.json
 # Micro runtime state (managed: bindings.json, settings.json)
 .config/micro/buffers
 
+# Project dependencies and lockfiles (installed at deploy time)
+.local/share/commit/node_modules
+.local/share/commit/bun.lock
+
 {{/* WSL Only Files */}}
 {{ if (not .wsl) }}
 
