@@ -20,5 +20,3 @@ exemplars: []
 <!-- Div soup, missing alt text, autofocus abuse, layout tables -->
 
 ## Open Questions
-
-<!-- Web component adoption, dialog element patterns -->

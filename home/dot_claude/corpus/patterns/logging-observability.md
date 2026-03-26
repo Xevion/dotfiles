@@ -6,6 +6,12 @@ exemplars:
   - repo: Xevion/banner
     path: src/logging/
     note: Custom tracing formatters (pretty + JSON), request ID middleware, runtime format selection
+  - repo: Xevion/doujin-ocr-summary
+    path: internal/middleware/ + internal/logging/
+    note: Go slog with path-based levels, slog-formatter, context propagation
+  - repo: Xevion/instant-upscale
+    path: frontend/src/lib/logging.ts
+    note: Batching dev-forward sink, E2E console sentinel capture
 ---
 
 # Logging & Observability
@@ -38,11 +44,14 @@ let filter = EnvFilter::new(format!(
 
 ### TypeScript
 
-<!-- Placeholder: pino/winston, OpenTelemetry, request ID middleware -->
+- Batching dev-forward sink: browser/worker log records serialized to flat format, batched (count threshold or debounce timer), POSTed to dev server relay for unified terminal output
+- E2E console.debug sentinel capture: build-flag-gated sink emits structured logs as `'__LOGTAPE__' + JSON`, Playwright intercepts via `page.on('console')`, tests assert on structured records
 
 ### Go
 
-<!-- Placeholder: slog, context-based logger propagation -->
+- Path-based request log level: `/api/*` at Info, SSR pages at Debug, dev assets (HMR, node_modules) at custom Trace level (`slog.LevelDebug - 4`). Prevents proxy noise without suppressing API traffic
+- slog-formatter middleware for value-level transformations (duration humanization, integer comma-formatting, typed `Pct` wrapper). Keeps structured fields intact while improving readability
+- Context-based logger propagation: attach pre-seeded `*slog.Logger` (with request_id) to context in middleware, retrieve with `LoggerFromContext` helper with default fallback
 
 ## Anti-Patterns
 
@@ -53,5 +62,4 @@ let filter = EnvFilter::new(format!(
 
 ## Open Questions
 
-- OpenTelemetry maturity and adoption per language ecosystem
-- Log aggregation preferences (Loki vs Elasticsearch vs Axiom)
+- OpenTelemetry integration for tracing across service boundaries

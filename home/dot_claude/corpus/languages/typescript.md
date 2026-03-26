@@ -6,6 +6,12 @@ exemplars:
   - repo: Xevion/banner
     path: web/src/lib/bindings/
     note: ts-rs generated discriminated unions with "type" literal field
+  - repo: Xevion/instant-upscale
+    path: frontend/src/lib/pipeline/
+    note: Typed Web Worker messages, Extract<Union> pub/sub, event bus with discriminated unions
+  - repo: Xevion/tempo
+    path: src/types.ts
+    note: NoInfer<T> on Record keys, template-literal index types, const generic builder functions
 ---
 
 # TypeScript
@@ -31,6 +37,13 @@ type InstructionalMethod =
 - **Absolute imports** (`$lib/...`, `@/...`) over relative imports when the project supports path aliases
 - **Functional patterns**: `map`, `filter`, `reduce` over `for` loops when idiomatic
 - **Zod for external/user input**: use Zod only at system boundaries (form input, third-party APIs), not for internally-generated types
+- **Typed Web Worker communication**: define `MainToWorker` and `WorkerToMain` discriminated unions with typed wrapper functions over `postMessage`. Enforce compile-time exhaustiveness on message handling
+- **`Extract<Union, { type: T }>`**: use this conditional type for narrowing subscriber callbacks in typed pub/sub systems
+- **Advanced type-level patterns** (situational — useful in config DSLs and builder APIs):
+  - `NoInfer<T>` on Record keys to prevent generic widening
+  - Template-literal types (`"${Subsystem}:${Action}"`) as index constraints for namespaced key systems
+  - `<const T extends string>` on builder functions to preserve literal unions from inferred object keys
+- **Tag-free structural unions for user-facing config**: `string | string[] | Object` unions are acceptable for user-facing config types. Reserve explicit `kind`/`type` discriminants for internal types
 
 ## Anti-Patterns
 

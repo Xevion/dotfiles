@@ -6,6 +6,9 @@ exemplars:
   - repo: Xevion/banner
     path: scripts/pre-commit.ts
     note: Pre-commit hook with partial-staging detection and auto-format safety
+  - repo: local/maestro
+    path: scripts/pre-commit.ts
+    note: Pre-commit hook with partial-staging detection, installed via just install-hooks
 ---
 
 # Git Workflow
@@ -17,8 +20,9 @@ Conventional commits. `master` as default branch. Rebase-merge for clean history
 ## Conventions
 
 - **Scoped conventional commits**: `feat(backend):`, `fix(frontend):`, `refactor(scraper):` — scope maps to subsystem. Release-please (or similar) auto-generates changelogs from these prefixes
-- **Pre-commit auto-format with staging safety**: pre-commit hooks that auto-format must detect partially-staged files and refuse to re-stage when both staged and unstaged changes exist. Staging isolation is non-negotiable
+- **Pre-commit auto-format with staging safety**: pre-commit hooks that auto-format must handle partially-staged files safely (see [project-automation](../dx/project-automation.md) for the detection pattern)
 - **GPG commit signing**: sign commits with GPG keys. WSL environments bridge to Windows GPG for native pinentry
+- **`just install-hooks` convention**: symlinks pre-commit scripts and makes them executable. Reference in CLAUDE.md to tell AI agents the hook handles formatting so agents don't duplicate that work
 - **Short-lived branches**: `feature/*`, `fix/*` — merge quickly, delete after merge
 
 ## Anti-Patterns
@@ -26,7 +30,7 @@ Conventional commits. `master` as default branch. Rebase-merge for clean history
 - Merge commits for single-commit PRs (use rebase-merge)
 - WIP commits left in history (squash or interactive rebase before merge)
 - Force-pushing shared branches
-- Pre-commit hooks that silently include unstaged changes during auto-formatting
+- Pre-commit hooks that silently include unstaged changes during auto-formatting (see [project-automation](../dx/project-automation.md))
 
 ## Open Questions
 

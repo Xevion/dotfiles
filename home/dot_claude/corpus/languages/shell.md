@@ -20,5 +20,3 @@ exemplars: []
 <!-- Parsing ls output, unquoted variables, complex inline scripts, eval abuse -->
 
 ## Open Questions
-
-<!-- Nushell adoption for data-heavy scripting, Fish vs Nu long-term -->

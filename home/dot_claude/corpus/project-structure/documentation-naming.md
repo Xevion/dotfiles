@@ -20,5 +20,3 @@ exemplars: []
 <!-- Stale documentation kept around, comments that restate the code, inconsistent casing in a project -->
 
 ## Open Questions
-
-<!-- ADR adoption, documentation generation tooling preferences -->

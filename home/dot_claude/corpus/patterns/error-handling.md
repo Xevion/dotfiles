@@ -9,6 +9,12 @@ exemplars:
   - repo: Xevion/banner
     path: src/scraper/worker.rs
     note: Recoverable/Unrecoverable job error enum for explicit retry policy
+  - repo: Xevion/instant-upscale
+    path: crates/common/error module
+    note: status_and_code() helper colocating HTTP status mapping with sanitization
+  - repo: Xevion/doujin-ocr-summary
+    path: internal/service/errors
+    note: Go sentinel errors with MapDBError boundary, constructor+extraction helpers
 ---
 
 # Error Handling
@@ -32,6 +38,7 @@ enum JobError {
 
 - **Error context at boundaries**: attach context (status codes, URLs, entity names) to errors at the boundary where it's available, not at the catch site
 - **Single sanitization point**: a boundary function (e.g. `db_error()`) logs the raw error and returns a sanitized message. Handlers never log-and-throw
+- **`status_and_code()` helper on error enums**: returns both HTTP status and stable machine-readable code in one match arm, consumed by `IntoResponse`. Keeps error-to-HTTP mapping single-source
 
 ## Language-Specific
 
@@ -43,11 +50,11 @@ enum JobError {
 
 ### TypeScript
 
-<!-- Placeholder: discriminated union Result types, Zod parse errors -->
+- Named sentinel error class (e.g., `AbortError`) for user-triggered abort paths in CLIs/hooks. Catch only at runner boundary and convert to exit code. Re-throw everything else
 
 ### Go
 
-<!-- Placeholder: errors.Is/As, fmt.Errorf with %w, sentinel errors -->
+- Sentinel errors as package-level `errors.New` vars (`ErrNotFound`, `ErrConflict`). `MapDBError` translates driver errors at persistence boundary. Constructor functions (`NewValidationError(msg)`) + extraction helpers (`ValidationMessage(err)`) carry user-facing messages through the error chain without string-matching
 
 ## Anti-Patterns
 

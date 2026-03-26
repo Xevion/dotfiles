@@ -20,5 +20,3 @@ exemplars: []
 <!-- Pinning to exact versions without updates, ignoring audit warnings, adding deps for trivial functions -->
 
 ## Open Questions
-
-<!-- Supply chain security tooling, vendoring strategies -->

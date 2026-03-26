@@ -6,6 +6,9 @@ exemplars:
   - repo: Xevion/banner
     path: migrations/
     note: JSONB sub-entities, materialized views, safe CHECK constraint migrations
+  - repo: Xevion/doujin-ocr-summary
+    path: internal/database/ + sqlc.yml
+    note: sqlc with json.RawMessage JSONB overrides, goose sequential migrations
 ---
 
 # Data Modeling
@@ -45,7 +48,8 @@ ALTER TABLE courses ADD CONSTRAINT chk_enrollment_nonneg CHECK (enrollment >= 0)
 
 ### Go
 
-<!-- Placeholder: sqlc, goose/atlas -->
+- **sqlc compile-time checked queries with `encoding/json.RawMessage` type overrides**: use type overrides in `sqlc.yml` to map JSONB columns to `json.RawMessage` rather than `[]byte`. Avoids double serialization while maintaining type safety for known-shape columns. Pair with `tstype` override for TypeScript output
+- **One logical change per migration file**: mixing unrelated schema evolutions in a single file makes rollback and bisecting harder. Each migration file should describe exactly one intentional change
 
 ## Anti-Patterns
 
@@ -56,5 +60,4 @@ ALTER TABLE courses ADD CONSTRAINT chk_enrollment_nonneg CHECK (enrollment >= 0)
 
 ## Open Questions
 
-- Event sourcing criteria and when to adopt
-- CQRS adoption thresholds
+- When materialized views stop scaling and whether a dedicated read store (CQRS-style) is worth the operational complexity for a solo developer

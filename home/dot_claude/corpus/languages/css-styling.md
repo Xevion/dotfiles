@@ -6,6 +6,12 @@ exemplars:
   - repo: Xevion/banner
     path: web/src/routes/layout.css
     note: Tailwind v4 @theme inline with oklch tokens, View Transitions for navigation
+  - repo: Xevion/instant-upscale
+    path: frontend/panda.config.ts
+    note: PandaCSS with oklch tokens, semantic dark mode via _dark conditions
+  - repo: Xevion/doujin-ocr-summary
+    path: web/panda.config.ts
+    note: PandaCSS primitive + semantic token system with oklch values
 ---
 
 # CSS & Styling
@@ -37,6 +43,8 @@ Tailwind utility-first. Design tokens as CSS custom properties. Minimal custom C
 - **Dark mode via class strategy**: `.dark` class on `documentElement`, not `prefers-color-scheme` media query (allows user override)
 - **View Transitions API**: use for page navigation and theme-change animations. Named transition groups (`view-transition-name`) scope animations to specific elements. Data attributes on `:root` select directional keyframe variants
 - **Responsive-first**: mobile-first breakpoints, avoid fixed widths
+- **PandaCSS as an alternative to Tailwind v4**: define tokens in `panda.config.ts` using `oklch()`, with semantic aliases using `{ base: ..., _dark: ... }` condition variants. Same oklch + class-strategy dark mode philosophy as Tailwind v4, different implementation
+- **PandaCSS dark mode**: use `_dark` semantic token conditions — equivalent to Tailwind's `dark:` variant. `.dark` class toggle on `documentElement` is the same activation mechanism as the Tailwind class strategy
 
 ## Anti-Patterns
 

@@ -28,5 +28,3 @@ exemplars: []
 <!-- Global state for everything, prop drilling 5+ levels deep, syncing server and client state manually -->
 
 ## Open Questions
-
-<!-- Signals standardization, offline-first patterns -->

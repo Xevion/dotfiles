@@ -4,7 +4,7 @@ Use these templates when dispatching Sonnet subagents for corpus audits. Fill in
 
 ## Per-Topic Variant
 
-One subagent per corpus topic, checking multiple projects.
+One subagent per corpus topic, checking multiple projects. Best for routine maintenance.
 
 ```
 Agent tool:
@@ -15,142 +15,114 @@ Agent tool:
 
     ## Topic Being Audited
 
-    [PASTE FULL CONTENT of the corpus topic file here — do not make the subagent read it]
+    Read the corpus topic file: [path-to-topic-file]
+    Key conventions to check for: [1-2 line summary of what the topic covers]
 
     ## Projects to Check
 
-    [List project directories to scan:]
-    - ~/projects/[project-a]
-    - ~/projects/[project-b]
-    - ~/projects/[project-c]
+    [List project directories with brief summaries:]
+    - ~/projects/[project-a] — [tech stack, LOC, key patterns]
+    - ~/projects/[project-b] — [tech stack, LOC, key patterns]
 
-    ## Your Job
+    ## Instructions
 
-    For each project:
+    1. Read the corpus topic file first
+    2. For each project: `git ls-files` + `fd -H --type f --max-depth 2 --no-ignore`
+    3. Read key files (CLAUDE.md, configs, source relevant to the topic)
+    4. Compare against the corpus topic's Philosophy, Conventions, Anti-Patterns, Exemplars
+    5. Return findings as YAML (see format below)
 
-    1. **Get the file tree:**
-       - Run: `git -C [project-dir] ls-files` for git-tracked files
-       - Also run: `fd -H --type f --no-ignore . [project-dir] | head -200` to find ALL files including gitignored ones
-       - Note which files are gitignored — they often contain AI rulesets, local configs, and conventions worth examining
+    ## Output Format
 
-    2. **Scan broadly.** Do NOT skip gitignored files. Specifically look for:
-       - AI rulesets: `.claude/`, `.cursor/`, `.github/copilot/`, CLAUDE.md, .cursorrules
-       - Local configs: .env.example, docker-compose.yml, Justfile, Makefile
-       - Build configs: Cargo.toml, package.json, build.gradle.kts, pyproject.toml, go.mod
-       - Source code relevant to the topic being audited
+    ```yaml
+    findings:
+      - topic: [topic-slug]
+        cross_topics: []  # optional
+        project: [directory-name]
+        finding_type: stale | improved | new | exemplar_update
+        path: [file path within project]
+        description: [1-3 sentences, generalized]
+        evidence: |
+          [3-8 lines of code]
+        suggested_change: [general convention for corpus]
+    ```
 
-    3. **Batch reads in parallel** — dispatch multiple Read tool calls at once for efficiency
-
-    4. **Compare** what you find against the corpus topic's:
-       - Philosophy — does the project align or diverge?
-       - Conventions — does the project follow, extend, or contradict?
-       - Anti-Patterns — does the project exhibit any listed anti-patterns?
-       - Exemplars — are listed exemplars still accurate? Is this project a better example?
-
-    5. **Return findings** in this exact YAML format:
-
-       ```yaml
-       findings:
-         - topic: [topic-slug]
-           cross_topics:              # optional: other topics this finding relates to
-             - [other-topic-slug]
-           project: [directory-name]
-           finding_type: stale | improved | new | exemplar_update
-           path: [file path within project, for evidence only]
-           description: [what you found, 1-3 sentences — generalize the pattern, don't just describe the project's code]
-           evidence: |
-             [3-8 lines of relevant code showing the pattern shape]
-           suggested_change: [what should change in the corpus topic file — phrased as a general convention, not project-specific]
-       ```
-
-    ## Finding Types
-
-    - **stale** — corpus says X, but this project (and possibly others) have moved past X
-    - **improved** — corpus convention is good, but this project shows a better version
-    - **new** — project demonstrates a pattern/convention not yet in the corpus
-    - **exemplar_update** — an existing exemplar is outdated, or this project is a better exemplar
-
-    ## Rules
-
-    - Return findings ONLY. Do not modify any files.
-    - Be specific — include file paths and code snippets as evidence.
-    - One finding per observation. Don't bundle unrelated things.
-    - **Generalize**: extract the underlying preference or pattern, not a description of what one project does. "Use UNLOGGED TABLE for ephemeral state" not "Banner uses UNLOGGED TABLE for scheduler timestamps."
-    - **Cross-topic awareness**: if a finding is relevant to topics beyond the one being audited, list them in `cross_topics`. This helps the caller deduplicate across auditors.
-    - If a project has nothing relevant to this topic, say so briefly and move on.
-    - Prioritize quality over quantity — 3 strong findings beat 10 weak ones.
-    - If a topic has only placeholder content (HTML comments), focus on discovering NEW patterns.
-    - If unsure whether something qualifies, include it with a note.
+    Rules: findings only, no file modifications, one per observation,
+    generalize patterns, quality over quantity. For stub topics (HTML
+    comment placeholders), focus on NEW pattern discovery.
 ```
 
 ## Per-Project Variant
 
-One subagent per project, checking multiple corpus topics grouped by domain.
+One subagent per project, checking all relevant corpus topics. **Default choice** — avoids cross-subagent duplicates.
 
-**Grouping guidance for the caller:** when dispatching per-project, group topics by domain to keep prompt size manageable and reduce cross-auditor duplication:
-- **Languages**: rust, typescript, sql, css-styling, svelte, go, python, etc.
-- **Architecture & Patterns**: api-design, data-modeling, concurrency-async, error-handling, logging-observability, state-management
-- **DX & Project Structure**: build-systems, project-automation, ci-cd-deployment, git-workflow, testing-quality, ai-assisted-dev, repo-layout
+Do NOT split a single project into domain groups (Languages vs Arch+DX). This causes duplicate findings at domain boundaries and doubles token cost for overlapping patterns.
 
 ```
 Agent tool:
-  description: "Audit project: [project-name] ([domain-group])"
+  description: "Audit project: [project-name]"
   model: "sonnet"
   prompt: |
-    You are auditing a project against multiple design corpus topics.
+    You are auditing a project against design corpus topics. Return YAML findings only.
 
-    ## Project to Audit
+    ## Project
 
     Directory: ~/projects/[project-name]
+    [Brief summary: tech stack, LOC, architecture, key patterns]
 
-    [Optional: include a brief project summary if available from CLAUDE.md or README, to save the subagent time discovering the tech stack]
+    ## Topics to Check
 
-    ## Corpus Topics to Check
+    Read each corpus topic file before auditing against it. For STUBs
+    (HTML comment placeholders), discover NEW patterns.
 
-    [For each relevant topic, paste the FULL CONTENT:]
+    [For each relevant topic, list name + file path + 1-line summary:]
+    **[topic-name]** ([path]) — [key conventions or "STUB"]
+    ...
 
-    ### Topic: [topic-name-1]
-    [full topic file content]
+    ## Instructions
 
-    ### Topic: [topic-name-2]
-    [full topic file content]
+    1. Get file tree: `git ls-files` + `fd -H --type f --max-depth 2 --no-ignore`
+    2. Read key files: CLAUDE.md, configs, source code relevant to topics
+    3. Read each corpus topic file listed above
+    4. Compare project against each topic's conventions
+    5. Return findings as YAML (same format as per-topic variant)
 
-    [... repeat for each topic ...]
+    Rules: findings only, no file modifications, one per observation,
+    generalize patterns, quality over quantity. For STUBs focus on NEW
+    discoveries. Use cross_topics when findings span topic boundaries.
+```
 
-    ## Your Job
+## Gap Analysis Variant
 
-    1. **Get the file tree:**
-       - Run: `git -C ~/projects/[project-name] ls-files` for git-tracked files
-       - Also run: `fd -H --type f --no-ignore . ~/projects/[project-name] | head -200` for ALL files
-       - Note which files are gitignored
+Always dispatch alongside audit subagents. Cheap (~65s, ~68K tokens) and identifies missing topics.
 
-    2. **Scan broadly.** Do NOT skip gitignored files. Check:
-       - AI rulesets: `.claude/`, `.cursor/`, `.github/copilot/`, CLAUDE.md, .cursorrules
-       - Local configs, build configs, source code
-       - All files relevant to the topics being checked
+```
+Agent tool:
+  description: "Analyze corpus topic gaps"
+  model: "sonnet"
+  prompt: |
+    Analyze projects for design corpus GAPS — topics that should exist but don't.
 
-    3. **Batch reads in parallel**
+    ## Current Topics
+    [List all topic names by category from INDEX.md]
 
-    4. **For each topic**, compare the project against Philosophy, Conventions,
-       Anti-Patterns, and Exemplars sections
+    ## Projects
+    [List each project with directory path and brief summary]
 
-    5. **Return findings** in the same YAML format:
+    ## Instructions
+    For each project: get file tree, read CLAUDE.md + key configs.
+    Identify technologies, patterns, and domains NOT covered by existing topics.
 
-       ```yaml
-       findings:
-         - topic: [topic-slug]
-           cross_topics:              # optional: other topics this is relevant to
-             - [other-topic-slug]
-           project: [directory-name]
-           finding_type: stale | improved | new | exemplar_update
-           path: [file path within project, for evidence only]
-           description: [1-3 sentences — generalize the pattern]
-           evidence: |
-             [3-8 lines of code showing the pattern shape]
-           suggested_change: [what should change in corpus — phrased as a general convention]
-       ```
-
-    Same rules: findings only, be specific, quality over quantity, generalize patterns.
-    If a topic has only placeholder content, focus on NEW pattern discovery.
-    Use `cross_topics` when a finding spans topic boundaries — this helps dedup across auditors.
+    ## Output
+    ```yaml
+    gaps:
+      - suggested_topic: [slug]
+        category: [category]
+        projects_demonstrating: [list]
+        description: [2-3 sentences]
+        existing_overlap: [which existing topics partially cover this]
+        priority: high | medium | low
+    observations:
+      - [structural observations about the corpus]
+    ```
 ```

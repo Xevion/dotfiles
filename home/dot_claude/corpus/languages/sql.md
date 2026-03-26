@@ -6,6 +6,9 @@ exemplars:
   - repo: Xevion/banner
     path: migrations/
     note: 30+ PostgreSQL migrations demonstrating JSONB, tsvector, materialized views, UNLOGGED tables
+  - repo: Xevion/doujin-ocr-summary
+    path: internal/database/migrations/
+    note: goose migrations with sequential numeric prefixes, sqlc-generated Go types
 ---
 
 # SQL
@@ -17,7 +20,7 @@ Migration discipline — schema is the source of truth. Normalize first, denorma
 ## Conventions
 
 - **Naming**: `snake_case` for tables and columns, plural table names (`courses`, `instructors`), explicit `JOIN` types
-- **Migration versioning**: timestamp-prefixed filenames (`20260128000000_description.sql`), one logical change per migration
+- **Migration versioning**: timestamp-prefixed filenames (`20260128000000_description.sql`), one logical change per migration. Sequential numeric prefixes (goose default: `00001_`, `00002_`) are also valid — prefer sequential for solo projects to avoid clock-skew; reserve timestamps for multi-team repos with concurrent migration creation
 - **JSONB for volatile 1-to-many data**: when sub-entities change shape frequently and you rarely filter by individual sub-fields, use JSONB arrays instead of join tables. Add GIN indexes for containment queries
 
 ```sql
@@ -32,7 +35,7 @@ CREATE INDEX idx_courses_meeting_times ON courses USING GIN (meeting_times);
 
 ## Anti-Patterns
 
-- `SELECT *` in application queries
+- `SELECT *` in application queries — acceptable in sqlc for simple single-table lookups where the full row is consumed, but avoid for JOIN queries (column name collisions, ambiguous types)
 - Implicit joins (comma-separated FROM)
 - Business logic in stored procedures
 - Schema changes without migrations
@@ -41,4 +44,4 @@ CREATE INDEX idx_courses_meeting_times ON courses USING GIN (meeting_times);
 ## Open Questions
 
 - ORM vs query builder vs raw SQL decision criteria per project size
-- Migration tool preferences per stack (SQLx, Diesel, Drizzle, golang-migrate)
+- Migration tool preferences per stack: SQLx (Rust), goose (Go), Drizzle (TS), golang-migrate (Go)

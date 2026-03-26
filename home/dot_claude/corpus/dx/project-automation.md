@@ -6,6 +6,12 @@ exemplars:
   - repo: Xevion/banner
     path: scripts/
     note: Bun-based build orchestration with command registry, staleness detection, and smart auto-fix
+  - repo: Xevion/tempo
+    path: src/runners/ + src/proc.ts + src/watch.ts
+    note: Dual auto-fix strategies, raceInOrder streaming, BackendWatcher state machine
+  - repo: Xevion/doujin-ocr-summary
+    path: scripts/lib/preflight.ts
+    note: ensureFresh mtime staleness detection for PandaCSS/tygo/sqlc
 ---
 
 # Project Automation
@@ -33,7 +39,11 @@ const REGISTRY: Record<Subsystem, Record<Action, CommandDef>> = {
 ```
 
 - **Mtime-based staleness detection**: before running checks, compare source mtime vs generated artifact mtime. Auto-regenerate code-gen outputs (type bindings, query metadata) when sources are newer
+- **`ensureFresh` as concrete mtime staleness pattern**: compare `newestMtime(sourceDir, glob)` vs `newestMtime(artifactDir, glob)`, run regeneration callback when stale, skip with a visible message when fresh
+- **Dual auto-fix strategies**: `fix-first` (optimistic: fix then check) and `fix-on-fail` (conservative: check, fix failures, re-verify). Always re-verify after fixing. Name strategies explicitly in config so intent is clear
 - **Smart auto-fix**: when running parallel checks, auto-format only if formatting is the sole failure (all peer checks passed). If other checks also fail, report errors without reformatting to avoid masking issues
+- **Streaming parallel results** (as implemented in Tempo, a purpose-built config-driven dev process runner): `Promise.race` + Map of remaining promises to display progress incrementally. Include fallback values for graceful rejection degradation
+- **State machines for file-watching dev processes** (as implemented in Tempo): named states (`building | idle | running | building_with_server | swapping`) make restart semantics auditable and debuggable. The pattern generalizes — any dev process with build/run/swap transitions benefits from an explicit state machine over ad-hoc flags
 - **Pre-commit partial-staging safety**: pre-commit hooks that auto-format must detect partially-staged files and refuse to re-stage when both staged and unstaged changes exist in the same file
 
 ## Anti-Patterns

@@ -31,5 +31,3 @@ exemplars: []
 <!-- Secrets in env files committed to git, rolling your own crypto, client-side-only auth checks -->
 
 ## Open Questions
-
-<!-- Passkey adoption, WebAuthn integration patterns -->

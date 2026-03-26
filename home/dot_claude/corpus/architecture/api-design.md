@@ -6,6 +6,9 @@ exemplars:
   - repo: Xevion/banner
     path: src/web/
     note: Axum API with typed error codes, cache constants, multi-window rate limiting, ts-rs contract generation
+  - repo: Xevion/doujin-ocr-summary
+    path: internal/server/ + internal/cache/
+    note: Go Chi API with writeServiceError sanitization, cache middleware, tygo contracts
 ---
 
 # API Design
@@ -37,6 +40,8 @@ pub struct ApiError {
 
 - **IntoResponse for errors**: implement `IntoResponse` on the error type to centralize HTTP status code mapping. Handlers return `Result<Response, ApiError>`
 - **Extension traits for handler ergonomics**: `.or_not_found("Course", &crn)?` on `Option<T>`, `.conflict_on_unique(msg)?` on SQLx results. A `db_error()` boundary function is the single place that logs raw DB errors and returns a sanitized 500
+- **`or_not_found` two-argument form**: takes entity name + `impl Display` ID, produces uniform `"<Entity> '<id>' not found"` messages. More reusable than raw string `.or_not_found(msg)` when the same pattern repeats across handlers
+- **Central `From<sqlx::Error>` with inline DB error code detection**: map DB-level error codes (SQLite unique constraint = "2067", Postgres = "23505") in one place. Better than per-callsite `.conflict_on_unique()` extension trait when the mapping is exhaustive
 - **ts-rs for contract generation**: derive `TS` on all request/response types. `#[ts(export)]` + `serde(rename_all = "camelCase")` ensures the TypeScript contract stays in sync at compile time — no hand-maintained interface files
 
 ### TypeScript
@@ -45,7 +50,9 @@ pub struct ApiError {
 
 ### Go
 
-<!-- Placeholder: net/http vs chi/gin, middleware chains -->
+- **tygo for typed Go→TypeScript contract generation**: parallel to ts-rs for Rust. `tstype` struct tag overrides handle nullable pointers and omitempty fields
+- **`writeServiceError` as single sanitization point**: `errors.Is` with sentinel errors to select status codes, log at status-proportional level (Debug for 404/409, Warn for 403, Error for 500). Keeps handlers clean and response shapes consistent
+- **Cache-Control named constants as Chi middleware**: define constants (`cache.Public`, `cache.Private`, `cache.NoStore`) and apply as middleware on route groups rather than inline per-handler. Makes caching intent explicit at route definition
 
 ## Anti-Patterns
 

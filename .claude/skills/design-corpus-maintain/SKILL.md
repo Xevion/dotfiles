@@ -54,10 +54,29 @@ Structured manual editing of corpus topic files.
 
 ### Adding a New Topic
 
+**When to create a new topic:**
+- Pattern is observed in 2+ projects, OR the user explicitly wants it tracked
+- The pattern doesn't fit naturally into any existing topic
+- There's enough substance for at least 3-4 conventions (not just one bullet point)
+
+**When to fold into an existing topic instead:**
+- Pattern is a sub-concern of an existing topic (e.g., a specific SQL technique belongs in `sql.md`, not its own topic)
+- Only observed in one project and isn't clearly generalizable yet — add as a convention or Open Question in the nearest topic
+- Creating the topic would cause heavy overlap with an existing one
+
+**Process:**
 1. Determine category and slug
 2. Create stub using the template in `./finding-schema.md`
 3. Add entry to `home/dot_claude/corpus/INDEX.md` in the correct category section
 4. Fill initial content based on user input
+
+### Retiring or Merging Topics
+
+When a topic turns out to be too narrow, overlaps excessively with another, or is no longer relevant:
+1. Identify the target topic to merge into (or confirm deletion with user)
+2. Migrate any non-redundant content to the target topic
+3. Remove the old topic file
+4. Update `INDEX.md` to remove the entry
 
 ---
 
@@ -83,15 +102,21 @@ First-time content generation for stub topics from real project scans. Use when 
 
 ### Process
 
-1. **Gather project context** — read key files (Cargo.toml, package.json, CLAUDE.md, Justfile, etc.) to understand the tech stack before dispatching subagents
-2. **Dispatch subagents** using the same templates as Audit mode (see `./auditor-prompt.md`), but group topics by domain to reduce prompt size:
-   - Languages (rust, typescript, sql, css, svelte, etc.)
-   - Architecture & Patterns (api-design, data-modeling, error-handling, concurrency, logging)
-   - DX & Project Structure (build-systems, ci-cd, git-workflow, testing, ai-dev, repo-layout)
+1. **Rapid project profiling** — for each project, gather context quickly without reading every file:
+   - `tokei ~/projects/<name>` for language breakdown and LOC
+   - `fd -H --type f --max-depth 2 . ~/projects/<name>` for directory structure
+   - Read CLAUDE.md / AGENTS.md / README.md for tech stack and conventions
+   - `git -C ~/projects/<name> log --oneline -20` for recent activity
+   - Identify which corpus topics are relevant based on languages and patterns observed
+2. **Dispatch subagents** using the templates in `./auditor-prompt.md`, one subagent per project (not split by domain — splitting causes cross-subagent duplicates):
+   - Include a brief project summary (from the profiling step)
+   - List relevant topic NAMES and their file paths — let subagents read corpus files directly
+   - Do NOT paste full corpus content into prompts (wastes tokens, bloats prompts)
 3. **Aggregate and deduplicate** — merge findings that overlap across auditors (common with per-project batching)
 4. **Interview-driven review** — mix structural brainstorming with finding approval:
    - **Structural questions first**: new topics needed? Cross-cutting patterns? Detail level? These shape how findings are applied
-   - **Batch approval via multi-select**: present findings grouped by theme, use multi-select "which to SKIP?" (approve-by-default). Most findings from stubs will be approved
+   - **Batch review via multi-select**: present findings grouped by theme, 4-6 per batch. Ask explicitly for confirmation — even in populate mode where most findings are valid, don't auto-approve
+   - **Flag generalizations**: when a finding generalizes from a single project, ask whether the generalization is correct before writing it as a convention
    - **Mix brainstorming throughout**: when presenting a batch, ask about related structural decisions (e.g. "Should Svelte be its own topic or fold into TypeScript?")
 5. **Write corpus content** — apply all approved findings, generalized into conventions:
    - Pattern descriptions + short illustrative snippets (3-5 lines, anonymized or using public project name)
@@ -133,41 +158,43 @@ Use for supplemental metadata (language, recent activity). Do not rely on this a
 **Manual specification:**
 The user can directly name repos or topics to audit.
 
-### Batching Strategy
+### Rapid Project Profiling
 
-Ask the user which approach to use each time:
+Before dispatching subagents, profile each project quickly (do NOT read every corpus file — just list them from INDEX.md):
 
-```dot
-digraph batching {
-    "What triggered the audit?" [shape=diamond];
-    "Per-topic\n(1 subagent per topic,\nall relevant projects)" [shape=box];
-    "Per-project\n(1 subagent per project,\nall relevant topics)" [shape=box];
-
-    "What triggered the audit?" -> "Per-topic\n(1 subagent per topic,\nall relevant projects)" [label="routine maintenance\nor specific topic"];
-    "What triggered the audit?" -> "Per-project\n(1 subagent per project,\nall relevant topics)" [label="just finished work\non a specific project"];
-}
+```bash
+# For each project:
+tokei ~/projects/<name>                              # Language breakdown + LOC
+fd -H --type f --max-depth 2 . ~/projects/<name>     # Directory structure
+cat ~/projects/<name>/CLAUDE.md                       # Tech stack + conventions (or README.md, AGENTS.md)
+git -C ~/projects/<name> log --oneline -20            # Recent activity
 ```
 
-**Per-topic batching:**
-- One Sonnet subagent per corpus topic
-- Each subagent receives the full topic file + list of project directories to check
-- Best for: routine maintenance, auditing specific topics across the portfolio
+This gives enough signal to determine which corpus topics are relevant to each project without reading the corpus files themselves.
 
-**Per-project batching:**
-- Group topics by domain (Languages, Architecture/Patterns, DX/Structure) — one subagent per group, not per individual topic
-- Each subagent receives all topic files in its group + the project directory
-- Best for: post-project audits, comprehensive review of a single project
-- Expect cross-auditor duplicates at domain boundaries (handled in dedup step)
+### Batching Strategy
+
+**Default: one subagent per project** with all relevant topics. Do NOT split a single project into domain groups — this causes cross-subagent duplicates and wastes tokens.
+
+**Per-topic batching** (1 subagent per topic, all projects) is better for routine maintenance or auditing a specific topic.
+
+**Always dispatch a gap analysis subagent** alongside audit subagents — it's cheap (~65s, ~68K tokens) and identifies missing topics that no audit subagent would catch.
 
 ### Dispatching Subagents
 
 Use the prompt template in `./auditor-prompt.md`. Key points:
 
 - **Model:** Dispatch with `model: "sonnet"` for cost efficiency
-- **Input:** Paste full corpus topic content into the prompt (don't make subagents read corpus files)
-- **Projects:** Pass directory paths, not repo names — subagents read `~/projects/` directly
+- **Lean prompts:** Do NOT paste full corpus topic content. Instead:
+  - Provide topic names and their file paths (e.g., `home/dot_claude/corpus/languages/rust.md`)
+  - For populated topics: include a 1-2 line summary of key conventions to look for
+  - For stub topics: note they are stubs and the subagent should focus on `new` pattern discovery
+  - Let subagents read corpus files directly — they're small (24-65 lines each)
+- **Project context:** Include a brief project summary from the profiling step (tech stack, LOC, key dirs). Pass directory paths, not repo names
 - **File discovery:** Subagents get the canonical file tree first, then scan including gitignored files
 - **Output:** Structured YAML findings per `./finding-schema.md`
+
+**Prompt size target:** ~100-150 lines per subagent prompt. If your prompt exceeds 200 lines, you're pasting too much content — summarize or let the subagent read it.
 
 ### Subagent File Scanning Rules
 
@@ -185,16 +212,27 @@ Subagents MUST:
 After all subagents return:
 
 1. **Aggregate findings** from all subagents into a single list
-2. **Deduplicate** findings that overlap — especially cross-auditor duplicates from per-project batching. Merge findings with the same pattern into one, noting all source projects
+2. **Deduplicate** findings that overlap — especially cross-auditor duplicates from per-project batching. Merge findings with the same pattern into one, noting all source projects. **Present merged findings for confirmation** — don't silently apply dedup decisions
 3. **Present summary** — finding counts per topic, high-level overview table
 4. **Batch review** using the Question tool with multi-select:
    - Group findings by theme (not strictly by topic — related findings from different topics go together)
-   - Present as "which to SKIP?" with multi-select (approve-by-default, since most findings are valid)
+   - 4-6 findings per question for manageable review
+   - **Ask explicitly** — present each batch for confirmation. Do not assume approval
    - Mix in structural/brainstorming questions when relevant (new topics, cross-cutting concerns)
-   - 4-8 findings per multi-select question for efficiency
+   - When a finding generalizes a project-specific pattern, **ask whether the generalization is correct** rather than assuming it is
 5. **Apply approved changes** to the corpus topic files in `home/dot_claude/corpus/`
 6. **Update `last_audited`** dates on all touched topics
 7. **Update INDEX.md** descriptions if content changed significantly
+
+### Review Discipline
+
+**Default to asking, not assuming.** The corpus encodes the user's real preferences — getting it wrong means future sessions act on false assumptions. Specific rules:
+
+- **Never silently fold decisions into approvals.** If you're about to change tone, generalize a pattern, or consolidate duplicates, present that decision as a separate question
+- **Flag project-specific vs. general.** When a finding comes from a single project, explicitly ask: "Is this a general convention or specific to this project?"
+- **Flag prescriptive tone.** When writing conventions, prefer descriptive language ("prefer X", "use X when Y") over prescriptive ("always X", "X is non-negotiable") unless the user confirms the stronger framing
+- **Don't batch too aggressively.** 4-6 findings per question. Larger batches cause users to skim and approve things they'd otherwise push back on
+- **Conflicting conventions between projects** must be flagged during review for the user to decide — never auto-resolve by picking one
 
 ### Scope Controls
 

@@ -22,7 +22,3 @@ Prefer native web platform APIs over library abstractions when browser support i
 - Ignoring platform APIs because "we've always used library X"
 
 ## Open Questions
-
-- Web Components adoption criteria vs framework components
-- Service Worker patterns for offline-capable apps
-- Container queries vs media queries decision criteria

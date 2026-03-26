@@ -6,6 +6,18 @@ exemplars:
   - repo: Xevion/banner
     path: tests/
     note: sqlx::test with builder fixtures, Vitest named projects (unit + storybook browser tests)
+  - repo: Xevion/doujin-ocr-summary
+    path: internal/testutil/
+    note: Go test factories with options-struct pattern, pgtestdb template cloning
+  - repo: local/maestro
+    path: common test module
+    note: Kotest DescribeSpec with property-based pathfinding tests, TestWorldBuilder spatial DSL
+  - repo: Xevion/instant-upscale
+    path: frontend/src/lib/pipeline/__tests__/
+    note: Vitest recording sink setup, EngineTestHarness browser API mock factory
+  - repo: Xevion/tempo
+    path: tests/
+    note: Cross-runtime compat tests with CI env-var gate
 ---
 
 # Testing & Quality
@@ -35,10 +47,20 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 - Storybook stories as browser component tests via `@storybook/addon-vitest` — stories run with Playwright in headless Chromium alongside jsdom unit tests
 - Playwright for E2E tests
 - MSW for API mocking when backend is unavailable
+- Global Vitest `setupFiles` recording sink: configure logger once with recording sink, auto-clear via `beforeEach`, export query helpers by category/level for asserting on structured log output
+- EngineTestHarness factory for browser API mocking: single factory installs all global mocks (Worker, ResizeObserver, HTMLAudioElement), returns cleanup closure, each mock exposes typed `Controls` interface
+- CI compat env-var gate: `test.skipIf(!available)` locally, hard throw when `CI_COMPAT=1`. Prevents both false negatives (skipped in CI) and false positives (failing locally)
+- Stale smoke test anti-pattern: smoke tests must use valid fixture data matching the actual schema. Identity-function wrappers like `defineConfig` won't catch wrong shapes
 
 ### Go
 
-<!-- Placeholder: table-driven tests, testify, httptest, go test -race -->
+- Options-struct builder for test factories: pointer fields for selective override, atomic sequence counters for collision-free defaults, `t.Helper()` + `t.Fatal` for single-line call sites. Factories call real DB queries, no mocks
+- pgtestdb + template-database cloning: per-test Postgres isolation. Single `NewEnv(t)` wires full stack (pool → queries → services → handler) for integration tests. Fast due to template cloning
+
+### Kotlin
+
+- Kotest DescribeSpec for nested scenario grouping in algorithm tests, `checkAll`/`Arb` for property-based testing. JUnit @Test and DescribeSpec coexist in same Gradle suite
+- TestWorldBuilder DSL for spatial fixtures: high-level spatial primitives (floor, wall, column) instead of coordinate arrays. Overwrite guard via `check()` on duplicate positions
 
 ## Anti-Patterns
 
@@ -50,4 +72,3 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 ## Open Questions
 
 - Mutation testing adoption and practical value
-- AI-assisted test generation quality and when to trust it

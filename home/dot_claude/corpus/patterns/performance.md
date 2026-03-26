@@ -31,5 +31,3 @@ exemplars: []
 <!-- Optimizing without measuring, premature caching, N+1 queries, unbounded memory growth -->
 
 ## Open Questions
-
-<!-- WASM performance boundaries, edge computing latency tradeoffs -->

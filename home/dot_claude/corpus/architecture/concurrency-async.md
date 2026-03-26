@@ -6,6 +6,9 @@ exemplars:
   - repo: Xevion/banner
     path: src/services/
     note: Service trait + ServiceManager with broadcast/mpsc, nested select! cancellation
+  - repo: Xevion/instant-upscale
+    path: crates/common/shutdown module
+    note: ShutdownTracker/ShutdownToken RAII pair with atomic drain counter
 ---
 
 # Concurrency & Async
@@ -39,6 +42,7 @@ pub trait Service: Send + Sync {
 - Tokio runtime, `select!` for racing futures, `JoinSet` for structured task spawning
 - `broadcast` for fan-out shutdown signals (each receiver gets its own copy)
 - `tokio::time::timeout` for bounded waits
+- **RAII shutdown token pattern**: `ShutdownTracker` hands out drop-on-complete `ShutdownToken` guards. Atomic counter tracks in-flight operations. `wait(timeout)` provides bounded draining. Complement to the Service trait — no lifecycle interface required per subsystem
 
 ### TypeScript
 
