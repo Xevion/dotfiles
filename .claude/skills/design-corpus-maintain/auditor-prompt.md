@@ -52,13 +52,15 @@ Agent tool:
        ```yaml
        findings:
          - topic: [topic-slug]
+           cross_topics:              # optional: other topics this finding relates to
+             - [other-topic-slug]
            project: [directory-name]
            finding_type: stale | improved | new | exemplar_update
-           path: [file path within project, if applicable]
-           description: [what you found, 1-3 sentences]
+           path: [file path within project, for evidence only]
+           description: [what you found, 1-3 sentences — generalize the pattern, don't just describe the project's code]
            evidence: |
-             [relevant code snippet or config excerpt, keep concise]
-           suggested_change: [what should change in the corpus topic file]
+             [3-8 lines of relevant code showing the pattern shape]
+           suggested_change: [what should change in the corpus topic file — phrased as a general convention, not project-specific]
        ```
 
     ## Finding Types
@@ -73,6 +75,8 @@ Agent tool:
     - Return findings ONLY. Do not modify any files.
     - Be specific — include file paths and code snippets as evidence.
     - One finding per observation. Don't bundle unrelated things.
+    - **Generalize**: extract the underlying preference or pattern, not a description of what one project does. "Use UNLOGGED TABLE for ephemeral state" not "Banner uses UNLOGGED TABLE for scheduler timestamps."
+    - **Cross-topic awareness**: if a finding is relevant to topics beyond the one being audited, list them in `cross_topics`. This helps the caller deduplicate across auditors.
     - If a project has nothing relevant to this topic, say so briefly and move on.
     - Prioritize quality over quantity — 3 strong findings beat 10 weak ones.
     - If a topic has only placeholder content (HTML comments), focus on discovering NEW patterns.
@@ -81,11 +85,16 @@ Agent tool:
 
 ## Per-Project Variant
 
-One subagent per project, checking multiple corpus topics.
+One subagent per project, checking multiple corpus topics grouped by domain.
+
+**Grouping guidance for the caller:** when dispatching per-project, group topics by domain to keep prompt size manageable and reduce cross-auditor duplication:
+- **Languages**: rust, typescript, sql, css-styling, svelte, go, python, etc.
+- **Architecture & Patterns**: api-design, data-modeling, concurrency-async, error-handling, logging-observability, state-management
+- **DX & Project Structure**: build-systems, project-automation, ci-cd-deployment, git-workflow, testing-quality, ai-assisted-dev, repo-layout
 
 ```
 Agent tool:
-  description: "Audit project: [project-name] against corpus"
+  description: "Audit project: [project-name] ([domain-group])"
   model: "sonnet"
   prompt: |
     You are auditing a project against multiple design corpus topics.
@@ -93,6 +102,8 @@ Agent tool:
     ## Project to Audit
 
     Directory: ~/projects/[project-name]
+
+    [Optional: include a brief project summary if available from CLAUDE.md or README, to save the subagent time discovering the tech stack]
 
     ## Corpus Topics to Check
 
@@ -128,15 +139,18 @@ Agent tool:
        ```yaml
        findings:
          - topic: [topic-slug]
+           cross_topics:              # optional: other topics this is relevant to
+             - [other-topic-slug]
            project: [directory-name]
            finding_type: stale | improved | new | exemplar_update
-           path: [file path within project]
-           description: [1-3 sentences]
+           path: [file path within project, for evidence only]
+           description: [1-3 sentences — generalize the pattern]
            evidence: |
-             [code snippet or config excerpt]
-           suggested_change: [what should change in corpus]
+             [3-8 lines of code showing the pattern shape]
+           suggested_change: [what should change in corpus — phrased as a general convention]
        ```
 
-    Same rules: findings only, be specific, quality over quantity.
+    Same rules: findings only, be specific, quality over quantity, generalize patterns.
     If a topic has only placeholder content, focus on NEW pattern discovery.
+    Use `cross_topics` when a finding spans topic boundaries — this helps dedup across auditors.
 ```
