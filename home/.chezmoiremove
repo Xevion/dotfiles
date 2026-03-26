@@ -4,6 +4,9 @@
 .config/fish/functions/sdk.fish
 .config/fish/functions/z.fish
 
+# reminder.fish replaced by Bun-based ~/.local/bin/reminder
+.config/fish/functions/reminder.fish
+
 # fontconfig: fonts.toml replaced by fonts.conf
 .config/fontconfig/fonts.toml
 

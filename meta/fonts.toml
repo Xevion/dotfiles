@@ -32,4 +32,4 @@ primary = "Noto Color Emoji"
 [extras]
 # Additional fonts to install without category assignment
 # Useful for fonts needed by specific applications
-fonts = ["ZedMono NF"]
+fonts = ["GeistMono NF", "ZedMono NF"]
