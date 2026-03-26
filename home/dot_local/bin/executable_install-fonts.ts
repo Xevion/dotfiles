@@ -84,6 +84,10 @@ interface GitHubFontConfig {
 }
 
 const GITHUB_FONTS: Record<string, GitHubFontConfig> = {
+  "GeistMono NF": {
+    repo: "ryanoasis/nerd-fonts",
+    assetPattern: /^GeistMono\.zip$/,
+  },
   "ZedMono NF": {
     repo: "ryanoasis/nerd-fonts",
     assetPattern: /^ZedMono\.zip$/,
@@ -284,7 +288,9 @@ async function installGitHubFont(fontName: string): Promise<boolean> {
 
   // Check if already installed
   if (existsSync(fontDir)) {
-    const files = readdirSync(fontDir).filter((f) => f.endsWith(".ttf"));
+    const files = readdirSync(fontDir).filter(
+      (f) => f.endsWith(".ttf") || f.endsWith(".otf"),
+    );
     if (files.length > 0) {
       log.success(`${fontName} already installed (${files.length} files)`);
       return true;
@@ -329,11 +335,23 @@ async function installGitHubFont(fontName: string): Promise<boolean> {
     mkdirSync(fontDir, { recursive: true });
   }
 
-  // Extract ZIP using unzip command
+  // Extract font files from ZIP
+  // Use bash -c to ensure glob patterns are interpreted by a real shell,
+  // since Bun's $ template literal can mangle unzip glob arguments
   try {
-    await $`unzip -o -j ${zipPath} "*.ttf" -d ${fontDir}`.quiet();
-  } catch (e) {
-    log.error(`Failed to extract ${asset.name}`);
+    const result =
+      await $`bash -c ${"unzip -o -j " + zipPath + ' "*.ttf" "*.otf" -d ' + fontDir}`.quiet();
+  } catch (e: any) {
+    // unzip exit code 11 = no matching files found at all
+    if (e?.exitCode === 11) {
+      log.error(`No .ttf or .otf files found in ${asset.name}`);
+      rmSync(zipPath, { force: true });
+      return false;
+    }
+    log.error(`Failed to extract ${asset.name} (exit code ${e?.exitCode})`);
+    if (e?.stderr?.toString().trim()) {
+      log.error(`  ${e.stderr.toString().trim()}`);
+    }
     rmSync(zipPath, { force: true });
     return false;
   }
@@ -341,7 +359,9 @@ async function installGitHubFont(fontName: string): Promise<boolean> {
   // Clean up ZIP
   rmSync(zipPath, { force: true });
 
-  const files = readdirSync(fontDir).filter((f) => f.endsWith(".ttf"));
+  const files = readdirSync(fontDir).filter(
+    (f) => f.endsWith(".ttf") || f.endsWith(".otf"),
+  );
   log.success(
     `Installed ${fontName}: ${files.length} files (${release.tag_name})`,
   );
