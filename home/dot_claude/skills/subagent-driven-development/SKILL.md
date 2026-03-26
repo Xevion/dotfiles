@@ -178,10 +178,17 @@ Done!
 - Dispatch fix subagent with specific instructions
 - Don't try to fix manually (context pollution)
 
+## Task Sources
+
+This skill accepts tasks from any source:
+- **Native plan mode** — Plans created in Claude Code's built-in plan mode
+- **Interview skill** — Designs validated through the interview & design workflow
+- **User-provided list** — Tasks the user describes directly
+- **TodoWrite** — Pre-existing task lists in the conversation
+
+The only requirement is that each task has a clear scope and can be implemented independently.
+
 ## Integration
 
-**Required workflow skills:**
-- **writing-plans** - Creates the plan this skill executes
-
 **Subagents should use:**
-- **test-driven-development** - Subagents follow TDD for each task
+- **test-driven-development** - Subagents follow TDD for each task (when the project has test infrastructure)

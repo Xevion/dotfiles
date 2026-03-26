@@ -175,6 +175,8 @@ The Bash tool automatically truncates output that exceeds its limits. Do not man
 
 **When implementing features or fixing bugs** in projects with test infrastructure (Vitest, cargo nextest, Playwright, Jest, pytest, etc.), **load the `test-driven-development` skill BEFORE writing implementation code.** Write failing tests first, then implement until they pass. This applies to any feature, bugfix, or refactor — not just when the user says "TDD."
 
+**When planning** (native plan mode or otherwise), offer TDD-style task decomposition: break each task into "write failing test → verify it fails → implement minimal code → verify it passes" steps. This isn't always viable — some projects lack test infrastructure, or the task may be purely configuration/docs. Use judgment, but default to offering it.
+
 ### Test Organization
 
 - **Integration/feature tests**: Place in `tests/` directory

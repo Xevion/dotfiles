@@ -196,7 +196,7 @@ Ready to implement <feature-name>
 ## Integration
 
 **Called by:**
-- **brainstorming** - When design is approved and implementation follows
+- **interview** - When design is approved and implementation follows
 - Any skill needing isolated workspace
 
 **Pairs with:**
