@@ -2,23 +2,43 @@
 name: sql
 category: languages
 last_audited: 2026-03-26
-exemplars: []
+exemplars:
+  - repo: Xevion/banner
+    path: migrations/
+    note: 30+ PostgreSQL migrations demonstrating JSONB, tsvector, materialized views, UNLOGGED tables
 ---
 
 # SQL
 
 ## Philosophy
 
-<!-- Migration discipline, schema as source of truth, naming conventions matter -->
+Migration discipline — schema is the source of truth. Normalize first, denormalize intentionally. Migrations are first-class artifacts that document schema evolution.
 
 ## Conventions
 
-<!-- snake_case tables/columns, plural table names, explicit JOIN types, migration versioning -->
+- **Naming**: `snake_case` for tables and columns, plural table names (`courses`, `instructors`), explicit `JOIN` types
+- **Migration versioning**: timestamp-prefixed filenames (`20260128000000_description.sql`), one logical change per migration
+- **JSONB for volatile 1-to-many data**: when sub-entities change shape frequently and you rarely filter by individual sub-fields, use JSONB arrays instead of join tables. Add GIN indexes for containment queries
+
+```sql
+ALTER TABLE courses ADD COLUMN meeting_times JSONB NOT NULL DEFAULT '[]'::jsonb;
+CREATE INDEX idx_courses_meeting_times ON courses USING GIN (meeting_times);
+```
+
+- **Full-text search**: generated `tsvector` columns (`GENERATED ALWAYS AS ... STORED`) with GIN indexes for search. `pg_trgm` GIN for substring/ILIKE patterns. Create indexes in the same migration as their columns
+- **Materialized views for precomputed aggregations**: when aggregations are expensive and read-heavy but write-infrequent. Add a UNIQUE index on the grouping key to enable `REFRESH CONCURRENTLY`
+- **UNLOGGED TABLE for ephemeral state**: scheduler timestamps, cache entries, bot command fingerprints — data where crash-loss is acceptable. No WAL overhead. Document the tradeoff in a migration comment
+- **Safe CHECK constraint migrations**: include a data-repair step (UPDATE to fix invalid rows) and a validation block (`DO $$ ... RAISE EXCEPTION ... $$`) before adding the constraint
 
 ## Anti-Patterns
 
-<!-- SELECT *, implicit joins, business logic in stored procedures, schema changes without migrations -->
+- `SELECT *` in application queries
+- Implicit joins (comma-separated FROM)
+- Business logic in stored procedures
+- Schema changes without migrations
+- Modifying applied migration files (SQLx tracks checksums)
 
 ## Open Questions
 
-<!-- ORM vs query builder vs raw SQL decision criteria, migration tool preferences per stack -->
+- ORM vs query builder vs raw SQL decision criteria per project size
+- Migration tool preferences per stack (SQLx, Diesel, Drizzle, golang-migrate)

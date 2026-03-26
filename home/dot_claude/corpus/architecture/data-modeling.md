@@ -2,34 +2,59 @@
 name: data-modeling
 category: architecture
 last_audited: 2026-03-26
-exemplars: []
+exemplars:
+  - repo: Xevion/banner
+    path: migrations/
+    note: JSONB sub-entities, materialized views, safe CHECK constraint migrations
 ---
 
 # Data Modeling
 
 ## Philosophy
 
-<!-- Schema-first, normalize then denormalize intentionally, migrations as first-class artifacts -->
+Schema-first — the database schema is the source of truth. Normalize first, denormalize intentionally for read performance. Migrations are first-class artifacts, not afterthoughts.
 
 ## Conventions
 
-<!-- Migration versioning, seed data patterns, index strategy, foreign key discipline -->
+- **Migration versioning**: timestamp-prefixed, one logical change per file, never modify after application
+- **JSONB for volatile sub-entities**: use JSONB arrays for 1-to-many data whose shape changes frequently and is rarely filtered individually (e.g. meeting times, attribute lists). Keep enumerable filter columns (campus, method) as plain `VARCHAR` with btree indexes
+- **Materialized views for read-heavy aggregations**: precompute expensive joins/aggregations. Add a UNIQUE index on the grouping key to enable `REFRESH CONCURRENTLY`. Refresh explicitly after mutations
+- **Safe constraint migrations**: when adding CHECK constraints to tables with existing data, include (1) a data-repair step for historical invalid values and (2) a validation block that raises an exception if any rows still violate the constraint
+
+```sql
+-- Pattern: safe CHECK constraint addition
+UPDATE courses SET enrollment = 0 WHERE enrollment < 0;
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM courses WHERE enrollment < 0) THEN
+        RAISE EXCEPTION 'courses contains negative enrollment values';
+    END IF;
+END $$;
+ALTER TABLE courses ADD CONSTRAINT chk_enrollment_nonneg CHECK (enrollment >= 0);
+```
 
 ## Language-Specific
 
 ### Rust
-<!-- sqlx compile-time checked queries, sea-orm vs diesel decision criteria -->
+
+- **SQLx compile-time checked queries**: use `sqlx::query!` / `sqlx::query_as!` with offline mode (`.sqlx/` metadata). `QueryBuilder<Postgres>` for dynamic conditions
+- **JSONB in Rust**: `sqlx::types::Json<Vec<T>>` or `Json<Struct>`, never `Option<String>`. Ensures ts-rs generates `Array<T>` in TypeScript, not `string`
 
 ### TypeScript
-<!-- Drizzle/Prisma patterns, migration tooling, type generation -->
+
+<!-- Placeholder: Drizzle/Prisma patterns, migration tooling -->
 
 ### Go
-<!-- sqlc for type-safe queries, goose/atlas for migrations -->
+
+<!-- Placeholder: sqlc, goose/atlas -->
 
 ## Anti-Patterns
 
-<!-- Schemaless by default, EAV tables, migrations that aren't idempotent -->
+- Schemaless by default ("we'll figure out the schema later")
+- EAV (Entity-Attribute-Value) tables
+- Non-idempotent migrations
+- Storing structured data as JSON-encoded TEXT columns
 
 ## Open Questions
 
-<!-- Event sourcing criteria, CQRS adoption thresholds -->
+- Event sourcing criteria and when to adopt
+- CQRS adoption thresholds

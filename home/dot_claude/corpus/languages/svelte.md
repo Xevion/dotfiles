@@ -1,0 +1,41 @@
+---
+name: svelte
+category: languages
+last_audited: 2026-03-26
+exemplars:
+  - repo: Xevion/banner
+    path: web/src/lib/
+    note: Svelte 5 runes-only codebase with createContext for shared state, bits-ui components
+---
+
+# Svelte
+
+## Philosophy
+
+Svelte 5 runes exclusively — no legacy stores. Reactive state is explicit via `$state`, derived values via `$derived`, side effects via `$effect`. Shared state uses `createContext()` pairs, not global stores.
+
+## Conventions
+
+- **Runes only**: `$state`, `$derived`, `$effect`, `$props` — never `writable()`, `readable()`, or `$store` syntax
+- **Shared state**: wrap reactive objects in a class or plain object with `$state` fields, expose via `createContext()` from `*.svelte.ts` files
+- **Component composition**: prefer bits-ui headless primitives, compose with Tailwind utility classes
+- **Type safety**: import types from auto-generated bindings (`$lib/bindings`), never hand-maintain TypeScript interfaces that mirror backend types
+
+```svelte
+<!-- Shared state pattern -->
+<script lang="ts">
+  import { getFiltersContext } from '$lib/stores/filters.svelte';
+  const filters = getFiltersContext();
+</script>
+```
+
+## Anti-Patterns
+
+- Mixing Svelte 4 stores with rune-based components
+- Using `$effect` for derived state that `$derived` can express
+- Global mutable singletons instead of context-scoped state
+
+## Open Questions
+
+- Svelte 5 snippet composition patterns
+- Server-only vs shared state boundaries in SvelteKit
