@@ -247,6 +247,17 @@ Before writing any code, detect the project's formatter:
 - Make multiple Edit calls to fix lint/format warnings one by one
 - Skip running the formatter because "the code looks right"
 
+**Generated files (bindings, codegen output, lock files, etc.):**
+- **Never auto-format generated files.** They have their own formatting from the generator and reformatting them creates noisy diffs or breaks roundtripping.
+- When a format check flags a generated file, **exclude it from the formatter's config** rather than formatting it:
+  - Prettier: add to `.prettierignore`
+  - Biome: add to `biome.json` `files.ignore`
+  - ESLint: add to `.eslintignore` or `ignores` in flat config
+  - rustfmt: add to `rustfmt.toml` `ignore` list
+  - Ruff/Black: add to `pyproject.toml` exclude
+- Common patterns to exclude: `*.generated.ts`, `*.gen.ts`, `bindings.ts`, `*_pb.ts`, `*.rs` in a `gen/` or `bindings/` directory
+- If unsure whether a file is generated, check for a header comment (e.g., `// This file is auto-generated`) or ask before formatting
+
 ## Comments & Documentation
 
 - Write comments that explain **WHY**, not **WHAT**
