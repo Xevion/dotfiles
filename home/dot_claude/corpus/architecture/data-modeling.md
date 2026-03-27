@@ -23,6 +23,7 @@ Schema-first — the database schema is the source of truth. Normalize first, de
 - **JSONB for volatile sub-entities**: use JSONB arrays for 1-to-many data whose shape changes frequently and is rarely filtered individually (e.g. meeting times, attribute lists). Keep enumerable filter columns (campus, method) as plain `VARCHAR` with btree indexes
 - **Materialized views for read-heavy aggregations**: precompute expensive joins/aggregations. Add a UNIQUE index on the grouping key to enable `REFRESH CONCURRENTLY`. Refresh explicitly after mutations
 - **Safe constraint migrations**: when adding CHECK constraints to tables with existing data, include (1) a data-repair step for historical invalid values and (2) a validation block that raises an exception if any rows still violate the constraint
+- **Table consolidation migration**: when backfilling from a related table before applying NOT NULL, the sequence is (1) add columns nullable, (2) backfill via `UPDATE...FROM` join, (3) apply NOT NULL constraints, (4) optionally drop the source table. This is a superset of the CHECK constraint pattern
 
 ```sql
 -- Pattern: safe CHECK constraint addition

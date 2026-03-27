@@ -6,6 +6,12 @@ exemplars:
   - repo: Xevion/glint
     path: frontend/src/lib/stores/ + components/data-view/
     note: "Connectivity singleton, cursor-paginated list factory, module-scoped $state patterns"
+  - repo: local/inkwell
+    path: web/src/lib/stores/
+    note: "Cursor-paginated list with ETag sync, $effect.root debounced server sync, version-counter reactivity"
+  - repo: Xevion/xevion.dev
+    path: web/src/lib/stores/
+    note: Module-scoped auth singleton, ThemeStore with SSR guard
 ---
 
 # State Management
@@ -36,6 +42,9 @@ Reactivity through signals/runes, not manual subscription. Clear boundary betwee
 ```
 
 - **Tree-scoped via createContext**: for state shared across a component subtree (filters, selected item, UI mode). Avoid for single-consumer state where a factory is simpler
+- **Module-scoped class singleton**: for auth/session state that spans multiple pages, use a class with `$state` fields and async methods (login, logout, checkSession) exported as a module-level instance. Distinguish from page-scoped factories by lifecycle: singleton is created once per module load, factory per route mount
+- **Cursor-paginated list store with background sync**: a class-based `$state` store combining pagination state, ETag tracking, visibility-triggered sync, and sessionStorage snapshot is preferable to a generic factory when the state needs lifecycle methods (`initialize`, `prepend`, `destroy`) and cross-tab reconciliation
+- **`$effect.root` for class-based store effects**: use `$effect.root(() => { ... })` in a class constructor to register reactive effects (e.g., debounced PUT sync) outside the component tree. Store the returned cleanup function and call from `destroy()`. This is the correct pattern for stores that react to their own `$state` changes
 
 ## Anti-Patterns
 

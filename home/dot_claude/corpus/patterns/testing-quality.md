@@ -21,6 +21,12 @@ exemplars:
   - repo: Xevion/glint
     path: mod/common test module + scripts/check.ts
     note: "Cross-language JSON schema contract tests between Rust backend and Kotlin mod"
+  - repo: local/inkwell
+    path: internal/testutil/dbtest/
+    note: pgtestdb with CI env-var port switching, goosemigrator with embedded FS
+  - repo: Xevion/Pac-Man
+    path: pacman/tests/ + pacman-server/tests/
+    note: "ECS World fixture builders, testcontainers + bon builder for app-state integration tests"
 ---
 
 # Testing & Quality
@@ -43,7 +49,9 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 - `cargo nextest` as the test runner (parallel, better output than `cargo test`)
 - `#[sqlx::test]` for database integration tests — each test gets a fresh `PgPool` with migrations applied. No manual setup/teardown
 - Builder pattern in `tests/helpers/` for test data construction
-- `assert2` crate: `assert!()` over `assert_eq!()`, `let_assert!()` for pattern matching, `check!()` for non-fatal assertions
+- `assert2` crate: `assert!()` over `assert_eq!()`, `let_assert!()` for pattern matching, `check!()` for non-fatal assertions. Prefer `assert2` over `speculoos` — `speculoos` is verbose without providing the structural pattern-matching that `assert2::let_assert!` enables
+- **ECS World fixture builders**: for Bevy ECS tests, use `create_*_world()` to initialize required resources, named `spawn_*_entity()` helpers to abstract component bundles, and a `run_*_system()` driver to encapsulate system invocation. Each test body reads as Arrange → Act → Assert against a single variable
+- **testcontainers + typed builder for app-state integration tests**: combine `testcontainers` (isolated DB) with a typed builder (e.g. `bon::builder`) to compose full app state (router, auth, health). Gate behind a Cargo feature (`postgres-tests`) so CI runs both fast in-memory and full Postgres variants. Complements `#[sqlx::test]` by covering router/extractor/auth layers
 
 ### TypeScript
 
@@ -54,12 +62,12 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 - Global Vitest `setupFiles` recording sink: configure logger once with recording sink, auto-clear via `beforeEach`, export query helpers by category/level for asserting on structured log output
 - EngineTestHarness factory for browser API mocking: single factory installs all global mocks (Worker, ResizeObserver, HTMLAudioElement), returns cleanup closure, each mock exposes typed `Controls` interface
 - CI compat env-var gate: `test.skipIf(!available)` locally, hard throw when `CI_COMPAT=1`. Prevents both false negatives (skipped in CI) and false positives (failing locally)
-- Stale smoke test anti-pattern: smoke tests must use valid fixture data matching the actual schema. Identity-function wrappers like `defineConfig` won't catch wrong shapes
+- Stale smoke test anti-pattern: smoke tests must use valid fixture data matching the actual schema. Identity-function wrappers like `defineConfig` won't catch wrong shapes. Smoke tests that only assert element presence (e.g., `expect(canvas).not.toBeNull()`) are fragile proxies for real behavior — test state transitions instead
 
 ### Go
 
 - Options-struct builder for test factories: pointer fields for selective override, atomic sequence counters for collision-free defaults, `t.Helper()` + `t.Fatal` for single-line call sites. Factories call real DB queries, no mocks
-- pgtestdb + template-database cloning: per-test Postgres isolation. Single `NewEnv(t)` wires full stack (pool → queries → services → handler) for integration tests. Fast due to template cloning
+- pgtestdb + template-database cloning: per-test Postgres isolation. Single `NewEnv(t)` wires full stack (pool → queries → services → handler) for integration tests. Fast due to template cloning. CI env-var port-switching (`os.Getenv("CI")`) to select between local dev port and standard CI postgres is simpler than build-tag gating
 
 ### Kotlin
 

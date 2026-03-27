@@ -28,6 +28,10 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [image-processing-pipeline](./architecture/image-processing-pipeline.md) — Capture→transform→progressive loading, thumbhash placeholders
 - [minecraft-mod-architecture](./architecture/minecraft-mod-architecture.md) — Architectury cross-loader, Mixin injection, tick-driven state machines
 - [real-time-subscriptions](./architecture/real-time-subscriptions.md) — GraphQL WS, typed domain events, connectivity state
+- [wasm-compilation-targets](./architecture/wasm-compilation-targets.md) — Dual-target Rust (native + Emscripten), platform-gated modules
+- [isr-caching-proxy-patterns](./architecture/isr-caching-proxy-patterns.md) — Stale-while-revalidate, lazy multi-encoding compression, singleflight
+- [game-loop-ecs-architecture](./architecture/game-loop-ecs-architecture.md) — Bevy ECS standalone, fixed-tick scheduling, SDL2 graphics
+- [asset-pipeline-atlas](./architecture/asset-pipeline-atlas.md) — Sprite atlas packing, build.rs PHF maps, typed asset handles
 
 ## Patterns
 
@@ -36,7 +40,8 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [testing-quality](./patterns/testing-quality.md) — TDD when infra exists, property tests, cross-language contract tests
 - [security-auth](./patterns/security-auth.md) — Zero-trust defaults, token rotation, secret management
 - [device-code-auth-flow](./patterns/device-code-auth-flow.md) — RFC 8628 for headless clients, polling with backoff, session token exchange
-- [performance](./patterns/performance.md) — Measure first, profile-guided optimization
+- [performance](./patterns/performance.md) — Measure first, profile-guided optimization, ISR caching
+- [bot-abuse-defense](./patterns/bot-abuse-defense.md) — Tarpit streaming, per-IP semaphore limits, active defense
 
 ## Project Structure
 
@@ -56,3 +61,4 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [docker-multi-service](./dx/docker-multi-service.md) — Compose orchestration, multi-stage builds, cargo-chef, deps-only layers
 - [headless-gpu-rendering](./dx/headless-gpu-rendering.md) — Xvfb + VirtualGL, NVIDIA passthrough, containerized GPU workloads
 - [npm-library-publishing](./dx/npm-library-publishing.md) — ESM builds, conditional exports, cross-runtime testing, release-please
+- [build-time-codegen](./dx/build-time-codegen.md) — build.rs, sqlc/tygo, sqlx offline, CI verification via regen+diff

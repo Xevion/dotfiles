@@ -12,6 +12,9 @@ exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: scripts/lib/preflight.ts
     note: ensureFresh mtime staleness detection for PandaCSS/tygo/sqlc
+  - repo: local/inkwell
+    path: scripts/check.ts
+    note: "Warn-only exit code pattern, TTY-aware live progress ticker"
 ---
 
 # Project Automation
@@ -43,6 +46,8 @@ const REGISTRY: Record<Subsystem, Record<Action, CommandDef>> = {
 - **Dual auto-fix strategies**: `fix-first` (optimistic: fix then check) and `fix-on-fail` (conservative: check, fix failures, re-verify). Always re-verify after fixing. Name strategies explicitly in config so intent is clear
 - **Smart auto-fix**: when running parallel checks, auto-format only if formatting is the sole failure (all peer checks passed). If other checks also fail, report errors without reformatting to avoid masking issues
 - **Streaming parallel results** (as implemented in Tempo, a purpose-built config-driven dev process runner): `Promise.race` + Map of remaining promises to display progress incrementally. Include fallback values for graceful rejection degradation
+- **Warn-only exit code**: support a `warnIfExitCode` field per check to distinguish advisory failures (e.g., coverage below threshold) from blocking failures. Print a colored warning with a hint message but continue the run. Useful for checks that report degradation but should not block local development
+- **TTY-aware live progress ticker**: in TTY mode, show a live-updating line of remaining check names with elapsed time. Use `setInterval` at 100ms with `\r\x1b[K` line clearing. Skip in non-TTY (CI) mode for clean log output
 - **State machines for file-watching dev processes** (as implemented in Tempo): named states (`building | idle | running | building_with_server | swapping`) make restart semantics auditable and debuggable. The pattern generalizes — any dev process with build/run/swap transitions benefits from an explicit state machine over ad-hoc flags
 - **Pre-commit partial-staging safety**: pre-commit hooks that auto-format must detect partially-staged files and refuse to re-stage when both staged and unstaged changes exist in the same file
 

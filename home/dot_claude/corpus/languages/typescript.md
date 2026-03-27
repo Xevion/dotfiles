@@ -39,6 +39,8 @@ type InstructionalMethod =
 - **Zod for external/user input**: use Zod only at system boundaries (form input, third-party APIs), not for internally-generated types
 - **Typed Web Worker communication**: define `MainToWorker` and `WorkerToMain` discriminated unions with typed wrapper functions over `postMessage`. Enforce compile-time exhaustiveness on message handling
 - **`Extract<Union, { type: T }>`**: use this conditional type for narrowing subscriber callbacks in typed pub/sub systems
+- **Hand-authored discriminated unions for frontend-only types**: when a type has no backend counterpart (e.g., loading state, UI error), hand-author a discriminated union with a `type` literal field following the same pattern as ts-rs-generated unions. Reserve ts-rs for API contract types
+- **tygo as alternative to ts-rs for Go backends**: tygo generates TypeScript interfaces from Go structs with minimal transformation. Unlike ts-rs, tygo does not produce discriminated unions or enforce camelCase — it produces weaker TypeScript contracts. When event type fields are plain `string` rather than literal unions, callers resort to `as` casts instead of narrowing — an anti-pattern to watch for
 - **Advanced type-level patterns** (situational — useful in config DSLs and builder APIs):
   - `NoInfer<T>` on Record keys to prevent generic widening
   - Template-literal types (`"${Subsystem}:${Action}"`) as index constraints for namespaced key systems

@@ -15,6 +15,12 @@ exemplars:
   - repo: Xevion/glint
     path: backend/src/logging.rs
     note: "CompactFields with field-level transforms, coordinated LOG_JSON across Rust + SvelteKit"
+  - repo: local/inkwell
+    path: internal/middleware/ + web/vite-plugin-json-logger.ts
+    note: "Three-layer LOG_JSON coordination (Go + SvelteKit + Vite plugin), LevelTrace named constant"
+  - repo: Xevion/xevion.dev
+    path: src/middleware/request_id.rs + web/console-logger.js
+    note: "RequestIdLayer with upstream header trust + ULID fallback, console-logger preload"
 ---
 
 # Logging & Observability
@@ -26,10 +32,10 @@ Structured logging always. Tracing spans for request lifecycle. Log format is a 
 ## Conventions
 
 - **Runtime format selection**: choose log format via CLI flag or config, not compile-time features. Pretty for dev, JSON for production
-- **Request correlation**: generate or inherit a request ID (prefer upstream edge headers like `X-Railway-Request-Id`, `X-Request-Id`) and attach it to a span that wraps the entire request lifecycle
+- **Request correlation**: generate or inherit a request ID (prefer upstream edge headers like `X-Railway-Request-Id`, `X-Request-Id`) and attach it to a span that wraps the entire request lifecycle. In Rust/Axum, implement as a Tower middleware layer that combines upstream header trust (configurable via CLI flag), ULID fallback generation, span attachment, and status-proportional response logging
 - **Status-proportional log levels**: 2xx/3xx at debug, 4xx at info, 5xx at warn/error. Keeps normal traffic out of INFO while surfacing errors automatically
 - **Sane filter defaults**: suppress noisy internal modules (session middleware, HTTP retry loops) at `warn` level while keeping application modules at the configured level
-- **Coordinated log format across co-located services**: in a container running multiple subsystems (e.g. Rust binary + SvelteKit), coordinate log format via a single shared env var (`LOG_JSON`). Both must implement the same selection logic (`env var override → build-profile default`) so a single deployment variable controls both
+- **Coordinated log format across co-located services**: in a container running multiple subsystems, coordinate log format via a single shared env var (`LOG_JSON`). All layers must implement the same selection logic (`env var override → build-profile default`). This extends beyond two layers — inkwell coordinates three: Go slog, SvelteKit LogTape, and a custom Vite plugin that intercepts Vite's logger to reformat stray console output into structured JSON
 
 ```rust
 // Pattern: EnvFilter with per-module overrides
@@ -54,7 +60,7 @@ let filter = EnvFilter::new(format!(
 
 ### Go
 
-- Path-based request log level: `/api/*` at Info, SSR pages at Debug, dev assets (HMR, node_modules) at custom Trace level (`slog.LevelDebug - 4`). Prevents proxy noise without suppressing API traffic
+- Path-based request log level: `/api/*` at Info, SSR pages at Debug, dev assets (HMR, node_modules, `/@`, `/.svelte-kit/`, `/styled-system/`) at custom Trace level. Define `LevelTrace = slog.LevelDebug - 4` as a named constant rather than an inline value. Prevents proxy noise without suppressing API traffic
 - slog-formatter middleware for value-level transformations (duration humanization, integer comma-formatting, typed `Pct` wrapper). Keeps structured fields intact while improving readability
 - Context-based logger propagation: attach pre-seeded `*slog.Logger` (with request_id) to context in middleware, retrieve with `LoggerFromContext` helper with default fallback
 

@@ -12,6 +12,9 @@ exemplars:
   - repo: Xevion/instant-upscale
     path: crates/common/error module
     note: Manual From<sqlx::Error> with domain-logic mapping, or_not_found(entity, id) extension trait
+  - repo: Xevion/Pac-Man
+    path: pacman/src/error.rs
+    note: Multi-level thiserror hierarchy (GameError aggregates sub-enums), error type as Bevy ECS Event
 ---
 
 # Rust
@@ -22,7 +25,8 @@ Ownership-centric design, zero-cost abstractions, compile-time guarantees over r
 
 ## Conventions
 
-- **thiserror/anyhow split**: `thiserror` for module-boundary error enums (pattern-matchable by callers), `anyhow` for opaque upstream errors. Use `#[source]` on struct variants to attach cause, `#[from]` on transparent catch-all variants for ergonomic conversion
+- **thiserror/anyhow split**: `thiserror` for module-boundary error enums (pattern-matchable by callers), `anyhow` for opaque upstream errors. Use `#[source]` on struct variants to attach cause, `#[from]` on transparent catch-all variants for ergonomic conversion. **Exception**: `anyhow`-only is appropriate for batch CLI tools and application entry points where errors are only displayed, never matched by callers — the split is for library crates and service boundaries
+- **Multi-level thiserror hierarchies**: a top-level error enum aggregates domain sub-enums via `#[from]`. Pac-Man's `GameError` composes `AssetError`, `PlatformError`, `ParseError`, etc., and doubles as a Bevy ECS `Event` for surfacing errors into the game loop
 
 ```rust
 #[derive(Debug, thiserror::Error)]

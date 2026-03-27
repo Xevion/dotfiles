@@ -92,6 +92,54 @@ Agent tool:
     discoveries. Use cross_topics when findings span topic boundaries.
 ```
 
+## Split-Project Variant (Medium/Large Projects)
+
+For projects above 8K LOC, split into domain-scoped subagents. Each subagent gets a subset of topics.
+
+**Medium (8–20K LOC) — 2 subagents:**
+- Languages subagent: `languages/*` + `error-handling`, `testing-quality`
+- Arch+DX subagent: `architecture/*`, `project-structure/*`, `dx/*`, remaining `patterns/*`
+
+**Large (20K+ LOC) — 3 subagents:**
+- Languages subagent: `languages/*`
+- Architecture subagent: `architecture/*` + `project-structure/*` + `error-handling`, `testing-quality`, `performance`
+- DX+Patterns subagent: `dx/*` + `security-auth`, `logging-observability`, `device-code-auth-flow`
+
+```
+Agent tool:
+  description: "Audit [project-name]: [domain]"
+  model: "sonnet"
+  prompt: |
+    You are auditing a project against a SUBSET of design corpus topics. Return YAML findings only.
+
+    ## Project
+
+    Directory: ~/projects/[project-name]
+    [Brief summary: tech stack, LOC, architecture, key patterns]
+
+    ## Topics to Check (YOUR DOMAIN ONLY)
+
+    Read each corpus topic file before auditing against it. For STUBs
+    (HTML comment placeholders), discover NEW patterns.
+
+    [List ONLY the topics assigned to this domain:]
+    **[topic-name]** ([path]) — [key conventions or "STUB"]
+    ...
+
+    ## Instructions
+
+    1. Get file tree: `git ls-files` + `fd -H --type f --max-depth 2 --no-ignore`
+    2. Read key files: CLAUDE.md, configs, source code relevant to YOUR topics
+    3. Read each corpus topic file listed above
+    4. Compare project against each topic's conventions
+    5. Return findings as YAML (same format as per-project variant)
+    6. Use cross_topics when a finding touches topics OUTSIDE your domain
+
+    Rules: findings only, no file modifications, one per observation,
+    generalize patterns, quality over quantity. For STUBs focus on NEW
+    discoveries. Mark cross_topics so the aggregator can dedup across domains.
+```
+
 ## Gap Analysis Variant
 
 Always dispatch alongside audit subagents. Cheap (~65s, ~68K tokens) and identifies missing topics.

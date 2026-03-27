@@ -12,6 +12,9 @@ exemplars:
   - repo: Xevion/glint
     path: backend/src/services/lifecycle.rs
     note: "TaskTracker + CancellationToken with ServiceContext tick/sleep helpers"
+  - repo: local/inkwell
+    path: internal/shutdown/
+    note: Go shutdown tracker with WaitGroup + sync.Once + select/timeout drain
 ---
 
 # Concurrency & Async
@@ -68,11 +71,11 @@ pub async fn shutdown(self, timeout: Duration) -> bool {
 
 ### TypeScript
 
-<!-- Placeholder: Promise.all, AbortController, worker threads -->
+- **`Promise.race` for multi-process lifecycle management**: race child process `.exited` promises as the equivalent of Rust's top-level `select!`. Any process exit triggers cleanup of all others before the supervisor exits with the original code. Suitable for single-container multi-process supervisors (e.g., entrypoint.ts orchestrating Rust + Bun)
 
 ### Go
 
-<!-- Placeholder: goroutines + channels, context.Context, errgroup -->
+- **Lightweight shutdown tracker**: `sync.WaitGroup` + `sync.Once`-protected close channel. `Add()`/`Done()` bracket in-flight critical operations; `Stop()` signals shutdown via `once.Do(func() { close(stopping) })`; `Wait(timeout)` drains with a bounded timeout using a goroutine + `select`. No per-subsystem interface required — the Go equivalent of the Rust RAII ShutdownTracker pattern
 
 ### Kotlin
 

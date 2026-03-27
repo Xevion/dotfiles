@@ -108,7 +108,8 @@ First-time content generation for stub topics from real project scans. Use when 
    - Read CLAUDE.md / AGENTS.md / README.md for tech stack and conventions
    - `git -C ~/projects/<name> log --oneline -20` for recent activity
    - Identify which corpus topics are relevant based on languages and patterns observed
-2. **Dispatch subagents** using the templates in `./auditor-prompt.md`, one subagent per project (not split by domain — splitting causes cross-subagent duplicates):
+2. **Dispatch subagents** using the templates in `./auditor-prompt.md`, following the size-tiered strategy from Audit Mode's Batching Strategy section:
+   - Small (<8K): 1 subagent per project. Medium (8–20K): 2 subagents split by domain. Large (20K+): 3 subagents split by domain
    - Include a brief project summary (from the profiling step)
    - List relevant topic NAMES and their file paths — let subagents read corpus files directly
    - Do NOT paste full corpus content into prompts (wastes tokens, bloats prompts)
@@ -118,7 +119,7 @@ First-time content generation for stub topics from real project scans. Use when 
    - **Batch review via multi-select**: present findings grouped by theme, 4-6 per batch. Ask explicitly for confirmation — even in populate mode where most findings are valid, don't auto-approve
    - **Flag generalizations**: when a finding generalizes from a single project, ask whether the generalization is correct before writing it as a convention
    - **Mix brainstorming throughout**: when presenting a batch, ask about related structural decisions (e.g. "Should Svelte be its own topic or fold into TypeScript?")
-5. **Write corpus content** — apply all approved findings, generalized into conventions:
+5. **Write corpus content directly** — do NOT dispatch subagents for writing. Read corpus files and edit them yourself with parallel Edit calls. Subagents for writing double token cost with no benefit. Apply all approved findings generalized into conventions:
    - Pattern descriptions + short illustrative snippets (3-5 lines, anonymized or using public project name)
    - Reference projects by name + module/type/function, not file paths (paths drift)
    - Add project as exemplar where it demonstrates a pattern well
@@ -174,9 +175,26 @@ This gives enough signal to determine which corpus topics are relevant to each p
 
 ### Batching Strategy
 
-**Default: one subagent per project** with all relevant topics. Do NOT split a single project into domain groups — this causes cross-subagent duplicates and wastes tokens.
+**Size-tiered dispatch** — scale subagent count based on project LOC:
 
-**Per-topic batching** (1 subagent per topic, all projects) is better for routine maintenance or auditing a specific topic.
+| Project size | Subagents | Split strategy |
+|-------------|-----------|----------------|
+| Small (<8K LOC) | 1 | Single subagent, all relevant topics |
+| Medium (8–20K LOC) | 2 | Split by domain: **Languages** vs **Architecture + DX + Patterns** |
+| Large (20K+ LOC) | 3 | Split into: **Languages**, **Architecture + Project Structure**, **DX + Patterns** |
+
+**Domain splits for medium projects (2 subagents):**
+- **Languages subagent**: all `languages/*` topics + `error-handling`, `testing-quality` (language-specific patterns)
+- **Arch+DX subagent**: all `architecture/*`, `project-structure/*`, `dx/*`, `patterns/*` topics (minus error-handling/testing)
+
+**Domain splits for large projects (3 subagents):**
+- **Languages subagent**: all `languages/*` topics
+- **Architecture subagent**: all `architecture/*` + `project-structure/*` topics + `error-handling`, `testing-quality`, `performance`
+- **DX+Patterns subagent**: all `dx/*` topics + `security-auth`, `logging-observability`, `device-code-auth-flow`
+
+**Dedup awareness:** Domain splits will produce some cross-boundary duplicates (e.g., a pattern touching both `rust` and `api-design`). This is expected — the `cross_topics` field flags these, and the review phase deduplicates. The parallelism gain outweighs the dedup cost for projects above 8K LOC.
+
+**Per-topic batching** (1 subagent per topic, all projects) is still better for routine maintenance or auditing a specific topic.
 
 **Always dispatch a gap analysis subagent** alongside audit subagents — it's cheap (~65s, ~68K tokens) and identifies missing topics that no audit subagent would catch.
 
@@ -220,7 +238,7 @@ After all subagents return:
    - **Ask explicitly** — present each batch for confirmation. Do not assume approval
    - Mix in structural/brainstorming questions when relevant (new topics, cross-cutting concerns)
    - When a finding generalizes a project-specific pattern, **ask whether the generalization is correct** rather than assuming it is
-5. **Apply approved changes** to the corpus topic files in `home/dot_claude/corpus/`
+5. **Apply approved changes directly** — do NOT dispatch subagents for writing. You already have all findings in context; read the corpus files yourself and edit them directly with parallel Edit calls. Subagents for writing would double token cost (re-pasting findings + re-reading files) with no benefit. The corpus files are small (24-65 lines each) and writing is mechanical once findings are approved
 6. **Update `last_audited`** dates on all touched topics
 7. **Update INDEX.md** descriptions if content changed significantly
 

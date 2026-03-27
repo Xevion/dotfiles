@@ -6,6 +6,9 @@ exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: internal/server/
     note: Chi router with writeJSON buffer pattern, dual timeouts, sentinel error mapping, slog context propagation
+  - repo: local/inkwell
+    path: internal/server/
+    note: Dual-%w error wrapping, writeServiceError with context.Canceled/DeadlineExceeded, ETag conditional GET, Go 1.26 new(expr)
 ---
 
 # Go
@@ -57,11 +60,11 @@ var (
 
 func MapDBError(err error) error {
     if errors.Is(err, pgx.ErrNoRows) {
-        return ErrNotFound
+        return fmt.Errorf("%w: %w", ErrNotFound, err) // dual-%w preserves both chains
     }
     var pgErr *pgconn.PgError
     if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-        return ErrConflict
+        return fmt.Errorf("%w: %w", ErrConflict, err)
     }
     return err
 }
@@ -79,6 +82,35 @@ func LoggerFromContext(ctx context.Context) *slog.Logger {
     return slog.Default()
 }
 ```
+
+### writeServiceError for domain-to-HTTP translation
+
+Centralize domain-error to HTTP status mapping in a single switch function. Include `context.Canceled` → 499 (client disconnected) and `context.DeadlineExceeded` → 504. Log at status-proportional levels (Debug for 404/client-disconnect, Error for 5xx). Complements `MapDBError` at the persistence boundary by handling the handler boundary.
+
+```go
+func writeServiceError(w http.ResponseWriter, r *http.Request, err error, action string) {
+    switch {
+    case errors.Is(err, context.Canceled):
+        writeError(w, 499, "client closed request")
+    case errors.Is(err, context.DeadlineExceeded):
+        writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("%s timed out", action))
+    case errors.Is(err, ErrNotFound):
+        writeError(w, http.StatusNotFound, "not found")
+    case errors.Is(err, ErrConflict):
+        writeError(w, http.StatusConflict, "already exists")
+    default:
+        writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to %s", action))
+    }
+}
+```
+
+### ETag conditional GET on paginated endpoints
+
+For cursor-paginated list endpoints, derive an ETag from the most-recent item's opaque ID (e.g., ULID). Only set and check the ETag on the first page (no cursor) — subsequent pages have stable content. Enables efficient polling via `If-None-Match` / 304 without a dedicated "last-modified" column.
+
+### Go 1.26 `new(expr)`
+
+Go 1.26 extended `new` to accept expressions, not just types: `new("foo")` returns `*string`, `new(42)` returns `*int`. Use this instead of helper functions like `strPtr` or `ptr.Of` when Go 1.26+ is the minimum version.
 
 ### Union-type constraints for structurally identical generated types (situational)
 

@@ -15,6 +15,12 @@ exemplars:
   - repo: Xevion/glint
     path: frontend/src/lib/stores/
     note: "Connectivity singleton with SSR guard, cursor-paginated list factory"
+  - repo: local/inkwell
+    path: web/src/lib/stores/
+    note: "Version-counter reactivity, discriminated union $state phases, $effect.root class stores, cursor-paginated ETag sync"
+  - repo: Xevion/xevion.dev
+    path: web/src/lib/stores/
+    note: ThemeStore factory-singleton with SSR guard, onNavigate + View Transitions
 ---
 
 # Svelte
@@ -30,6 +36,10 @@ Svelte 5 runes exclusively — no legacy stores. Reactive state is explicit via 
 - **Module-scoped reactive state (factory-singleton)**: for app-wide state (theme, session), use a factory function returning a plain object with `$state` closures and `get` accessor properties. Reserve `createContext()` for tree-scoped state. Factory must live in a `.svelte.ts` file (required for rune usage outside components)
 - **SSE/WebSocket subscription state**: encapsulate in a `.svelte.ts` factory returning reactive getters plus a `close()` method. Caller handles cleanup via `$effect`
 - **Browser environment singletons**: for app-wide browser state (online/offline, backend reachability), use module-scoped `$state` with a plain-object getter facade and mutation methods. SSR guard with `browser ? navigator.onLine : true` as the idiomatic initial value pattern
+- **Version-counter reactivity for large collections**: for large Maps/Sets that are frequently mutated, keep the collection in a plain (non-reactive) field and bump a `$state` integer on writes. Readers call `void this._version` to create a reactive dependency. Avoids Svelte proxying every Map entry while enabling fine-grained reactivity
+- **Discriminated union `$state` for multi-phase async flows**: model phases (idle, generating, uploading, complete, error) as a discriminated union on a `phase` string-literal field stored in `$state`. Each phase carries only the fields valid in that phase. Phase narrowing (`this.state.phase === 'x'`) gives TypeScript access to phase-specific properties
+- **`$effect.root` for class-based store effects**: use `$effect.root(() => { ... })` in a class constructor to register reactive effects outside the component tree. Store the returned cleanup function and call it from `destroy()`. This is the correct pattern for class stores that need to react to their own `$state` changes (e.g., debounced server sync)
+- **`onNavigate` + View Transitions**: use `onNavigate` with `document.startViewTransition` for SvelteKit page transitions. Assign `view-transition-name` to persistent shell elements (nav, theme toggle) to exclude them from transitions
 - **Component composition**: prefer bits-ui headless primitives, compose with Tailwind utility classes
 - **Type safety**: import types from auto-generated bindings (`$lib/bindings`), never hand-maintain TypeScript interfaces that mirror backend types
 

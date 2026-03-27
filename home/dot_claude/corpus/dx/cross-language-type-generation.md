@@ -12,6 +12,9 @@ exemplars:
   - repo: Xevion/glint
     path: backend models + schemas/ + frontend/src/lib/bindings/
     note: "ts-rs with JSON schema intermediary, DateTime/JSONB type overrides, snake_case wire format"
+  - repo: local/inkwell
+    path: tygo.yaml + web/src/lib/types.gen.ts
+    note: "tygo type_mappings for pgx nullable types, dual codegen verification (sqlc + tygo) in CI"
 ---
 
 # Cross-Language Type Generation
@@ -35,7 +38,10 @@ exemplars:
 
 ### Go (tygo)
 
-<!-- tygo.yaml config, tstype struct tag overrides for nullable pointers and omitempty. json.RawMessage → any (override with tstype for known shapes). Output to web/src/lib/types.gen.ts -->
+- `tygo.yaml` with `include_files` to scope generation to a specific types file. Output to `web/src/lib/types.gen.ts`
+- **`type_mappings` for pgx nullable types**: `pgtype.Text` → `"string | null"`, `pgtype.Int4` → `"number | null"`, `pgtype.Timestamptz` → `"string | null"`. Also map `time.Time` and `uuid.UUID` → `"string"` for database scalar overrides
+- `json.RawMessage` maps to `any` by default — override with `tstype` struct tag for known shapes
+- CI verification: `tygo generate && git diff --exit-code -- web/src/lib/types.gen.ts`
 
 ## Anti-Patterns
 

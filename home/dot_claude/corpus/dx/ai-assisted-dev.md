@@ -15,6 +15,9 @@ exemplars:
   - repo: local/maestro
     path: CLAUDE.md
     note: 30-minute decision threshold, multi-stage questioning, domain-specific skills
+  - repo: local/inkwell
+    path: CLAUDE.md + docs/
+    note: "Domain vocabulary enforcement, runtime-version guidance (Go 1.26 new(expr)), two-tier docs with STYLE.md"
 ---
 
 # AI-Assisted Development
@@ -43,6 +46,7 @@ CLAUDE.md as project context — the single document that orients an AI agent in
 - **Task-to-doc routing table in CLAUDE.md**: directs AI agents to read the relevant style/architecture doc before acting on a given task type. Pair with a domain vocabulary anti-pattern table (wrong term → correct term) in STYLE.md
 - **Skills section in CLAUDE.md**: document project-specific skills with trigger path, activation condition, and scope. Include explicit maintenance directives telling agents when to update both CLAUDE.md and skills
 - **Two-tier doc hierarchy**: CLAUDE.md = quick reference + agent constraints. DESIGN.md = authoritative spec, full schema, decisions. Point agents to the spec doc for architectural questions
+- **Runtime/language quirk documentation in CLAUDE.md**: when using a language feature that is new or surprising (e.g., Go 1.26 `new(expr)`, Svelte 5 runes migration), document it in CLAUDE.md so AI agents don't generate outdated patterns. This is especially important for features that change idiomatic usage patterns
 - **Project CLAUDE.md with conventions and restrictions**: document technology stack, quick-reference commands, workflow patterns, and explicit enforcement framing ("pattern violations will be rejected")
 - **TDD with AI assistance**: when test infrastructure exists, load the TDD skill before implementation
 

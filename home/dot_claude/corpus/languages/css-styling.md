@@ -15,6 +15,12 @@ exemplars:
   - repo: Xevion/glint
     path: frontend/src/routes/layout.css
     note: "oklch relative color syntax, @custom-variant dark, direction-aware View Transitions"
+  - repo: local/inkwell
+    path: web/panda.config.ts
+    note: "Two-tier oklch tokens (primitive → semantic), inline oklch alpha for dark borders, VT conflict suppression"
+  - repo: Xevion/xevion.dev
+    path: web/panda.config.ts
+    note: VT keyframes defined in PandaCSS config (keyframes + globalCss)
 ---
 
 # CSS & Styling
@@ -48,6 +54,8 @@ Tailwind utility-first. Design tokens as CSS custom properties. Minimal custom C
 - **oklch() relative color syntax**: use `oklch(from var(--token) l c h / alpha)` for alpha-only variants without hardcoding or repeating the color value. Useful for glass effects, hover states, and overlay backgrounds
 - **@custom-variant for dark mode with shadcn-ui**: declare `@custom-variant dark (&:is(.dark *));` in Tailwind v4 when using shadcn-ui's class-based dark mode. This replaces the default `prefers-color-scheme` detection with class-based toggling
 - **Direction-aware View Transitions**: set a `data-nav-direction` attribute on `:root` before navigation, then select directional keyframe variants (slide-left vs slide-right) via `:root[data-nav-direction="left"]` selectors on `::view-transition-old`/`::view-transition-new`
+- **View Transition conflict suppression**: when triggering a full-page theme transition, temporarily suppress all element-level `view-transition-name` assignments by adding a class (e.g., `.theme-transitioning *`) that sets `view-transition-name: none !important` on all descendants. Also reset the root group animation to prevent default crossfade conflicts
+- **VT keyframes in PandaCSS config**: define View Transition keyframes in `panda.config.ts` (keyframes block) and reference them from `globalCss`, keeping all animation definitions co-located with the token system rather than mixing `@keyframes` into a separate CSS file
 - **Responsive-first**: mobile-first breakpoints, avoid fixed widths
 - **PandaCSS as an alternative to Tailwind v4**: define tokens in `panda.config.ts` using `oklch()`, with semantic aliases using `{ base: ..., _dark: ... }` condition variants. Same oklch + class-strategy dark mode philosophy as Tailwind v4, different implementation
 - **PandaCSS dark mode**: use `_dark` semantic token conditions — equivalent to Tailwind's `dark:` variant. `.dark` class toggle on `documentElement` is the same activation mechanism as the Tailwind class strategy

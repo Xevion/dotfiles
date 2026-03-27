@@ -9,6 +9,9 @@ exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: .github/workflows/ci.yml + Dockerfile
     note: 5-job parallel CI with codegen verification, multi-stage Go Docker build
+  - repo: local/inkwell
+    path: .github/workflows/ci.yml
+    note: "Dual codegen verification (sqlc + tygo) in same job, frozen-lockfile frontend, GHA cache for Docker"
 ---
 
 # CI/CD & Deployment

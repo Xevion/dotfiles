@@ -89,5 +89,5 @@ Bun.plugin({
 ## Open Questions
 
 - **JSONC adoption breadth** — VS Code normalized JSONC but it is not supported by most config parsers. Worth tracking whether a standard emerges or whether TOML/YAML fully displace it.
-- **KDL as a TOML alternative** — KDL has cleaner syntax for document-like configs and better support for heterogeneous lists. Ecosystem adoption is still nascent.
+- **KDL as a TOML alternative** — KDL is well-suited for hierarchical/DSL configs that TOML cannot express without awkward array-of-tables nesting. Inkwell uses KDL for a tag classification rule engine where nested boolean logic (`and`/`or`/`not` nodes) reads naturally as a document tree. KDL's heterogeneous child blocks and named node arguments make it a strong fit for tree-structured configs. Ecosystem adoption is growing (calico32/kdl-go for Go, kdl-rs for Rust).
 - **Standardization of TS config loading across runtimes** — Bun, Node (tsx/ts-node), and Deno each load TypeScript differently. No standard virtual module protocol exists yet for self-registration.
