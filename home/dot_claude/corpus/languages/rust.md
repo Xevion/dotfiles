@@ -15,6 +15,12 @@ exemplars:
   - repo: Xevion/Pac-Man
     path: pacman/src/error.rs
     note: Multi-level thiserror hierarchy (GameError aggregates sub-enums), error type as Bevy ECS Event
+  - repo: local/bose-re
+    path: crates/bose-protocol/src/error.rs
+    note: thiserror + miette::Diagnostic with machine-readable codes, two-level hierarchy wrapping TransportError
+  - repo: Xevion/ferrite
+    path: src/alloc.rs
+    note: thiserror with #[source] nix::Error wrapping, anyhow Context at application entry point
 ---
 
 # Rust
@@ -47,6 +53,10 @@ pub enum ClientError {
 - **ts-rs optional fields**: `#[ts(optional_fields)]` on structs with `Option<T>` fields produces `field?: T` in TypeScript output. Use `#[ts(type = "string")]` for types like `NaiveDateTime` that have no automatic TS mapping
 - **Manual `From` for domain-logic conversions**: prefer `#[from]` for transparent catch-alls, but write manual `From<sqlx::Error>` impls when conversion carries domain logic (e.g., mapping DB error codes to `NotFound`/`Conflict`)
 - **`Params<'a>` naming suffix**: consider `Params<'a>` for insert/upsert input structs that borrow from request context — distinguishes them from read-only filter structs
+- **thiserror + miette::Diagnostic for user-facing library crates**: derive both `thiserror::Error` and `miette::Diagnostic` on error enums. Attach machine-readable codes via `#[diagnostic(code(crate::module::variant))]` on each variant. Callers get structured error codes for programmatic handling; end-users get miette's rich display with source spans and hints
+- **Extension traits for non-sqlx error conversion**: the extension trait pattern generalizes beyond database errors — use it for any third-party crate with `Display`-but-not-`std::Error` error types. E.g., `OrtResultExt` with `.ort()` converts opaque ONNX Runtime errors to `anyhow::Error`
+- **Dual-channel error separation for thread pools**: separate result and error into distinct `crossbeam-channel` channels rather than `Result<T, E>`-wrapping results. The error channel carries fatal worker state; the coordinator uses `select!` to race both with a timeout arm
+- **Typed errors at Tauri IPC boundary**: implement `serde::Serialize` on command error enums so Tauri commands return `Result<T, CommandError>` instead of `Result<T, String>`. Eliminates stringly-typed failure paths across the IPC boundary
 
 ## Anti-Patterns
 

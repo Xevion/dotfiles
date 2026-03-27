@@ -51,6 +51,7 @@ ALTER TABLE courses ADD CONSTRAINT chk_enrollment_nonneg CHECK (enrollment >= 0)
 
 - **sqlc compile-time checked queries with `encoding/json.RawMessage` type overrides**: use type overrides in `sqlc.yml` to map JSONB columns to `json.RawMessage` rather than `[]byte`. Avoids double serialization while maintaining type safety for known-shape columns. Pair with `tstype` override for TypeScript output
 - **One logical change per migration file**: mixing unrelated schema evolutions in a single file makes rollback and bisecting harder. Each migration file should describe exactly one intentional change
+- **bbolt for embedded state persistence**: for CLI tools and collectors that need durable state across restarts without a separate database process, bbolt with raw JSON byte values per named bucket is a lightweight alternative to SQLite/sqlc. Name buckets as package-level byte slice constants. Store raw JSON and defer deserialization to the caller to keep the store interface generic. Ensure bucket existence at Open time via a single `db.Update`
 
 ## Anti-Patterns
 

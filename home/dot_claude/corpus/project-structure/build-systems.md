@@ -15,6 +15,9 @@ exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: scripts/lib/commands.ts
     note: (subsystem, action) → CommandDef registry with typed enums
+  - repo: local/bose-re
+    path: Justfile + tempo.config.ts
+    note: "Justfile as pure passthrough to tempo, preset-override-extend pattern"
 ---
 
 # Build Systems
@@ -44,6 +47,9 @@ test *args:
 - **Justfile self-delegation**: tools that manage dev workflows should use themselves for their own development. Validates the tool in real use
 - **Pre-commit partial-staging detection**: build the set of partially-staged files before formatting; abort if the formatter modifies files in that set. Only re-stage files from the original staged set
 - **Delegated check scripts**: parallel execution of independent checks (format, compile, lint, test) with auto-fix loop — if only formatting failed and all peers passed, apply the formatter and re-verify
+- **Justfile as pure passthrough to tempo**: for Rust projects using tempo as the typed config-driven runner, every Justfile recipe is a one-liner delegating to `tempo check`, `tempo fmt`, `tempo lint`, etc. No logic in Justfile at all — tempo drives all orchestration
+- **tempo preset-override-extend pattern**: in `tempo.config.ts`, spread a typed preset (`presets.rust()`), selectively override commands that need workspace flags, and extend with additional checks (cargo-deny, cargo-machete, doc-check with `RUSTDOCFLAGS=-D warnings`). The `requires` field on each check communicates optional tool dependencies and skips gracefully when absent
+- **`set dotenv-load` in Justfile**: standard header for projects that need environment-specific paths (GPU library locations, custom SDK roots). Auto-loads `.env` variables into recipe execution
 
 ## Anti-Patterns
 

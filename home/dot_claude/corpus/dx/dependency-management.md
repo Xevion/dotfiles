@@ -32,6 +32,10 @@ Lock files always committed. Conservative updates. Audit discipline. Minimal dep
 - Adding deps for trivial functions
 - Blocking major version upgrades without documenting the reason
 
+### Dependabot Alternative
+
+For projects where Renovate's advanced features (allowedVersions with rationale, minimumReleaseAge) are not needed, GitHub Dependabot is a simpler alternative. Minimum config for a Rust project covers `cargo` + `github-actions` ecosystems. Use `commit-message: { prefix: "chore", include: "scope" }` to produce conventional commits. Dependabot lacks Renovate's grouping and release-age guards — use Renovate when those guards are needed.
+
 ## Open Questions
 
 - Renovate vs Dependabot feature parity and selection criteria

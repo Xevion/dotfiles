@@ -39,6 +39,7 @@ Zero-trust defaults. Validate at system boundaries. Secrets never in code — us
 ### Go
 
 - `crypto/subtle` for constant-time comparisons, middleware chains for auth, `context.Context` for user propagation
+- **Bearer token confinement in `http.RoundTripper`**: inject the bearer token inside `RoundTrip()` so the token never appears in call-site code, log fields, or error messages. Store the token in the transport struct, set the header once in `RoundTrip()`, and validate at startup (error if empty) before any requests fire
 
 ## Anti-Patterns
 

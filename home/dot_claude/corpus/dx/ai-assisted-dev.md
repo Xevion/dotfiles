@@ -18,6 +18,12 @@ exemplars:
   - repo: local/inkwell
     path: CLAUDE.md + docs/
     note: "Domain vocabulary enforcement, runtime-version guidance (Go 1.26 new(expr)), two-tier docs with STYLE.md"
+  - repo: local/bose-re
+    path: CLAUDE.md
+    note: "Quick Reference protocol fact sheet, per-finding-type doc routing, documentation maintenance rules"
+  - repo: Xevion/railway-collector
+    path: CLAUDE.md
+    note: "Annotated file tree with per-file purpose descriptions, generated file annotations"
 ---
 
 # AI-Assisted Development
@@ -46,6 +52,8 @@ CLAUDE.md as project context — the single document that orients an AI agent in
 - **Task-to-doc routing table in CLAUDE.md**: directs AI agents to read the relevant style/architecture doc before acting on a given task type. Pair with a domain vocabulary anti-pattern table (wrong term → correct term) in STYLE.md
 - **Skills section in CLAUDE.md**: document project-specific skills with trigger path, activation condition, and scope. Include explicit maintenance directives telling agents when to update both CLAUDE.md and skills
 - **Two-tier doc hierarchy**: CLAUDE.md = quick reference + agent constraints. DESIGN.md = authoritative spec, full schema, decisions. Point agents to the spec doc for architectural questions
+- **Quick Reference for RE/exploratory projects**: a dense machine-readable section in CLAUDE.md containing confirmed protocol facts, packet formats, UUIDs, enum values, and key class names. Paired with per-finding-type doc routing rules and maintenance instructions. Reading this section should orient a new session without reading all docs
+- **Annotated architecture file tree**: per-file purpose descriptions in the architecture section of CLAUDE.md, marking generated files with "DO NOT EDIT" and regeneration commands. Valuable when a directory contains both hand-written and codegen outputs
 - **Runtime/language quirk documentation in CLAUDE.md**: when using a language feature that is new or surprising (e.g., Go 1.26 `new(expr)`, Svelte 5 runes migration), document it in CLAUDE.md so AI agents don't generate outdated patterns. This is especially important for features that change idiomatic usage patterns
 - **Project CLAUDE.md with conventions and restrictions**: document technology stack, quick-reference commands, workflow patterns, and explicit enforcement framing ("pattern violations will be rejected")
 - **TDD with AI assistance**: when test infrastructure exists, load the TDD skill before implementation

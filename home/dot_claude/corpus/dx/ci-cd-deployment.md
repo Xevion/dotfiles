@@ -12,6 +12,9 @@ exemplars:
   - repo: local/inkwell
     path: .github/workflows/ci.yml
     note: "Dual codegen verification (sqlc + tygo) in same job, frozen-lockfile frontend, GHA cache for Docker"
+  - repo: Xevion/ferrite
+    path: .github/workflows/
+    note: "workflow_run gating for release-please, Dependabot for cargo + github-actions"
 ---
 
 # CI/CD & Deployment
@@ -36,7 +39,7 @@ COPY . .
 RUN cargo build --release
 ```
 
-- **Release automation gated on CI**: trigger release-please (or equivalent) via `workflow_run` only after CI completes successfully. Use language-native release types (e.g. `rust` type bumps `Cargo.toml` and `Cargo.lock`)
+- **Release automation gated on CI**: trigger release-please (or equivalent) via `workflow_run` only after CI completes successfully. Use language-native release types (e.g. `rust` type bumps `Cargo.toml` and `Cargo.lock`). For single-branch repos, `workflow_run` gating with `if: conclusion == 'success'` is simpler than branch-protection merge queues and doesn't require GitHub Advanced Security
 - **Frozen lockfiles in CI**: use `--frozen-lockfile` / `--locked` flags to ensure CI reproduces exactly what was committed
 - **Multi-language parallel job split**: one job per subsystem (Go, Svelte, Python) running in parallel, with a gated docker job depending on all quality jobs passing
 - **Generated artifact verification in CI**: regenerate and diff (`sqlc diff`, `tygo generate && git diff --exit-code`). Catches stale generated code in PRs before merge

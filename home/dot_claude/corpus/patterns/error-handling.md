@@ -63,7 +63,7 @@ enum JobError {
 ## Anti-Patterns
 
 - Catch-all handlers that swallow errors silently
-- String matching on error messages (`if err.to_string().contains("timeout")`)
+- String matching on error messages (`if err.to_string().contains("timeout")`). **Exception at API boundaries**: when consuming third-party APIs that return unstructured error messages (no error codes), isolate string matching to a single detection predicate (`isComputationLimitError(err)`) at the client boundary. The string is maintained in one place rather than spread across callers
 - `panic!`/`throw` for control flow — only for bugs/invariant violations
 - Implicit retry logic scattered across callers instead of typed at the error level
 

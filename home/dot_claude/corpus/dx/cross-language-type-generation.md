@@ -33,8 +33,10 @@ exemplars:
 
 - `#[derive(TS)]` + `#[ts(export)]` on all request/response types. `#[ts(optional_fields)]` maps `Option<T>` to optional TypeScript properties
 - **Type overrides for unmapped types**: `#[ts(type = "string")]` for `DateTime<Utc>`, `#[ts(as = "Option<String>")]` for `Option<DateTime<Utc>>`, `#[ts(optional, type = "Array<string>")]` for `Json<Vec<String>>` (JSONB columns)
+- **Struct-level `serde(rename_all = "camelCase")`**: always prefer struct-level `rename_all` over per-field `#[serde(rename)]` on types exposed to the frontend. Per-field renames add maintenance burden and risk inconsistency
 - **Wire format casing**: when both Rust and JSON use `snake_case`, `serde(rename_all = "camelCase")` is unnecessary. Document the project's casing convention explicitly so contributors don't add it reflexively
-- Output to `frontend/src/lib/bindings/` with auto-maintained barrel index
+- **Single-file vs barrel-index output**: for small type surfaces (~10 types), `#[ts(export_to = "bindings.ts")]` targeting a single file is acceptable. The barrel-index pattern (`frontend/src/lib/bindings/` with auto-maintained index) is warranted when the binding surface grows beyond ~10 types or is consumed selectively across many import sites
+- Output to `frontend/src/lib/bindings/` with auto-maintained barrel index (or single `bindings.ts` for small surfaces)
 
 ### Go (tygo)
 

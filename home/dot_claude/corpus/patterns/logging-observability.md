@@ -21,6 +21,18 @@ exemplars:
   - repo: Xevion/xevion.dev
     path: src/middleware/request_id.rs + web/console-logger.js
     note: "RequestIdLayer with upstream header trust + ULID fallback, console-logger preload"
+  - repo: Xevion/railway-collector
+    path: internal/logging/
+    note: "slog.LogValuer Pct type, composable handler chain, FilteringHandler, status-proportional RoundTripper"
+  - repo: local/bose-re
+    path: crates/bose-cli/src/main.rs + commands/common.rs
+    note: "Three-tier log level override, OutputBuffer for async CLI output integrity"
+  - repo: local/topaz-video-ai-re
+    path: inference/src/main.rs + pipeline.rs
+    note: "Interactive vs non-interactive tracing, EMA-based outlier detection"
+  - repo: Xevion/ferrite
+    path: src/tui/
+    note: "Channel-backed tracing Layer for ratatui TUI"
 ---
 
 # Logging & Observability
@@ -52,6 +64,11 @@ let filter = EnvFilter::new(format!(
 - Custom `FormatEvent` + `FormatFields` implementations for per-environment formatting without changing call sites
 - Techniques: group dotted field names into inline structs, type-aware coloring in dev, never truncate the `error` field, abbreviate high-cardinality IDs (ULIDs) on log lines
 - **Field-level transforms via builder pattern**: `CompactFields` builder registers per-field transforms (e.g., truncate high-cardinality ULIDs to `4..6` chars in pretty mode) without affecting JSON output. Use `writer.has_ansi_escapes()` rather than `is_tty()` for the ANSI-safe check in custom `FormatEvent` impls
+- **Three-tier log level override for CLIs**: `RUST_LOG` takes full control (verbatim filter string), `LOG_LEVEL` sets per-crate level while holding external crates at `warn`, `-v` flag controls verbosity when neither env var is set. All tracing routed to stderr explicitly (`.with_writer(std::io::stderr)`) so stdout is reserved for structured program output
+- **OutputBuffer for async CLI output integrity**: when a command performs async I/O before printing results, buffer all stdout writes and flush atomically after async work completes. Prevents stderr (tracing) and stdout interleaving. Companion `buf_println!` macro provides `println!`-compatible ergonomics. Streaming commands (monitoring, tailing) are exempt
+- **Interactive vs non-interactive tracing**: runtime-selectable subscriber layers — TUI layer (ratatui channel-backed) if TTY, plain `fmt` layer if not. Extends "format is a deployment concern" beyond dev/prod to interactive vs non-interactive environments
+- **Channel-backed tracing Layer for TUI**: implement a custom `tracing::Layer` that serializes log records into an `mpsc` channel; the TUI rendering thread drains the channel each frame. Keeps log records in-process and lets the TUI control presentation
+- **EMA-based outlier detection in hot paths**: use exponential moving average (α=0.05) as a running baseline and emit a structured warning when a measurement exceeds 5×EMA. Lighter than a sliding window and naturally adapts to warm-up
 
 ### TypeScript
 
@@ -63,6 +80,8 @@ let filter = EnvFilter::new(format!(
 - Path-based request log level: `/api/*` at Info, SSR pages at Debug, dev assets (HMR, node_modules, `/@`, `/.svelte-kit/`, `/styled-system/`) at custom Trace level. Define `LevelTrace = slog.LevelDebug - 4` as a named constant rather than an inline value. Prevents proxy noise without suppressing API traffic
 - slog-formatter middleware for value-level transformations (duration humanization, integer comma-formatting, typed `Pct` wrapper). Keeps structured fields intact while improving readability
 - Context-based logger propagation: attach pre-seeded `*slog.Logger` (with request_id) to context in middleware, retrieve with `LoggerFromContext` helper with default fallback
+- **Composable slog handler chain**: base handler (tint or JSON) → slog-formatter middleware → FilteringHandler. Each layer is a distinct concern — formatting, value transforms, noise suppression. The FilteringHandler silently drops records matching known-noisy substrings (e.g., `net/http` idle connection chatter)
+- **Status-proportional levels in RoundTripper**: apply status-proportional log levels inside `http.RoundTripper` implementations, not just at HTTP handler middleware layers. Debug for normal responses, Warn for rate limits and errors. Keeps transport-level noise at Debug while surfacing rate limit events at Warn without requiring the caller to inspect every response
 
 ## Anti-Patterns
 

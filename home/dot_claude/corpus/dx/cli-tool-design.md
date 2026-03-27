@@ -6,6 +6,9 @@ exemplars:
   - repo: Xevion/tempo
     path: src/cli.ts
     note: cleye-based CLI with global flag pre-pass, prefix matching, automatic TTY/CI detection, partial-staging safety
+  - repo: local/bose-re
+    path: crates/bose-cli/src/main.rs
+    note: "clap global = true for -v flag, three-tier log level override, OutputBuffer for async output"
 ---
 
 # CLI Tool Design
@@ -59,6 +62,8 @@ const logger = env.isCI && env.provider === "github"
 ### Rust
 
 Use `clap` derive macros for argument parsing — the derive API keeps argument definitions colocated with the struct fields that receive them. Use `colored` or `owo-colors` for terminal output (prefer `owo-colors` for zero-allocation formatting). Use `indicatif` for progress bars and spinners. Use `anyhow` for error propagation in binaries; `thiserror` for library error types that callers might match on.
+
+- **Global flags via clap `global = true`**: declare global flags (`--verbose`, `--quiet`, `--config`) with `global = true` on the top-level `Cli` struct. Clap handles positional extraction automatically — the idiomatic Rust equivalent of the TypeScript global flag pre-pass. Use `ArgAction::Count` for `-v`/-vv`/-vvv` verbosity patterns
 
 ### TypeScript
 

@@ -15,6 +15,18 @@ exemplars:
   - repo: local/inkwell
     path: internal/shutdown/
     note: Go shutdown tracker with WaitGroup + sync.Once + select/timeout drain
+  - repo: Xevion/railway-collector
+    path: internal/collector/unified_scheduler.go
+    note: Two-phase shutdown, independent housekeeping goroutine, dynamic rate-limiter adjustment
+  - repo: local/topaz-video-ai-re
+    path: inference/src/pipeline.rs
+    note: crossbeam thread pool with dual result/error channels, AtomicBool quit flag
+  - repo: local/bose-re
+    path: crates/bose-protocol/src/device/session.rs
+    note: Serial fan-out/collect with deadline-bounded recv loop for RFCOMM
+  - repo: Xevion/ferrite
+    path: src/main.rs
+    note: thread::scope + AtomicBool, Rayon two-phase write-verify
 ---
 
 # Concurrency & Async
@@ -68,6 +80,11 @@ pub async fn shutdown(self, timeout: Duration) -> bool {
 - `broadcast` for fan-out shutdown signals (each receiver gets its own copy)
 - `tokio::time::timeout` for bounded waits
 - **RAII shutdown token pattern**: `ShutdownTracker` hands out drop-on-complete `ShutdownToken` guards. Atomic counter tracks in-flight operations. `wait(timeout)` provides bounded draining. Complement to the Service trait — no lifecycle interface required per subsystem
+- **CPU-bound thread pool with crossbeam**: use `std::thread` + `crossbeam-channel` (bounded work queue, unbounded result/error queues) rather than Tokio tasks for long-running blocking work (e.g., ONNX inference). Named threads via `thread::Builder::new().name(...)` for traceability. Use Rayon `par_iter` for data-parallel CPU work within each task unit
+- **Serial fan-out/collect for serial I/O channels**: for RFCOMM, UART, or other serial protocols, batch sends followed by deadline-bounded collect. Use `tokio::time::Instant` + `saturating_duration_since` for the remaining-time calculation in the recv loop — correctly handles expired deadlines without panic. `JoinSet` is not applicable since work is sequentially serialized on a single stream
+- **`Arc<AtomicBool>` for cooperative cancellation**: appropriate for synchronous thread-based loops where `CancellationToken` would require polling `is_cancelled()` anyway. Lower overhead and no external dependency. Reserve CancellationToken for async contexts where `.cancelled().await` is genuinely useful
+- **`thread::scope` for OS-thread structured concurrency**: ensures all spawned threads join before the scope exits. Share a single `Arc<AtomicBool>` cancellation flag. Appropriate for CPU-bound parallel workers where async overhead is undesirable
+- **Rayon two-phase write-then-verify**: separate `par_chunks_mut` write and `par_chunks` verify sweeps for cache-bypassed parallel memory access. Rayon's join barrier guarantees sfence visibility before the verify phase begins
 
 ### TypeScript
 
@@ -76,6 +93,8 @@ pub async fn shutdown(self, timeout: Duration) -> bool {
 ### Go
 
 - **Lightweight shutdown tracker**: `sync.WaitGroup` + `sync.Once`-protected close channel. `Add()`/`Done()` bracket in-flight critical operations; `Stop()` signals shutdown via `once.Do(func() { close(stopping) })`; `Wait(timeout)` drains with a bounded timeout using a goroutine + `select`. No per-subsystem interface required — the Go equivalent of the Rust RAII ShutdownTracker pattern
+- **Two-phase shutdown**: `Stop()` halts new ticks, then a bounded drain (select on done-channel vs timeout) precedes context cancellation. Avoids a fixed-sleep anti-pattern between phases — prefer signalling the scheduler's internal done-channel or waiting on a WaitGroup with a timeout
+- **Independent housekeeping goroutines**: housekeeping tasks (heartbeat, self-metrics emission) that must not be gated by the primary work path run on independent goroutines with their own tickers, racing the same `stopCh` and `ctx.Done()` signals as the main loop. Prevents rate-limiter or API stalls from delaying observability data
 
 ### Kotlin
 

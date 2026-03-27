@@ -12,6 +12,9 @@ exemplars:
   - repo: Xevion/xevion.dev
     path: .sqlx/ + Cargo.toml
     note: "sqlx offline query caching, ts-rs for Rust→TypeScript bindings"
+  - repo: Xevion/railway-collector
+    path: internal/railway/generate.go + genqlient.yaml
+    note: "genqlient with scalar bindings, gomock from interfaces.go"
 ---
 
 # Build-Time Code Generation
@@ -32,7 +35,9 @@ exemplars:
 
 ### Go
 
-<!-- sqlc for SQL→Go, tygo for Go→TypeScript, codegen outputs committed and CI-verified -->
+- **genqlient for type-safe GraphQL client**: `go:generate go run github.com/Khan/genqlient` directive. Scalar bindings in `genqlient.yaml` map API types to Go types (`DateTime` → `string`, `BigInt` → `int64`, `JSON` → `any`). Generated file is committed; regenerate after schema or query edits
+- **gomock for interface-driven mocks**: `go:generate mockgen -source=interfaces.go -destination=mocks/mocks.go`. Define interfaces in a dedicated file, commit output to `mocks/`, expose regeneration as a Justfile recipe (`just mocks`). Mock staleness should be verified in CI like other codegen
+- sqlc for SQL→Go, tygo for Go→TypeScript, codegen outputs committed and CI-verified
 
 ### TypeScript
 

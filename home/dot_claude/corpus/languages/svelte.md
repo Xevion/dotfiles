@@ -53,7 +53,7 @@ Svelte 5 runes exclusively — no legacy stores. Reactive state is explicit via 
 
 ## Anti-Patterns
 
-- Mixing Svelte 4 stores with rune-based components
+- **Mixing Svelte 4 stores with rune-based components**: projects on Svelte 5 that retain `writable()`/`derived()` stores alongside `$state` runes in components are in a partial migration state. Module-scoped `$state` variables are the idiomatic replacement. The `$store` subscription syntax mixed with `$derived` in the same component is the primary Svelte 5 anti-pattern
 - Using `$effect` for derived state that `$derived` can express
 - Global mutable singletons instead of context-scoped state
 

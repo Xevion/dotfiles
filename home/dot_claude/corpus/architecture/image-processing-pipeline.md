@@ -33,6 +33,7 @@ Capture once, transform on demand. Store originals, derive variants via CDN/prox
 ### Rust
 
 - Image decode/resize/encode operations are CPU-bound and must be wrapped in `tokio::task::spawn_blocking` when called from async handlers
+- **Tiled ML inference**: for models with fixed spatial input sizes, decompose the full frame into overlapping tiles, run inference per tile, and reconstruct via weighted blending (cosine/Hann window). Pre-compute weight maps once per pipeline configuration. See [ml-inference-pipeline](./ml-inference-pipeline.md) for the full pattern
 
 ### TypeScript
 

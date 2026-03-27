@@ -4,9 +4,9 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 
 ## Languages
 
-- [rust](./languages/rust.md) — thiserror/anyhow split, extension traits, ts-rs contracts, lifetime-bound filters
+- [rust](./languages/rust.md) — thiserror/anyhow split, miette::Diagnostic, extension traits, ts-rs contracts, dual-channel errors
 - [typescript](./languages/typescript.md) — Strict mode, discriminated unions, ts-rs over Zod, functional patterns
-- [go](./languages/go.md) — Sentinel errors, writeJSON buffer pattern, dual timeouts, slog context propagation
+- [go](./languages/go.md) — Sentinel errors, writeJSON buffer, slog LogValuer types, koanf layered config, dynamic rate limiting
 - [python](./languages/python.md) — Type hints everywhere, dataclasses over dicts, uv/ruff toolchain
 - [kotlin-jvm](./languages/kotlin-jvm.md) — @JvmInline value classes, sealed state, tick-driven state machines, sealed ApiError
 - [sql](./languages/sql.md) — JSONB patterns, tsvector search, materialized views, safe constraint migrations
@@ -22,8 +22,8 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [web-platform](./architecture/web-platform.md) — Native APIs over libraries, progressive enhancement
 - [data-modeling](./architecture/data-modeling.md) — JSONB sub-entities, materialized views, safe constraint migrations
 - [state-management](./architecture/state-management.md) — Signals/runes for reactivity, page-scoped factories, server vs client state
-- [concurrency-async](./architecture/concurrency-async.md) — Structured concurrency, cancellation, backpressure
-- [graphql-schema-design](./architecture/graphql-schema-design.md) — Code-first schemas, DataLoader N+1 avoidance, subscriptions, cursor pagination
+- [concurrency-async](./architecture/concurrency-async.md) — Structured concurrency, cancellation, crossbeam thread pools, serial fan-out, AtomicBool
+- [graphql-schema-design](./architecture/graphql-schema-design.md) — Runtime aliased-batch queries, breadth-based budget packing, genqlient codegen
 - [object-storage-patterns](./architecture/object-storage-patterns.md) — S3-compatible uploads, imgproxy/cdn-cgi transforms, orphan cleanup
 - [image-processing-pipeline](./architecture/image-processing-pipeline.md) — Capture→transform→progressive loading, thumbhash placeholders
 - [minecraft-mod-architecture](./architecture/minecraft-mod-architecture.md) — Architectury cross-loader, Mixin injection, tick-driven state machines
@@ -32,21 +32,26 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [isr-caching-proxy-patterns](./architecture/isr-caching-proxy-patterns.md) — Stale-while-revalidate, lazy multi-encoding compression, singleflight
 - [game-loop-ecs-architecture](./architecture/game-loop-ecs-architecture.md) — Bevy ECS standalone, fixed-tick scheduling, SDL2 graphics
 - [asset-pipeline-atlas](./architecture/asset-pipeline-atlas.md) — Sprite atlas packing, build.rs PHF maps, typed asset handles
+- [custom-binary-protocol](./architecture/custom-binary-protocol.md) — Protocol framing, dispatch enums, newtype invariants, proptest roundtrip
+- [ml-inference-pipeline](./architecture/ml-inference-pipeline.md) — ONNX Runtime, tiled spatial inference, crossbeam thread pool, EMA outlier detection
+- [tauri-desktop-app](./architecture/tauri-desktop-app.md) — Rust command/event IPC, typed errors at boundary, Pest PEG parser
+- [linux-hardware-interfaces](./architecture/linux-hardware-interfaces.md) — /proc/pagemap, EDAC sysfs, SMBIOS, mlock, AVX-512 non-temporal stores
 
 ## Patterns
 
 - [error-handling](./patterns/error-handling.md) — Typed errors, no stringly-typed, thiserror/anyhow split
-- [logging-observability](./patterns/logging-observability.md) — Structured logging, tracing spans, metric naming
-- [testing-quality](./patterns/testing-quality.md) — TDD when infra exists, property tests, cross-language contract tests
+- [logging-observability](./patterns/logging-observability.md) — Structured logging, tracing spans, OutputBuffer, slog handler chains, TUI channel layer
+- [testing-quality](./patterns/testing-quality.md) — TDD, proptest roundtrip, assert2 chaining, hardware-feature gates, recording sinks
 - [security-auth](./patterns/security-auth.md) — Zero-trust defaults, token rotation, secret management
 - [device-code-auth-flow](./patterns/device-code-auth-flow.md) — RFC 8628 for headless clients, polling with backoff, session token exchange
 - [performance](./patterns/performance.md) — Measure first, profile-guided optimization, ISR caching
 - [bot-abuse-defense](./patterns/bot-abuse-defense.md) — Tarpit streaming, per-IP semaphore limits, active defense
+- [binary-reverse-engineering](./patterns/binary-reverse-engineering.md) — Documentation-driven RE, implementation-as-validation, static analysis workflow
 
 ## Project Structure
 
 - [repo-layout](./project-structure/repo-layout.md) — scripts/ dir, docs/ hierarchy, generated bindings, CLAUDE.md at root
-- [build-systems](./project-structure/build-systems.md) — Justfile as thin wrapper, language-native builds, mise
+- [build-systems](./project-structure/build-systems.md) — Justfile as thin wrapper, tempo passthrough, preset-override-extend, mise
 - [documentation-naming](./project-structure/documentation-naming.md) — README templates, file naming, ADRs
 
 ## Developer Experience

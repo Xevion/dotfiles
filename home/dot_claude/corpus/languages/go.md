@@ -9,6 +9,9 @@ exemplars:
   - repo: local/inkwell
     path: internal/server/
     note: Dual-%w error wrapping, writeServiceError with context.Canceled/DeadlineExceeded, ETag conditional GET, Go 1.26 new(expr)
+  - repo: Xevion/railway-collector
+    path: internal/logging/
+    note: slog.LogValuer types (Pct), LevelTrace, FilteringHandler, slog-formatter composition, dynamic rate limiting
 ---
 
 # Go
@@ -139,6 +142,51 @@ func toUser[T RowVariant](row T) User {
 - **`init()` abuse** — `init` runs implicitly at program start with no way to pass arguments or return errors; prefer explicit initialization in `main` or constructor functions so startup failures surface cleanly.
 - **Interface pollution** — defining interfaces in the producer package, or defining wide interfaces with methods callers don't need, forces unnecessary coupling; define interfaces where they are consumed and keep them as narrow as the caller requires.
 - **Ad-hoc `map[string]any` response shapes** — untyped response maps skip compile-time checks and make API contracts invisible; define concrete response structs even for simple payloads.
+
+### slog.LogValuer for semantic wrapper types
+
+Implement `slog.LogValuer` on domain-specific types (e.g., `type Pct float64`, `type Bytes int64`) so structured log callsites log typed values and the handler layer handles rendering. Compose with `slog-formatter` `FormatByKind`/`FormatByType` middleware for automatic dispatch.
+
+```go
+type Pct float64
+func (p Pct) LogValue() slog.Value {
+    return slog.StringValue(fmt.Sprintf("%.1f%%", float64(p)))
+}
+// Callsite: slog.Any("match_rate", logging.Pct(94.3))
+```
+
+### LevelTrace for per-datapoint verbosity
+
+Define `LevelTrace = slog.LevelDebug - 4` in a `logging` package for below-Debug noise. Pair with a tint-compatible `ReplaceAttrFunc` to render as a distinct label (e.g., "TRC"). Use `deliveryLogLevel(count)` pattern to pick Trace vs Debug based on whether results are empty.
+
+### FilteringHandler for noisy third-party log suppression
+
+Compose a `FilteringHandler` wrapper around the root slog handler to silently drop log records containing known-noisy substrings (e.g., `net/http` idle connection chatter). Implement all four `slog.Handler` interface methods, forwarding `WithAttrs`/`WithGroup` to preserve the wrapped chain.
+
+### Dynamic rate-limiter adjustment from response headers
+
+For rate-limited APIs with hourly budgets, read `X-RateLimit-Remaining` and `X-RateLimit-Reset` from response headers in a mutex-protected transport. Recompute RPS each cycle as `min(MaxRPS, remaining/secondsLeft * 0.9)`. Use `limiter.SetLimit()` after each request. Floor to a non-zero minimum (e.g., 0.001) to avoid complete stall on exhaustion.
+
+### koanf layered config pattern
+
+Load config in layers: (1) typed struct defaults via `structs.Provider`, (2) YAML file, (3) env vars with a prefix and double-underscore nesting delimiter (e.g., `RAILWAY_COLLECTOR__COLLECT__METRICS__INTERVAL`). Register bare convenience env aliases (e.g., `RAILWAY_TOKEN`, `LOG_LEVEL`) as additional `env.Provider` layers. Missing default config file is silently ignored; explicit path is always an error.
+
+### YAML duration strings with koanf
+
+YAML with koanf deserializes duration strings like `"5m"` or `"240h"` into `time.Duration`. Use inline comments with unit clarification (`# 10 days`) for non-obvious computed durations.
+
+### Params struct with functional callbacks for shared loop logic
+
+When multiple generators share a loop structure with per-type varying behavior, extract the loop into a shared function taking a params struct with functional callbacks for the varying parts. Prefer a params struct over multiple function arguments when there are 4+ parameters.
+
+```go
+type gapPollParams struct {
+    entities   func(targets []ServiceTarget) []pollEntity
+    buildItems func(entity pollEntity, chunk TimeWindow) []WorkItem
+    logPrefix  string
+}
+func pollCoverageGaps(now time.Time, p gapPollParams) []WorkItem { ... }
+```
 
 ## Open Questions
 
