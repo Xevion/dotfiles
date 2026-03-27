@@ -6,6 +6,9 @@ exemplars:
   - repo: local/maestro
     path: common module
     note: "@JvmInline value classes for domain types, ReadWriteProperty config delegation, Kotest DescribeSpec with property-based pathfinding tests"
+  - repo: Xevion/glint
+    path: mod/common orchestration + API modules
+    note: "Tick-driven state machine with CompletableFuture polling, sealed ApiError with companion factory"
 ---
 
 # Kotlin / JVM
@@ -100,6 +103,43 @@ class PathfinderSpec : DescribeSpec({
 ### Programmatic Log4j2 appenders (JVM embedded apps)
 
 When a framework initializes logging before your code runs (e.g., Minecraft mods, plugin systems), use programmatic appender construction for dual-format output (pretty console + JSONL file). This bypasses the framework's logging config without fighting it.
+
+### Tick-driven state machine for game-loop environments
+
+When the main loop cannot suspend (game ticks, UI event loops), use a `State` enum with a sealed `PendingOp` class to track async work. Each `PendingOp` variant types its `CompletableFuture` result, eliminating unsafe casts when advancing state. `tick()` checks `future.isDone` and advances only when the off-thread work completes.
+
+```kotlin
+private enum class State { FetchingWork, PreparingAssets, Capturing, Done }
+private sealed class PendingOp {
+    abstract val future: CompletableFuture<*>
+    class FetchWork(override val future: CompletableFuture<Result<List<WorkItem>>>) : PendingOp()
+    class PrepareAssets(override val future: CompletableFuture<PrepResult>) : PendingOp()
+}
+fun tick() {
+    val op = pending ?: return
+    if (!op.future.isDone) return
+    // advance state based on result
+}
+```
+
+### Sealed error class with companion factory
+
+Sealed error classes should carry domain-specific state (retry timing, cause type) and expose a `userMessage` computed property. A companion `fromException()` factory centralizes boundary wrapping — call sites don't scatter `when` chains for exception-to-error conversion.
+
+```kotlin
+sealed class ApiError : Exception() {
+    abstract val userMessage: String
+    data class RateLimited(val retryAfterSeconds: Long) : ApiError() {
+        override val userMessage = "Too many requests. Retrying in ${retryAfterSeconds}s..."
+    }
+    companion object {
+        fun fromException(e: Exception): ApiError = when (e) {
+            is ConnectException -> NetworkError(e.message ?: "Connection failed")
+            else -> UnknownError(e.message ?: "Unknown error")
+        }
+    }
+}
+```
 
 ## Anti-Patterns
 

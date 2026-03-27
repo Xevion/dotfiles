@@ -9,6 +9,9 @@ exemplars:
   - repo: Xevion/instant-upscale
     path: crates/common/shutdown module
     note: ShutdownTracker/ShutdownToken RAII pair with atomic drain counter
+  - repo: Xevion/glint
+    path: backend/src/services/lifecycle.rs
+    note: "TaskTracker + CancellationToken with ServiceContext tick/sleep helpers"
 ---
 
 # Concurrency & Async
@@ -34,6 +37,25 @@ pub trait Service: Send + Sync {
 
 - **Nested select! for lifecycle-aware cancellation**: use different `select!` arms at different points in a task's lifecycle. Before acquiring a resource: cancel cleanly. After acquiring: do explicit cleanup in the cancellation arm (don't rely on async Drop)
 - **Unified signal + exit handling**: race OS signals (SIGINT, SIGTERM) against service completion in a single top-level `select!`. Any unexpected service exit triggers the same graceful shutdown path as a signal. Stub platform-specific signals with `std::future::pending()` for cross-platform compilation
+- **TaskTracker + CancellationToken (alternative to Service trait)**: `tokio_util::task::TaskTracker` with `CancellationToken` provides structured task ownership without requiring an interface. A `ServiceContext` wraps both and offers cancellation-aware `tick()` and `sleep()` helpers that eliminate boilerplate `select!` arms at each use site. `child_token()` isolates per-task cancellation. Shutdown broadcasts cancel via the root token and drains the tracker with a bounded timeout
+
+```rust
+// Pattern: ServiceContext with cancellation-aware helpers
+pub async fn tick(&self, interval: &mut Interval) -> bool {
+    tokio::select! {
+        _ = interval.tick() => true,
+        () = self.token.cancelled() => false,
+    }
+}
+pub async fn shutdown(self, timeout: Duration) -> bool {
+    self.token.cancel();
+    self.tracker.close();
+    tokio::select! {
+        () = self.tracker.wait() => true,
+        () = tokio::time::sleep(timeout) => false,
+    }
+}
+```
 
 ## Language-Specific
 
@@ -54,7 +76,7 @@ pub trait Service: Send + Sync {
 
 ### Kotlin
 
-<!-- Placeholder: CoroutineScope, Flow, SupervisorJob -->
+- **Tick-driven state machines for game-loop environments**: when the main loop cannot suspend (Minecraft ticks, UI event loops), use `CompletableFuture.isDone` polling in `tick()` to advance a `State` enum without blocking. See [kotlin-jvm](../languages/kotlin-jvm.md) for the full pattern
 
 ## Anti-Patterns
 

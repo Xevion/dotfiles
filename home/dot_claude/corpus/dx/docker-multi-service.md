@@ -9,6 +9,9 @@ exemplars:
   - repo: Xevion/instant-upscale
     path: docker/
     note: Deps-only ML base image with hot-sync for model code iteration
+  - repo: Xevion/glint
+    path: Dockerfile + docker/
+    note: "cargo-chef dependency caching, Bun runtime co-hosting SvelteKit + Rust binary"
 ---
 
 # Docker & Multi-Service Orchestration
@@ -29,7 +32,9 @@ exemplars:
 
 ### Rust
 
-<!-- cargo-chef for dependency caching (planner → cook → build), minimal runtime image -->
+- **cargo-chef for dependency caching**: three-stage pattern — `planner` (generates `recipe.json` from dependency tree), `cook` (builds dependencies only from recipe), `build` (compiles application code). Dependency layer changes only when `Cargo.toml`/`Cargo.lock` change
+- **Co-located services with shared runtime base**: when running a Rust binary alongside a Node/Bun frontend in one container, use the frontend runtime image (e.g., `oven/bun:1-slim`) as the final stage. Copy the compiled Rust binary in. A single entrypoint script orchestrates both processes
+- **Console-logger preload**: inject a preload script that captures stray `console.*` calls from SSR code and reformats them to match the structured logging format
 
 ### Python
 

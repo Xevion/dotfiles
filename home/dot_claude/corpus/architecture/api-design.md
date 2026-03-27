@@ -9,6 +9,9 @@ exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: internal/server/ + internal/cache/
     note: Go Chi API with writeServiceError sanitization, cache middleware, tygo contracts
+  - repo: Xevion/glint
+    path: backend/src/middleware/ + src/error.rs
+    note: "Multi-tier rate limiting with RAII cleanup, dual-surface error mapping (REST + GraphQL)"
 ---
 
 # API Design
@@ -33,6 +36,8 @@ pub struct ApiError {
 
 - **Cache-Control as named constants**: define per-route-category constants (`REFERENCE`, `SEARCH`, `DETAIL`, `ADMIN`), apply via a `with_cache_control()` wrapper. For mutable resources, combine with ETag + 304 based on a last-modified timestamp
 - **Multi-window rate limiting**: classify routes by group (API/SSR/Admin/Static) with group-level limits, add endpoint-specific limits on expensive operations. Use internal bypass tokens for same-process proxied calls (e.g. SSR → API) to avoid double-counting
+- **Per-tier rate limit configuration**: define named tiers (global, auth, device, upload, agent) with separate burst and rpm budgets in a `RateLimitConfig` struct. Use keyed governor limiter per tier. RAII `CleanupGuard` (abort background cleanup task via `Drop`) prevents leaking the retention task. `enabled: false` maps to `None` for zero-overhead bypass without conditional branching in the hot path
+- **Dual-surface error mapping**: when an error type serves both REST and GraphQL, a `status_and_code()` method returns `(StatusCode, &'static str)` in one match arm. Both `IntoResponse` and `ErrorExtensions` call it, keeping HTTP-status and machine-readable code single-source across API surfaces
 
 ## Language-Specific
 
@@ -64,5 +69,5 @@ pub struct ApiError {
 
 ## Open Questions
 
-- GraphQL adoption criteria vs REST
+- See [graphql-schema-design](../architecture/graphql-schema-design.md) for GraphQL-specific patterns
 - OpenAPI-first vs code-first for contract generation

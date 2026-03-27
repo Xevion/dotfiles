@@ -12,6 +12,9 @@ exemplars:
   - repo: Xevion/tempo
     path: fixtures/sample-project/
     note: Runnable consumer fixture for integration testing
+  - repo: Xevion/glint
+    path: docs/
+    note: "STYLE.md with per-subsystem links, VOCABULARY.md for domain terminology and anti-patterns"
 ---
 
 # Repo Layout
@@ -29,7 +32,8 @@ Convention over configuration. Predictable locations. Monorepo for tightly coupl
 - **docs/ hierarchy**: a top-level `STYLE.md` that links to language-specific guides (`RUST.md`, `SVELTE.md`). In-flight design work goes in `docs/plans/`. CLAUDE.md references these as required reading
 - **Auto-generated code in `lib/bindings/`**: cross-language generated types (ts-rs, protobuf, etc.) live in a dedicated bindings directory with an auto-maintained barrel index. The build system must remove stale files when source types are renamed or deleted
 - **`lib/bindings/` barrel generator**: companion script with idempotent write (skip when content unchanged) to avoid spurious git diffs. Justfile `bindings` recipe chains type generation and barrel regeneration
-- **Two-level `docs/`**: entry-point file (`docs/KOTLIN.md`, `docs/STYLE.md`) with a quick-reference table linking to `docs/patterns/` where each topic gets its own file with code examples. Include `docs/VOCABULARY.md` for domain terminology
+- **Two-level `docs/`**: entry-point file (`docs/KOTLIN.md`, `docs/STYLE.md`) with a quick-reference table linking to `docs/patterns/` where each topic gets its own file with code examples. `docs/VOCABULARY.md` documents domain terminology AND naming anti-patterns to prevent naming drift across language stacks. In multilingual monorepos, models are the source of truth for structure; VOCABULARY.md is the source of truth for naming
+- **Standard field names table in STYLE.md**: document structured log field names (`duration_ms`, `shader_id`, etc.) in the style guide, ensuring consistent field names across all language stacks in a monorepo
 - **`fixtures/<name>/` for runnable consumer fixtures**: complete mini-projects at the project root, serving as integration test input and living documentation
 
 ## Anti-Patterns

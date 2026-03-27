@@ -15,6 +15,9 @@ exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: internal/service/errors
     note: Go sentinel errors with MapDBError boundary, constructor+extraction helpers
+  - repo: Xevion/glint
+    path: backend/src/error.rs
+    note: "Dual-surface status_and_code() for REST + GraphQL, extension traits with entity interpolation"
 ---
 
 # Error Handling
@@ -38,7 +41,7 @@ enum JobError {
 
 - **Error context at boundaries**: attach context (status codes, URLs, entity names) to errors at the boundary where it's available, not at the catch site
 - **Single sanitization point**: a boundary function (e.g. `db_error()`) logs the raw error and returns a sanitized message. Handlers never log-and-throw
-- **`status_and_code()` helper on error enums**: returns both HTTP status and stable machine-readable code in one match arm, consumed by `IntoResponse`. Keeps error-to-HTTP mapping single-source
+- **`status_and_code()` helper on error enums**: returns both HTTP status and stable machine-readable code in one match arm. When a single error type serves both REST and GraphQL surfaces, both `IntoResponse` and `ErrorExtensions` impls call it, keeping error-to-HTTP mapping single-source across API surfaces
 
 ## Language-Specific
 
@@ -47,6 +50,7 @@ enum JobError {
 - `thiserror` for typed error enums at module boundaries, `anyhow` for opaque upstream errors in application code
 - `#[source]` attaches cause to struct variants, `#[from]` for transparent conversion
 - Callers use `downcast_ref::<SpecificError>()` for variant-specific handling
+- **Extension traits for common error mappings**: `OptionNotFoundExt` with `.or_not_found(entity, id)` takes entity name + `impl Display` ID for uniform `"<Entity> '<id>' not found"` messages. `SqlxResultExt` with `.conflict_on_unique(msg)` matches PG error code `23505` via `db_err.code().as_deref()`. Both attach to any `Option<T>` or `Result<T, sqlx::Error>` generically
 
 ### TypeScript
 

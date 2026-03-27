@@ -2,29 +2,49 @@
 name: state-management
 category: architecture
 last_audited: 2026-03-26
-exemplars: []
+exemplars:
+  - repo: Xevion/glint
+    path: frontend/src/lib/stores/ + components/data-view/
+    note: "Connectivity singleton, cursor-paginated list factory, module-scoped $state patterns"
 ---
 
 # State Management
 
 ## Philosophy
 
-<!-- Signals/stores for reactivity, clear server state vs client state boundary, minimal global state -->
+Reactivity through signals/runes, not manual subscription. Clear boundary between server state (fetched, cached, invalidated) and client state (UI, preferences, connectivity). Minimal global state — prefer page-scoped or tree-scoped state over app-wide singletons.
 
 ## Conventions
 
-<!-- Server state via query libraries (TanStack Query), client state via signals/stores, derived state over synced state -->
+- **Server state via query libraries**: TanStack Query, urql, or SvelteKit load functions for data that originates from the server. The library handles caching, deduplication, and invalidation
+- **Client state via signals/stores**: local reactive primitives ($state in Svelte, signals in Solid) for UI state that doesn't persist to the server
+- **Derived over synced**: prefer `$derived` / computed values over manually keeping two pieces of state in sync
+- **Page-scoped factory for server state**: for data-heavy pages (paginated lists, filtered tables), a factory function returning a `$state` object is preferable to `createContext()` when the state is local to one route. The factory encapsulates query logic, URL sync, and pagination without context boilerplate
 
-## Language-Specific
+```svelte
+<!-- Pattern: page-scoped server state factory -->
+<script lang="ts">
+  const list = createCursorList({
+    query: BrowseShadersQuery,
+    extract: (d) => d.shaders,
+    pageSize: 24,
+    search: { debounce: 300 },
+    sort: { options: [...], default: 'popular' },
+    syncUrl: true
+  });
+</script>
+```
 
-### TypeScript
-<!-- React: Zustand/Jotai, Solid: built-in signals, Svelte: stores, TanStack Query for server state -->
-
-### Rust
-<!-- Leptos signals, Dioxus state, backend state machines -->
+- **Tree-scoped via createContext**: for state shared across a component subtree (filters, selected item, UI mode). Avoid for single-consumer state where a factory is simpler
 
 ## Anti-Patterns
 
-<!-- Global state for everything, prop drilling 5+ levels deep, syncing server and client state manually -->
+- Global state for everything — most state is page-scoped or tree-scoped
+- Prop drilling 5+ levels deep — use context or a factory instead
+- Syncing server and client state manually instead of using a query library
+- Using `$effect` to derive values that `$derived` can express directly
 
 ## Open Questions
+
+- Server-only vs shared state boundaries in SvelteKit
+- Optimistic updates and rollback patterns

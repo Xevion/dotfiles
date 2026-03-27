@@ -9,6 +9,9 @@ exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: internal/server/types.go + web/src/lib/types.gen.ts
     note: tygo generating TypeScript from Go structs with tstype tag overrides
+  - repo: Xevion/glint
+    path: backend models + schemas/ + frontend/src/lib/bindings/
+    note: "ts-rs with JSON schema intermediary, DateTime/JSONB type overrides, snake_case wire format"
 ---
 
 # Cross-Language Type Generation
@@ -25,7 +28,10 @@ exemplars:
 
 ### Rust (ts-rs)
 
-<!-- #[derive(TS)] + #[ts(export)] + serde(rename_all = "camelCase"). #[ts(optional_fields)] for Option<T>. #[ts(type = "string")] for NaiveDateTime. Output to frontend/src/lib/bindings/ -->
+- `#[derive(TS)]` + `#[ts(export)]` on all request/response types. `#[ts(optional_fields)]` maps `Option<T>` to optional TypeScript properties
+- **Type overrides for unmapped types**: `#[ts(type = "string")]` for `DateTime<Utc>`, `#[ts(as = "Option<String>")]` for `Option<DateTime<Utc>>`, `#[ts(optional, type = "Array<string>")]` for `Json<Vec<String>>` (JSONB columns)
+- **Wire format casing**: when both Rust and JSON use `snake_case`, `serde(rename_all = "camelCase")` is unnecessary. Document the project's casing convention explicitly so contributors don't add it reflexively
+- Output to `frontend/src/lib/bindings/` with auto-maintained barrel index
 
 ### Go (tygo)
 

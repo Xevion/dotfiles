@@ -18,6 +18,9 @@ exemplars:
   - repo: Xevion/tempo
     path: tests/
     note: Cross-runtime compat tests with CI env-var gate
+  - repo: Xevion/glint
+    path: mod/common test module + scripts/check.ts
+    note: "Cross-language JSON schema contract tests between Rust backend and Kotlin mod"
 ---
 
 # Testing & Quality
@@ -31,6 +34,7 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 - **Test naming**: describes the behavior being tested, not the method name
 - **Arrange-Act-Assert**: clear three-phase structure in every test
 - **Builder patterns for fixtures**: test helpers with sensible defaults (`Default::default()`) so test bodies focus on the scenario, not fixture construction
+- **Cross-language contract tests via JSON schema**: for multi-language systems without a shared IDL, export JSON schemas from the source-of-truth language (e.g., `schemars` in Rust) and write deserialization compatibility tests in consumer languages (e.g., Kotlin). Must be paired with mtime-based schema regeneration in CI so stale schemas don't mask drift
 
 ## Language-Specific
 

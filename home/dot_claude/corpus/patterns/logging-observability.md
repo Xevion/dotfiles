@@ -12,6 +12,9 @@ exemplars:
   - repo: Xevion/instant-upscale
     path: frontend/src/lib/logging.ts
     note: Batching dev-forward sink, E2E console sentinel capture
+  - repo: Xevion/glint
+    path: backend/src/logging.rs
+    note: "CompactFields with field-level transforms, coordinated LOG_JSON across Rust + SvelteKit"
 ---
 
 # Logging & Observability
@@ -26,6 +29,7 @@ Structured logging always. Tracing spans for request lifecycle. Log format is a 
 - **Request correlation**: generate or inherit a request ID (prefer upstream edge headers like `X-Railway-Request-Id`, `X-Request-Id`) and attach it to a span that wraps the entire request lifecycle
 - **Status-proportional log levels**: 2xx/3xx at debug, 4xx at info, 5xx at warn/error. Keeps normal traffic out of INFO while surfacing errors automatically
 - **Sane filter defaults**: suppress noisy internal modules (session middleware, HTTP retry loops) at `warn` level while keeping application modules at the configured level
+- **Coordinated log format across co-located services**: in a container running multiple subsystems (e.g. Rust binary + SvelteKit), coordinate log format via a single shared env var (`LOG_JSON`). Both must implement the same selection logic (`env var override → build-profile default`) so a single deployment variable controls both
 
 ```rust
 // Pattern: EnvFilter with per-module overrides
@@ -41,6 +45,7 @@ let filter = EnvFilter::new(format!(
 - `tracing` crate with spans and the `#[instrument]` attribute macro
 - Custom `FormatEvent` + `FormatFields` implementations for per-environment formatting without changing call sites
 - Techniques: group dotted field names into inline structs, type-aware coloring in dev, never truncate the `error` field, abbreviate high-cardinality IDs (ULIDs) on log lines
+- **Field-level transforms via builder pattern**: `CompactFields` builder registers per-field transforms (e.g., truncate high-cardinality ULIDs to `4..6` chars in pretty mode) without affecting JSON output. Use `writer.has_ansi_escapes()` rather than `is_tty()` for the ANSI-safe check in custom `FormatEvent` impls
 
 ### TypeScript
 

@@ -12,6 +12,9 @@ exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: web/panda.config.ts
     note: PandaCSS primitive + semantic token system with oklch values
+  - repo: Xevion/glint
+    path: frontend/src/routes/layout.css
+    note: "oklch relative color syntax, @custom-variant dark, direction-aware View Transitions"
 ---
 
 # CSS & Styling
@@ -42,6 +45,9 @@ Tailwind utility-first. Design tokens as CSS custom properties. Minimal custom C
 
 - **Dark mode via class strategy**: `.dark` class on `documentElement`, not `prefers-color-scheme` media query (allows user override)
 - **View Transitions API**: use for page navigation and theme-change animations. Named transition groups (`view-transition-name`) scope animations to specific elements. Data attributes on `:root` select directional keyframe variants
+- **oklch() relative color syntax**: use `oklch(from var(--token) l c h / alpha)` for alpha-only variants without hardcoding or repeating the color value. Useful for glass effects, hover states, and overlay backgrounds
+- **@custom-variant for dark mode with shadcn-ui**: declare `@custom-variant dark (&:is(.dark *));` in Tailwind v4 when using shadcn-ui's class-based dark mode. This replaces the default `prefers-color-scheme` detection with class-based toggling
+- **Direction-aware View Transitions**: set a `data-nav-direction` attribute on `:root` before navigation, then select directional keyframe variants (slide-left vs slide-right) via `:root[data-nav-direction="left"]` selectors on `::view-transition-old`/`::view-transition-new`
 - **Responsive-first**: mobile-first breakpoints, avoid fixed widths
 - **PandaCSS as an alternative to Tailwind v4**: define tokens in `panda.config.ts` using `oklch()`, with semantic aliases using `{ base: ..., _dark: ... }` condition variants. Same oklch + class-strategy dark mode philosophy as Tailwind v4, different implementation
 - **PandaCSS dark mode**: use `_dark` semantic token conditions — equivalent to Tailwind's `dark:` variant. `.dark` class toggle on `documentElement` is the same activation mechanism as the Tailwind class strategy

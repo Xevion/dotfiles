@@ -20,7 +20,7 @@ Migration discipline — schema is the source of truth. Normalize first, denorma
 ## Conventions
 
 - **Naming**: `snake_case` for tables and columns, plural table names (`courses`, `instructors`), explicit `JOIN` types
-- **Migration versioning**: timestamp-prefixed filenames (`20260128000000_description.sql`), one logical change per migration. Sequential numeric prefixes (goose default: `00001_`, `00002_`) are also valid — prefer sequential for solo projects to avoid clock-skew; reserve timestamps for multi-team repos with concurrent migration creation
+- **Migration versioning**: timestamp-prefixed filenames (`20260128000000_description.sql`), one logical change per migration. Sequential numeric prefixes (goose default: `00001_`, `00002_`) are also valid — prefer sequential for solo projects to avoid clock-skew; reserve timestamps for multi-team repos with concurrent migration creation. Choose a consistent zero-pad width upfront (recommend 4-digit `0001_` for projects likely to exceed 100 migrations) — switching widths mid-project creates visual inconsistency and risks lexicographic mis-sort.
 - **JSONB for volatile 1-to-many data**: when sub-entities change shape frequently and you rarely filter by individual sub-fields, use JSONB arrays instead of join tables. Add GIN indexes for containment queries
 
 ```sql
@@ -31,7 +31,7 @@ CREATE INDEX idx_courses_meeting_times ON courses USING GIN (meeting_times);
 - **Full-text search**: generated `tsvector` columns (`GENERATED ALWAYS AS ... STORED`) with GIN indexes for search. `pg_trgm` GIN for substring/ILIKE patterns. Create indexes in the same migration as their columns
 - **Materialized views for precomputed aggregations**: when aggregations are expensive and read-heavy but write-infrequent. Add a UNIQUE index on the grouping key to enable `REFRESH CONCURRENTLY`
 - **UNLOGGED TABLE for ephemeral state**: scheduler timestamps, cache entries, bot command fingerprints — data where crash-loss is acceptable. No WAL overhead. Document the tradeoff in a migration comment
-- **Safe CHECK constraint migrations**: include a data-repair step (UPDATE to fix invalid rows) and a validation block (`DO $$ ... RAISE EXCEPTION ... $$`) before adding the constraint
+- **Safe CHECK constraint migrations**: include a data-repair step (UPDATE to fix invalid rows) and a validation block (`DO $$ ... RAISE EXCEPTION ... $$`) before adding the constraint. Even when data is believed clean, include the validation block — a comment asserting data cleanliness is acceptable documentation, but the validation block catches silent drift.
 
 ## Anti-Patterns
 

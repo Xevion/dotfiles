@@ -12,6 +12,9 @@ exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: web/src/lib/stores/
     note: SSE-driven operation stream factory with reactive getters and explicit close()
+  - repo: Xevion/glint
+    path: frontend/src/lib/stores/
+    note: "Connectivity singleton with SSR guard, cursor-paginated list factory"
 ---
 
 # Svelte
@@ -26,6 +29,7 @@ Svelte 5 runes exclusively — no legacy stores. Reactive state is explicit via 
 - **Shared state**: wrap reactive objects in a class or plain object with `$state` fields, expose via `createContext()` from `*.svelte.ts` files
 - **Module-scoped reactive state (factory-singleton)**: for app-wide state (theme, session), use a factory function returning a plain object with `$state` closures and `get` accessor properties. Reserve `createContext()` for tree-scoped state. Factory must live in a `.svelte.ts` file (required for rune usage outside components)
 - **SSE/WebSocket subscription state**: encapsulate in a `.svelte.ts` factory returning reactive getters plus a `close()` method. Caller handles cleanup via `$effect`
+- **Browser environment singletons**: for app-wide browser state (online/offline, backend reachability), use module-scoped `$state` with a plain-object getter facade and mutation methods. SSR guard with `browser ? navigator.onLine : true` as the idiomatic initial value pattern
 - **Component composition**: prefer bits-ui headless primitives, compose with Tailwind utility classes
 - **Type safety**: import types from auto-generated bindings (`$lib/bindings`), never hand-maintain TypeScript interfaces that mirror backend types
 
