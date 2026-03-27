@@ -1,7 +1,7 @@
 ---
 name: typescript
 category: languages
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/banner
     path: web/src/lib/bindings/
@@ -24,7 +24,7 @@ Strict mode always. Types as documentation. Functional patterns preferred. Let t
 
 - **Strict compiler options**: `strict: true`, `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`
 - **ts-rs replaces Zod for backend-driven types**: when the backend generates TypeScript bindings (via ts-rs, protobuf, etc.), trust those types as the source of truth. No redundant Zod schemas for API response shapes
-- **Discriminated unions**: use a `"type"` string-literal field as the discriminant. Match with `switch`/`if` chains on the `"type"` field, never cast with `as`
+- **Discriminated unions**: use a string-literal field as the discriminant. The field name need not be `"type"` — any domain-native literal field works (e.g., `objectClassName` for RDAP objects). The key convention is that the field is a string literal union and narrowing is done via `switch`/`if` without casts
 
 ```typescript
 // Pattern: discriminated union (ts-rs output format)
@@ -36,7 +36,7 @@ type InstructionalMethod =
 
 - **Absolute imports** (`$lib/...`, `@/...`) over relative imports when the project supports path aliases
 - **Functional patterns**: `map`, `filter`, `reduce` over `for` loops when idiomatic
-- **Zod for external/user input**: use Zod only at system boundaries (form input, third-party APIs), not for internally-generated types
+- **Zod for external/user input**: use Zod only at system boundaries (form input, third-party APIs), not for internally-generated types. For pure-frontend apps consuming multiple third-party APIs without a backend code-gen pipeline, Zod at each API boundary with `z.infer<typeof schema>` as the sole type source is the correct approach — not a violation of this convention
 - **Typed Web Worker communication**: define `MainToWorker` and `WorkerToMain` discriminated unions with typed wrapper functions over `postMessage`. Enforce compile-time exhaustiveness on message handling
 - **`Extract<Union, { type: T }>`**: use this conditional type for narrowing subscriber callbacks in typed pub/sub systems
 - **Hand-authored discriminated unions for frontend-only types**: when a type has no backend counterpart (e.g., loading state, UI error), hand-author a discriminated union with a `type` literal field following the same pattern as ts-rs-generated unions. Reserve ts-rs for API contract types
@@ -50,7 +50,9 @@ type InstructionalMethod =
 ## Anti-Patterns
 
 - `any` escape hatch — use `unknown` and narrow
-- Type assertions (`as`) without prior narrowing
+- Type assertions (`as`) without prior narrowing — includes duck-typed capability detection (`"method" in obj`) with inline cast, which indicates an incomplete interface
+- **Untagged multi-state unions**: `boolean | string` with 3 semantic states (false=no match, true=valid, string=invalid) — prefer a tagged union (`{ kind: "no-match" } | { kind: "valid" } | { kind: "invalid"; message: string }`) for self-documenting narrowing
+- **Inline types in component scripts**: when a type and its associated data constants are large enough to constitute a domain concept, extract to a co-located utility module rather than embedding in a component script block
 - Barrel exports (`index.ts`) in large projects — causes circular dependencies and tree-shaking issues
 - Hand-maintaining TypeScript interfaces that mirror backend types when a code-gen pipeline exists
 

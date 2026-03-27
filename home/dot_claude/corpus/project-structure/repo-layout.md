@@ -1,7 +1,7 @@
 ---
 name: repo-layout
 category: project-structure
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/banner
     path: ""
@@ -42,6 +42,8 @@ Convention over configuration. Predictable locations. Monorepo for tightly coupl
 - Deeply nested `src/` directories without clear module boundaries
 - Generated code mixed with hand-written code without clear separation
 - Build scripts without their own dependency tracking (polluting app dependencies)
+
+- **apps/ + packages/ monorepo split**: for npm/Bun monorepos, `apps/` contains deployable applications (SvelteKit, Electron, mobile), `packages/` contains internal libraries shared across apps. This mirrors the Turborepo convention and is the de-facto standard even when no monorepo tooling is used. See [monorepo-workspace-library](./monorepo-workspace-library.md) for intra-repo package boundary conventions
 
 ## Open Questions
 

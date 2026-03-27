@@ -1,7 +1,7 @@
 ---
 name: logging-observability
 category: patterns
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/banner
     path: src/logging/
@@ -68,6 +68,7 @@ let filter = EnvFilter::new(format!(
 - **OutputBuffer for async CLI output integrity**: when a command performs async I/O before printing results, buffer all stdout writes and flush atomically after async work completes. Prevents stderr (tracing) and stdout interleaving. Companion `buf_println!` macro provides `println!`-compatible ergonomics. Streaming commands (monitoring, tailing) are exempt
 - **Interactive vs non-interactive tracing**: runtime-selectable subscriber layers — TUI layer (ratatui channel-backed) if TTY, plain `fmt` layer if not. Extends "format is a deployment concern" beyond dev/prod to interactive vs non-interactive environments
 - **Channel-backed tracing Layer for TUI**: implement a custom `tracing::Layer` that serializes log records into an `mpsc` channel; the TUI rendering thread drains the channel each frame. Keeps log records in-process and lets the TUI control presentation
+- **WASM tracing with build-profile-gated filters**: for Rust compiled to WASM, use `wasm-tracing` with `tracing-subscriber::EnvFilter` for browser console output. Use `#[cfg(debug_assertions)]` to select debug vs production log levels at compile time (no runtime overhead). `set_report_logs_in_timings(true)` integrates logs with the browser performance timeline. This is the WASM-specific equivalent of "runtime format selection" for native targets
 - **EMA-based outlier detection in hot paths**: use exponential moving average (α=0.05) as a running baseline and emit a structured warning when a measurement exceeds 5×EMA. Lighter than a sliding window and naturally adapts to warm-up
 
 ### TypeScript

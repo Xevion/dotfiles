@@ -1,7 +1,7 @@
 ---
 name: npm-library-publishing
 category: dx
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/tempo
     path: package.json + src/
@@ -16,7 +16,9 @@ exemplars:
 
 ## Conventions
 
-<!-- Bun build pipeline, conditional exports (bun/types/default), package.json fields (files, bin, engines), release-please, are-the-types-wrong validation -->
+- **Bun workspace source exports for internal consumers**: within a Bun workspace, point `exports` at raw `.ts` source files (`"import": "./src/index.ts"`). Bun resolves TypeScript natively, eliminating the build step during development. The build script (tsc + tsc-alias) produces `dist/` only for external publishing
+- **Dual export modes**: workspace-internal consumption uses source exports. Before `npm publish`, exports must point at compiled `dist/` files with conditional `types`/`import` fields. The `tsc-alias` tool rewrites path aliases in the compiled output
+- Bun build pipeline, conditional exports (bun/types/default), package.json fields (files, bin, engines), release-please, are-the-types-wrong validation
 
 ## Anti-Patterns
 

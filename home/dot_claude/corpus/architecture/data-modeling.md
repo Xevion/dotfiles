@@ -1,7 +1,7 @@
 ---
 name: data-modeling
 category: architecture
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/banner
     path: migrations/
@@ -53,9 +53,12 @@ ALTER TABLE courses ADD CONSTRAINT chk_enrollment_nonneg CHECK (enrollment >= 0)
 - **One logical change per migration file**: mixing unrelated schema evolutions in a single file makes rollback and bisecting harder. Each migration file should describe exactly one intentional change
 - **bbolt for embedded state persistence**: for CLI tools and collectors that need durable state across restarts without a separate database process, bbolt with raw JSON byte values per named bucket is a lightweight alternative to SQLite/sqlc. Name buckets as package-level byte slice constants. Store raw JSON and defer deserialization to the caller to keep the store interface generic. Ensure bucket existence at Open time via a single `db.Update`
 
+- **Versioned migration files over ORM auto-migrate**: adopt golang-migrate or goose with numbered SQL migration files. Each schema change becomes a file with up/down steps. `AutoMigrate` (GORM) is acceptable for rapid prototyping but cannot drop columns, reorder constraints, or express data backfills as first-class steps. Once schema has real production data, migration files are mandatory
+
 ## Anti-Patterns
 
 - Schemaless by default ("we'll figure out the schema later")
+- **GORM AutoMigrate as sole migration strategy**: `AutoMigrate` on every startup with hand-rolled backfill functions is a maintenance liability. It cannot express destructive changes, rollbacks, or migration ordering
 - EAV (Entity-Attribute-Value) tables
 - Non-idempotent migrations
 - Storing structured data as JSON-encoded TEXT columns

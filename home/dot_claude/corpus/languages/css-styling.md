@@ -1,7 +1,7 @@
 ---
 name: css-styling
 category: languages
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/banner
     path: web/src/routes/layout.css
@@ -21,6 +21,9 @@ exemplars:
   - repo: Xevion/xevion.dev
     path: web/panda.config.ts
     note: VT keyframes defined in PandaCSS config (keyframes + globalCss)
+  - repo: Xevion/relatives
+    path: apps/web/src/routes/layout.css
+    note: "Full shadcn-svelte Tailwind v4 token set: oklch primitives, alpha-only dark borders, @custom-variant dark, @theme inline"
 ---
 
 # CSS & Styling
@@ -65,8 +68,11 @@ Tailwind utility-first. Design tokens as CSS custom properties. Minimal custom C
 - `!important` overrides — fix specificity at the source
 - Deeply nested selectors (> 3 levels)
 - Inline styles for layout
-- Defining colors as hex/rgb literals directly in Tailwind classes instead of going through the token system
+- Defining colors as hex/rgb literals directly in Tailwind classes or `@theme` token definitions instead of going through oklch. This includes `rgb()` and hex in `@theme {}` blocks — the oklch convention applies to token definitions, not just utility classes
 - CSS class-toggling or JS-driven opacity fades for page transitions when View Transitions API is available
+- **Blanket CSS transitions for theme changes**: broad `transition` rules on structural selectors (`div`, `section`, `body`) for dark mode animation conflict with the View Transitions approach and impose a compositing cost. View Transition API handles theme-change animation via a single crossfade on the root snapshot
+- **Radix UI color system exception**: when a project delegates its full color system to a component library (Radix Themes), the oklch token pattern does not apply — use Radix's semantic CSS variables for color and Tailwind only for layout/spacing. The anti-pattern to avoid is mixing Radix variables with Tailwind color classes
+- **SSR theme flash prevention**: in SSR frameworks (Next.js, SvelteKit), native `window.matchMedia` + class-toggle alone is insufficient — a blocking inline script or library (e.g., `next-themes`) is needed to prevent flash-of-incorrect-theme. The "native API over library" preference applies to client-only contexts; SSR changes the tradeoff
 
 ## Open Questions
 

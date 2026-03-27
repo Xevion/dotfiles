@@ -1,7 +1,7 @@
 ---
 name: performance
 category: patterns
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/xevion.dev
     path: src/cache.rs
@@ -27,6 +27,7 @@ Measure first. Profile-guided optimization. Avoid premature optimization. Budget
 
 - **Lazy per-encoding compression on cached responses**: use an `RwLock<HashMap<Encoding, Bytes>>` per entry. Compute each encoding (zstd/brotli/gzip) once on first request, skip if compressed size exceeds the original. Pair with stale-while-revalidate for SSR: serve stale immediately, trigger background refresh only once per path using a `DashSet` of in-flight refreshes to prevent thundering herd
 - **Runtime SIMD dispatch with `#[target_feature]`**: gate SIMD implementations behind `is_x86_feature_detected!` at the call site and annotate the implementation with `#[target_feature(enable = "avx512f")]`. Keeps the binary portable while taking the SIMD fast path on capable hardware. Pair with a scalar fallback for unsupported architectures
+- **Dedicated Cargo profile for mutation testing**: a `[profile.mutant]` inheriting from `dev` with `incremental = false`, `debug = 0`, `codegen-units = 256` optimizes for cargo-mutants' many-sequential-clean-builds pattern. `opt-level = 3` on dependencies + `opt-level = 1` on local crates balances compile speed with test runtime. Combined with `mutants.toml` for per-crate scope
 
 ### TypeScript
 <!-- Bundle analysis, code splitting, lighthouse budgets -->

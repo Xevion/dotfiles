@@ -1,0 +1,36 @@
+---
+name: scoring-ranking-algorithms
+category: architecture
+last_audited: 2026-03-27
+exemplars:
+  - repo: Xevion/relatives
+    path: packages/core/src/scoring.ts
+    note: "Composite proximity+relatability+accuracy score with configurable weights, nice-number multiplier"
+  - repo: local/rekuma
+    path: internal/data/priority.go
+    note: "Multi-factor refresh priority from pin status, staleness, catalog activity, archive state"
+---
+
+# Scoring & Ranking Algorithms
+
+## Philosophy
+
+Weighted multi-factor scoring for ranking items by relevance, freshness, or user preference. Scores are composable from independent factors, each with a clear semantic meaning. Weights are configurable — hardcoded weights are acceptable for internal ranking but should be tunable when exposed to users.
+
+## Conventions
+
+- **Composite scoring with named factors**: each factor (closeness, relatability, accuracy, staleness) is computed independently and combined via weighted sum. Factor functions are pure and independently testable
+- **Log-scale proximity for ratio-based comparisons**: when comparing magnitudes across orders of magnitude, use logarithmic proximity scoring (e.g., `1 / (1 + log(ratio))`) to prevent large values from dominating
+- **Behavioral invariant testing for scores**: test ordering properties (at1 > at2 > at5), symmetry (ratio 2 ≈ ratio 0.5), and floor/ceiling constraints rather than pinning exact float values. More resilient to algorithm tuning
+- **Multi-factor priority for scheduling**: combine boolean flags (pinned, archived), temporal staleness (time since last update), and activity signals (post count, bump status) into a single numeric priority score for queue ordering
+
+## Anti-Patterns
+
+- Hardcoding weights without documenting their semantic meaning
+- Testing exact float outputs instead of ordering/invariant properties
+- Single-factor ranking when multiple signals are available
+
+## Open Questions
+
+- When to expose scoring weights to end users vs keeping them internal
+- A/B testing infrastructure for ranking algorithm variants

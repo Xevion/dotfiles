@@ -65,6 +65,8 @@ pub enum ClientError {
 - `Rc<RefCell<T>>` as a first resort — reach for it only when shared ownership is genuinely needed
 - Manual `From` impls when `#[from]` or `#[source]` suffice — but this is the right choice when conversion carries domain logic (see Conventions above)
 
+- **cfg on individual enum variants**: use `#[cfg(not(target_arch = "wasm32"))]` on specific enum variants (e.g., `NetworkMode::Remote`) rather than gating the entire module. The type compiles on all targets with platform-specific variants restricted. Match arms referencing cfg-gated variants must also be cfg-gated
+
 ## Open Questions
 
 - When to reach for `async` vs OS threads (CPU-bound work boundaries)

@@ -1,7 +1,7 @@
 ---
 name: ci-cd-deployment
 category: dx
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/banner
     path: .github/workflows/
@@ -25,7 +25,7 @@ GitHub Actions as default CI. Docker for reproducible deploys. Fail fast — ind
 
 ## Conventions
 
-- **Parallel independent jobs**: split quality, tests, security, and docker-build into separate jobs that run simultaneously. Each job has a short timeout (10min)
+- **Parallel independent jobs**: split quality, tests, security, and docker-build into separate jobs that run simultaneously. Each job must declare an explicit `timeout-minutes` (e.g., 10) to prevent hung jobs from consuming CI minutes indefinitely — especially important for jobs hitting external networks
 - **cargo-chef for Rust Docker builds**: separate dependency-only cook step from source compilation for layer cache reuse. Final image based on a minimal runtime matching the actual entrypoint (e.g. `bun-slim` for Bun-based TypeScript orchestration, `alpine` for static binaries), not the build toolchain
 
 ```dockerfile
@@ -51,6 +51,8 @@ RUN cargo build --release
 - Deploy-on-merge without passing checks
 - Monolithic single-job pipelines (slow feedback)
 - Skipping security scanning (cargo-audit, bun audit, Trivy)
+- **GitHub Actions referenced by version tag without SHA pinning**: `actions/checkout@v6` is mutable — the tag can be moved. `aquasecurity/trivy-action@master` is even worse (branch ref). Pin all Actions to full SHA digests. Use `helpers:pinGitHubActionDigests` in Renovate or let Dependabot's `github-actions` ecosystem maintain SHA pins
+- **Same-workflow deploy gating**: for static-site/WASM deployments (Cloudflare Pages, Netlify), job-level `needs:` + `if: github.event_name == 'push'` is simpler than `workflow_run` gating when build and deploy are in the same workflow file. Reserve `workflow_run` for cross-workflow coordination
 
 ## Open Questions
 

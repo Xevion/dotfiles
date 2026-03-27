@@ -1,7 +1,7 @@
 ---
 name: dependency-management
 category: dx
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: local/inkwell
     path: renovate.json
@@ -34,7 +34,11 @@ Lock files always committed. Conservative updates. Audit discipline. Minimal dep
 
 ### Dependabot Alternative
 
-For projects where Renovate's advanced features (allowedVersions with rationale, minimumReleaseAge) are not needed, GitHub Dependabot is a simpler alternative. Minimum config for a Rust project covers `cargo` + `github-actions` ecosystems. Use `commit-message: { prefix: "chore", include: "scope" }` to produce conventional commits. Dependabot lacks Renovate's grouping and release-age guards — use Renovate when those guards are needed.
+For projects where Renovate's advanced features (allowedVersions with rationale, minimumReleaseAge) are not needed, GitHub Dependabot is a simpler alternative. Minimum config for a Rust project covers `cargo` + `github-actions` ecosystems. Use `commit-message: { prefix: "chore", include: "scope" }` to produce conventional commits. Dependabot lacks Renovate's grouping and release-age guards — use Renovate when those guards are needed. Note: even with Dependabot, GitHub Actions should reference pinned SHA digests — Dependabot's `github-actions` ecosystem will maintain SHA pins once added.
+
+### Baseline Renovate config for multi-language repos
+
+For multi-language monorepos (Go + TypeScript, Rust + TypeScript), four baseline conventions: (1) ecosystem grouping by manager and tightly-coupled namespaces, (2) `minimumReleaseAge` of 3 days, (3) `:semanticCommits` for conventional commit consistency, (4) `helpers:pinGitHubActionDigests` for supply-chain safety. A bare `{ "dependencyDashboard": true }` config is insufficient.
 
 ## Open Questions
 

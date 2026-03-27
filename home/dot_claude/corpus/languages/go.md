@@ -1,7 +1,7 @@
 ---
 name: go
 category: languages
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: internal/server/
@@ -139,7 +139,7 @@ func toUser[T RowVariant](row T) User {
 ## Anti-Patterns
 
 - **Naked returns in complex functions** — named return variables with bare `return` statements obscure what is being returned and make functions harder to read; use explicit returns.
-- **`init()` abuse** — `init` runs implicitly at program start with no way to pass arguments or return errors; prefer explicit initialization in `main` or constructor functions so startup failures surface cleanly.
+- **`init()` abuse** — `init` runs implicitly at program start with no way to pass arguments or return errors; prefer explicit initialization in `main` or constructor functions so startup failures surface cleanly. This includes database connections (`gorm.Open`) and logger setup (`zap.NewProduction`) — both should be explicit constructors returning errors, not panics in `init()`.
 - **Interface pollution** — defining interfaces in the producer package, or defining wide interfaces with methods callers don't need, forces unnecessary coupling; define interfaces where they are consumed and keep them as narrow as the caller requires.
 - **Ad-hoc `map[string]any` response shapes** — untyped response maps skip compile-time checks and make API contracts invisible; define concrete response structs even for simple payloads.
 

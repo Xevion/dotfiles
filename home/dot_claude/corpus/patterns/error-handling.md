@@ -1,7 +1,7 @@
 ---
 name: error-handling
 category: patterns
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/banner
     path: src/banner/errors.rs
@@ -55,6 +55,8 @@ enum JobError {
 ### TypeScript
 
 - Named sentinel error class (e.g., `AbortError`) for user-triggered abort paths in CLIs/hooks. Catch only at runner boundary and convert to exit code. Re-throw everything else
+- **Error subclasses with context fields**: use `class NotFoundError extends Error { constructor(message: string, public url: string) }` as typed sentinels with extra context (URL, status code). `instanceof` narrowing replaces `match`/`downcast_ref`. Combine with `true-myth` Result to avoid try/catch for expected failures at API boundaries
+- **Centralized telemetry classification**: when classifying errors for telemetry from third-party APIs without error codes, isolate string matching in a single `classifyError(err): ErrorCategory` function. The string patterns are maintained in one place with explicit fallback to "unknown"
 
 ### Go
 

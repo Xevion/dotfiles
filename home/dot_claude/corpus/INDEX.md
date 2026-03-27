@@ -36,6 +36,10 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [ml-inference-pipeline](./architecture/ml-inference-pipeline.md) — ONNX Runtime, tiled spatial inference, crossbeam thread pool, EMA outlier detection
 - [tauri-desktop-app](./architecture/tauri-desktop-app.md) — Rust command/event IPC, typed errors at boundary, Pest PEG parser
 - [linux-hardware-interfaces](./architecture/linux-hardware-interfaces.md) — /proc/pagemap, EDAC sysfs, SMBIOS, mlock, AVX-512 non-temporal stores
+- [deterministic-simulation](./architecture/deterministic-simulation.md) — Seeded RNG, context-keyed streams, deterministic client-side execution
+- [scoring-ranking-algorithms](./architecture/scoring-ranking-algorithms.md) — Weighted multi-factor scoring, log-scale proximity, adaptive priority
+- [platform-abstraction-layer](./architecture/platform-abstraction-layer.md) — Transport interface, build-time platform selection, separate entry points
+- [scheduling](./architecture/scheduling.md) — Priority-queue dispatch, optimistic stamping, activity-adaptive polling
 
 ## Patterns
 
@@ -53,6 +57,7 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [repo-layout](./project-structure/repo-layout.md) — scripts/ dir, docs/ hierarchy, generated bindings, CLAUDE.md at root
 - [build-systems](./project-structure/build-systems.md) — Justfile as thin wrapper, tempo passthrough, preset-override-extend, mise
 - [documentation-naming](./project-structure/documentation-naming.md) — README templates, file naming, ADRs
+- [monorepo-workspace-library](./project-structure/monorepo-workspace-library.md) — apps/packages split, Bun workspace source exports, dual export modes
 
 ## Developer Experience
 
@@ -67,3 +72,4 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [headless-gpu-rendering](./dx/headless-gpu-rendering.md) — Xvfb + VirtualGL, NVIDIA passthrough, containerized GPU workloads
 - [npm-library-publishing](./dx/npm-library-publishing.md) — ESM builds, conditional exports, cross-runtime testing, release-please
 - [build-time-codegen](./dx/build-time-codegen.md) — build.rs, sqlc/tygo, sqlx offline, CI verification via regen+diff
+- [multi-target-build-pipeline](./dx/multi-target-build-pipeline.md) — WASM + Tauri + native from one codebase, Vite build modes, mtime detection

@@ -1,7 +1,7 @@
 ---
 name: cross-language-type-generation
 category: dx
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/instant-upscale
     path: crates/server/ + frontend/src/lib/bindings/
@@ -47,7 +47,9 @@ exemplars:
 
 ## Anti-Patterns
 
-<!-- Hand-maintaining TypeScript interfaces, json.RawMessage without tstype override, stale generated files not caught in CI -->
+- **Hand-maintained TypeScript mirrors of Rust/Go enums**: TypeScript unions with a comment acknowledging they mirror a backend enum (e.g., `// These mirror the Rust enums in protocol.rs`) are a known maintenance hazard. Use ts-rs with `#[ts(export)]` on Rust message enums — the serde tag field (`msg_type`) maps naturally to a TypeScript discriminated union. This is the canonical motivation for ts-rs adoption
+- `json.RawMessage` without tstype override — produces `any` in generated TypeScript
+- Stale generated files not caught in CI
 
 ## Open Questions
 

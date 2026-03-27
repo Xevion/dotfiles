@@ -1,7 +1,7 @@
 ---
 name: git-workflow
 category: dx
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/banner
     path: scripts/pre-commit.ts
@@ -23,6 +23,7 @@ Conventional commits. `master` as default branch. Rebase-merge for clean history
 - **Pre-commit auto-format with staging safety**: pre-commit hooks that auto-format must handle partially-staged files safely (see [project-automation](../dx/project-automation.md) for the detection pattern)
 - **GPG commit signing**: sign commits with GPG keys. WSL environments bridge to Windows GPG for native pinentry
 - **`just install-hooks` convention**: symlinks pre-commit scripts and makes them executable. Reference in CLAUDE.md to tell AI agents the hook handles formatting so agents don't duplicate that work
+- **Commitlint + Husky for enforcement**: commitlint extending `@commitlint/config-conventional` via a Husky `commit-msg` hook. Pre-commit runs `lint-staged` for format/lint on staged files. Note: `lint-staged` handles partial-staging safety automatically — the custom TypeScript pre-commit script with explicit partial-staging detection is needed only when calling formatters directly without `lint-staged`
 - **Short-lived branches**: `feature/*`, `fix/*` — merge quickly, delete after merge
 
 ## Anti-Patterns

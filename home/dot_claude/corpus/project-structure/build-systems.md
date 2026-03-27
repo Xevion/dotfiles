@@ -1,7 +1,7 @@
 ---
 name: build-systems
 category: project-structure
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/banner
     path: Justfile
@@ -57,6 +57,9 @@ test *args:
 - Shell scripts as build systems (untyped, hard to test, no error handling)
 - Undocumented build steps that aren't in the Justfile
 - Inline orchestration logic in Justfile recipes (> 3 lines = extract to a script)
+- **Platform-specific shells in Justfile**: `set shell := ["powershell"]` breaks CI portability. For cross-platform projects, either omit the shell override or provide a platform-detected fallback. Complex recipes requiring platform-specific shells should be extracted to a script
+- **No Justfile threshold**: for single-runtime web apps where `package.json` scripts cover all commands without multi-line logic, `package.json` as the sole task runner is acceptable. Add a Justfile when commands require orchestration logic, multi-step delegation, or cross-tool coordination beyond `&&`-chained npm scripts
+- **Taskfile (go-task) as alternative**: acceptable for Go-centric projects. Note that inline `echo` + actual command pairs and compound `&&` chains in Taskfile recipes are the same anti-pattern as in Justfile — extract to scripts
 
 ## Open Questions
 

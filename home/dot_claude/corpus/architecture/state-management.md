@@ -1,7 +1,7 @@
 ---
 name: state-management
 category: architecture
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/glint
     path: frontend/src/lib/stores/ + components/data-view/
@@ -52,6 +52,10 @@ Reactivity through signals/runes, not manual subscription. Clear boundary betwee
 - Prop drilling 5+ levels deep — use context or a factory instead
 - Syncing server and client state manually instead of using a query library
 - Using `$effect` to derive values that `$derived` can express directly
+
+### React
+
+- **Custom hook as page-scoped state factory**: a custom hook (e.g., `useLookup`) that encapsulates co-located state, derived values (debounce, type detection), side effects, and async actions is the React equivalent of the Svelte `createCursorList()` factory. Returns a stable interface to the page component, keeping pages thin and making state logic independently testable. Use `useRef` for values that shouldn't trigger re-renders (e.g., repeatable URLs), `useDebouncedValue` for reactive throttling
 
 ## Open Questions
 

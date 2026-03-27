@@ -1,33 +1,45 @@
 ---
 name: wasm-compilation-targets
 category: architecture
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/Pac-Man
     path: pacman/src/platform/
     note: "Dual-target Rust (native + Emscripten WASM), platform-gated modules, extern C FFI"
+  - repo: Xevion/borde.rs
+    path: crates/borders-wasm/ + Justfile
+    note: "wasm-bindgen target, three WASM Cargo profiles, mtime-based wasm-bindgen skip, cfg-gated deps"
 ---
 
 # WASM Compilation Targets
 
 ## Philosophy
 
-<!-- Write once, compile to multiple targets. Platform abstraction at the module boundary. WASM is a compilation target, not a rewrite. -->
+Write once, compile to multiple targets. Platform abstraction at the module boundary. WASM is a compilation target, not a rewrite. Target-specific code is isolated behind cfg gates.
 
 ## Conventions
 
-<!-- #[cfg(target_os = "emscripten")] for platform gating, extern "C" FFI to Emscripten APIs, ASYNCIFY for browser game loop -->
+- **Two WASM pathways**: `wasm32-unknown-emscripten` (Pac-Man: SDL2 game loop via `emscripten_set_main_loop_arg`, extern "C" FFI) and `wasm32-unknown-unknown` with wasm-bindgen (borde.rs: Web Worker game loop via `gloo-timers`, JS interop). Choose based on whether you need Emscripten's POSIX emulation or prefer wasm-bindgen's lighter JS interop
+- **cfg-gated dependency sections**: separate `[target.'cfg(target_arch = "wasm32")'.dependencies]` from native deps. WASM gets wasm-bindgen, gloo-timers, web-sys; native gets tokio full, reqwest native-tls
+- **Three-tier WASM Cargo profiles**: `wasm-dev` (opt-level 1, debug info), `wasm-release` (opt-level z, LTO, strip, panic=abort, wasm-opt -Oz), `wasm-debug` (opt-level 0, full debug). Each inherits from the appropriate base profile
+- **Mtime-based wasm-bindgen skip**: compare artifact timestamp before/after cargo build; skip wasm-bindgen when unchanged and pkg artifacts already exist. Avoids redundant postprocessing during incremental development
+- **wasm-opt postprocessing**: run `wasm-opt -Oz` with `--enable-bulk-memory --enable-threads` on release builds for additional size reduction beyond what rustc/LTO achieves
 
 ## Language-Specific
 
 ### Rust
 
-<!-- wasm32-unknown-emscripten target, emscripten_set_main_loop_arg for browser game loop, platform module with cfg-gated impls -->
+- `wasm32-unknown-emscripten`: `emscripten_set_main_loop_arg` for browser game loop, ASYNCIFY for async operations, platform module with cfg-gated impls
+- `wasm32-unknown-unknown` + wasm-bindgen: manual update loop with `gloo-timers::future::sleep` for browser game loop in Web Worker context. `wasm-bindgen --target web` for ES module output
 
 ## Anti-Patterns
 
-<!-- Duplicating platform-specific code instead of abstracting, blocking the browser event loop, ignoring WASM binary size -->
+- Duplicating platform-specific code instead of abstracting behind cfg gates
+- Blocking the browser event loop (use ASYNCIFY or async sleep)
+- Ignoring WASM binary size (always use wasm-opt on release builds)
+- Running all postprocessing unconditionally on incremental rebuilds
 
 ## Open Questions
 
-<!-- wasm32-unknown-emscripten vs wasm32-unknown-unknown + wasm-bindgen tradeoffs, WASI adoption timeline -->
+- WASI adoption timeline and when it replaces Emscripten for server-side WASM
+- Shared memory and threads in WASM (atomics, SharedArrayBuffer requirements)

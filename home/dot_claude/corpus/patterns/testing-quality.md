@@ -1,7 +1,7 @@
 ---
 name: testing-quality
 category: patterns
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/banner
     path: tests/
@@ -78,6 +78,9 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 - Global Vitest `setupFiles` recording sink: configure logger once with recording sink, auto-clear via `beforeEach`, export query helpers by category/level for asserting on structured log output
 - EngineTestHarness factory for browser API mocking: single factory installs all global mocks (Worker, ResizeObserver, HTMLAudioElement), returns cleanup closure, each mock exposes typed `Controls` interface
 - CI compat env-var gate: `test.skipIf(!available)` locally, hard throw when `CI_COMPAT=1`. Prevents both false negatives (skipped in CI) and false positives (failing locally)
+- **`// @vitest-environment node` for real-network integration tests**: per-file environment override bypasses happy-dom's fake fetch to enable real HTTP calls. Distinct from the CI env-var gate — the gate is for tests that may be unavailable, while the environment override is for tests requiring real network semantics. Combine both when needed
+- **Behavioral invariant testing for math/scoring functions**: test ordering (at1 > at2 > at5), symmetry (ratio 2 ≈ ratio 0.5), bounds, and monotonicity properties rather than pinning exact float values. More resilient to algorithm tuning than spot-checking specific outputs
+- **Nested describe by input category**: group tests by input type rather than method under test, with explicit "should NOT" negative cases for parser edge coverage. Effective for type-detection, format-parsing, and other disambiguation logic
 - Stale smoke test anti-pattern: smoke tests must use valid fixture data matching the actual schema. Identity-function wrappers like `defineConfig` won't catch wrong shapes. Smoke tests that only assert element presence (e.g., `expect(canvas).not.toBeNull()`) are fragile proxies for real behavior — test state transitions instead
 
 ### Go

@@ -1,7 +1,7 @@
 ---
 name: svelte
 category: languages
-last_audited: 2026-03-26
+last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/banner
     path: web/src/lib/
@@ -39,7 +39,10 @@ Svelte 5 runes exclusively — no legacy stores. Reactive state is explicit via 
 - **Version-counter reactivity for large collections**: for large Maps/Sets that are frequently mutated, keep the collection in a plain (non-reactive) field and bump a `$state` integer on writes. Readers call `void this._version` to create a reactive dependency. Avoids Svelte proxying every Map entry while enabling fine-grained reactivity
 - **Discriminated union `$state` for multi-phase async flows**: model phases (idle, generating, uploading, complete, error) as a discriminated union on a `phase` string-literal field stored in `$state`. Each phase carries only the fields valid in that phase. Phase narrowing (`this.state.phase === 'x'`) gives TypeScript access to phase-specific properties
 - **`$effect.root` for class-based store effects**: use `$effect.root(() => { ... })` in a class constructor to register reactive effects outside the component tree. Store the returned cleanup function and call it from `destroy()`. This is the correct pattern for class stores that need to react to their own `$state` changes (e.g., debounced server sync)
-- **`onNavigate` + View Transitions**: use `onNavigate` with `document.startViewTransition` for SvelteKit page transitions. Assign `view-transition-name` to persistent shell elements (nav, theme toggle) to exclude them from transitions
+- **`onNavigate` + View Transitions**: use `onNavigate` with `document.startViewTransition` for SvelteKit page transitions. Assign `view-transition-name` to persistent shell elements (nav, theme toggle) to exclude them from transitions. For progressive enhancement, prefer declaration merging (`interface Document { startViewTransition?: (cb: () => void) => void }`) over `document as any` — preserves type safety on the callback
+- **Debounced `$effect` pattern**: when reactive inputs must trigger a debounced side effect (not a derived value), use `$effect` with an outer timeout ref, list dependencies explicitly on separate lines, and return cleanup that clears the pending timeout. This is distinct from the anti-pattern of using `$effect` for pure derived state
+- **Browser API wiring via `$effect`**: for imperative browser APIs (IntersectionObserver, ResizeObserver) tied to reactive state, use `$effect` with a null-guard on the bound element ref and a boolean reactive gate. Return cleanup that calls the API's teardown method and clears any associated timers
+- **Theme flash prevention via `{@html}` inline script**: for static SvelteKit sites without SSR, inject an IIFE in `<svelte:head>` via `{@html}` that reads localStorage and toggles the dark class on `documentElement` before hydration. This is the client-only complement to `transformPageChunk`. Note: bypasses CSP nonces and runs on every SPA navigation
 - **Component composition**: prefer bits-ui headless primitives, compose with Tailwind utility classes
 - **Type safety**: import types from auto-generated bindings (`$lib/bindings`), never hand-maintain TypeScript interfaces that mirror backend types
 
