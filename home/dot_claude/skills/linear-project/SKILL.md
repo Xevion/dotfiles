@@ -16,8 +16,6 @@ Create fully configured Linear projects with domain-specific labels, optional mi
 **This includes:**
 - Whether to create a new project or update an existing one
 - Project name, priority, and scope
-- Which existing labels to reuse vs which new labels to create
-- Label colors and descriptions
 - Whether to add milestones and what they should be
 - Final confirmation before executing
 
@@ -37,7 +35,7 @@ Create fully configured Linear projects with domain-specific labels, optional mi
 **Before creating anything, understand what already exists.**
 
 1. Query `list_projects` — get existing projects with their status and priority
-2. Query `list_issue_labels` — catalog all workspace and team labels
+2. Query `list_issue_labels` with `limit: 250` — catalog **all** workspace and team labels. If the response indicates more pages, paginate with the cursor until you have every label. **You must see the complete label list before suggesting new ones — partial results cause duplicate label creation.**
 3. Query `list_issue_statuses` for the team — confirm the status workflow
 
 Present a brief summary of what exists, then use the Question tool (`multiSelect: false`):
@@ -82,18 +80,14 @@ Question 4: **Start date** (`multiSelect: false`)
 
 **Before asking, cross-reference the reuse audit results.**
 
-Question 1: **Reuse existing labels** (`multiSelect: true`)
-- Present existing workspace labels that are relevant to this project type
-- Group by category in descriptions: "Type label — workspace-wide", "Domain label — already exists"
-- Type labels (Bug, Feature, Improvement, Refactoring) are workspace-wide — always suggest reusing, never recreating
+**Labels — auto-assigned, not asked.** After fetching all labels (Step 1), decide which existing labels to reuse and which new ones to create:
 
-Question 2: **New domain labels to create** (`multiSelect: true`)
-- Suggest project-specific labels based on the components selected in Round 1
-- Each option includes: name, suggested color (that doesn't clash), and one-line description
-- Example: "Capture (#E91E63) — Screenshot capture system and orchestration"
-- Only suggest labels that are genuinely project-specific and don't already exist
+- **Match by name, not description.** The label name is the primary signal; the description is ambient context, not a filter.
+- Type labels (Bug, Feature, Improvement, Refactoring) are workspace-wide — always reuse, never recreate.
+- For new domain labels, auto-assign colors that are visually distinct from existing labels. Don't ask about colors.
+- Show the full label plan (reuse + create) in the Step 3 preview. The user corrects there if wrong.
 
-Question 3: **Milestones** (`multiSelect: true`)
+Question 1: **Milestones** (`multiSelect: true`)
 - "No milestones for now" — first option if the project is early-stage
 - Suggest 1-2 obvious phase milestones based on the project scope (e.g., "MVP", "Alpha", "v1.0")
 - Keep it lean: 1-2 for new projects, 3 max
@@ -159,9 +153,8 @@ DESCRIPTION
 Then **immediately use the Question tool** (`multiSelect: false`) — do NOT present this as plain text options:
 - "Create everything as shown" (Recommended)
 - "Edit before creating" — let the user specify what to change
-- "Cancel"
 
-**If you skip the Question tool here and just ask in prose, you are violating this skill's core requirement.**
+No "Cancel" option — if the user wants to bail, they'll say so naturally.
 
 ## Step 4: Execute
 
@@ -213,12 +206,11 @@ Use the `linear-issue` skill for creating issues, or reference issues directly (
 
 ## Label Color Guidelines
 
-When creating new labels, **query existing labels first** with `list_issue_labels` to see what colors are already in use. Then:
+Colors are auto-assigned — don't ask the user. When creating new labels:
 
-- Pick colors that are visually distinct from existing labels
+- Pick colors that are visually distinct from existing labels (query first with `list_issue_labels`)
 - Avoid reusing the exact hex of an existing label for a different domain
 - Stick to saturated, easily distinguishable colors — avoid pastels that blend together
-- When in doubt, include color as an option in the Question tool
 
 ## When NOT to Create a New Project
 

@@ -19,15 +19,13 @@ Create well-structured Linear issues with automatic project detection, contextua
 
 **This includes:**
 - Project selection (when not auto-detected)
-- Issue type and priority
-- Label selection
 - Parent/relation linking
 - Whether to batch-create sub-issues
 - Final confirmation before creating
 
-**The only exception** is when the user's initial request is so specific that no questions are needed (e.g., "create bug XEV: ladder facing is wrong in ladderDown test" — title, type, and project are all explicit). Even then, use the Question tool for priority and labels.
+**Auto-assign without asking:** Type, priority, and labels. Infer these from context and show them in the preview. The user corrects in the preview step if wrong. Only ask when genuinely ambiguous (e.g., issue could be Bug or Improvement and it matters for triage).
 
-**Default to `multiSelect: true`** unless options are mutually exclusive. Labels, relations, and scope questions almost always allow multiple selections.
+**Default to `multiSelect: true`** unless options are mutually exclusive. Relations and scope questions almost always allow multiple selections.
 
 ## Step 1: Detect Project Context
 
@@ -49,37 +47,21 @@ Check for Linear configuration in order:
 
 ### What to ask (batch into 1-2 Question tool calls)
 
-**Round 1 — Core identity (always ask):**
+**Auto-assigned fields (no questions — show in preview):**
 
-Question 1: **Issue type** (`multiSelect: false`)
-- Suggest the most likely type first based on the user's description
-- Options: Bug, Feature, Improvement, Refactoring, Spike/Investigation
-- Put your reasoning in each option's description
+- **Type** — infer from context: broken behavior → Bug, new capability → Feature, improving existing behavior → Improvement, code restructuring → Refactoring, open question → Spike/Investigation
+- **Priority** — use the priority guidelines at the bottom of this skill
+- **Labels** — query existing labels with `list_issue_labels` using `limit: 250` BEFORE drafting. Paginate if needed — you must have the **complete** label list. Pick the right type label + any obvious domain labels from the project's CLAUDE.md label list. 1-3 labels total.
 
-Question 2: **Priority** (`multiSelect: false`)
-- Suggest priority with natural language reasoning in descriptions:
-  - "Medium — it's an improvement that isn't blocking anything, but it touches a core system"
-  - "High — data integrity bug that could silently corrupt state"
-  - "Low — nice-to-have cleanup, batch with similar items"
-- Always include at least one alternative with counter-reasoning
-- Present as: Urgent, High, Medium (Recommended), Low — with reasoning in descriptions
+**Only ask when needed:**
 
-Question 3: **Labels** (`multiSelect: true`)
-- Query existing labels for the target project with `list_issue_labels` BEFORE asking
-- Present relevant labels as options (type label pre-selected via recommendation, domain labels as choices)
-- Group by type vs domain in descriptions
-- 1-3 labels is the sweet spot — don't present more than 6-8 options
-
-Question 4 (if applicable): **Relations and hierarchy** (`multiSelect: true`)
+Question 1 (if applicable): **Relations and hierarchy** (`multiSelect: true`)
 - Only include this question if the user mentioned related issues, or the issue sounds like it could be a sub-task
 - Options: "Sub-issue of [XEV-###]", "Blocks [XEV-###]", "Blocked by [XEV-###]", "Standalone (no relations)"
 
-**Round 2 — Only if needed:**
-
-If the user's description was vague, ask a follow-up round:
-- Scope clarification (what's in/out)
-- Reproduction details (for bugs)
-- Whether to decompose into sub-issues (for large features)
+Question 2 (if vague): **Scope clarification**
+- Only if the user's description is too vague to draft a useful issue
+- Reproduction details (for bugs), scope boundaries (for features), decomposition (for large features)
 
 ### Batch mode (decomposing a large feature)
 
@@ -174,14 +156,14 @@ Relations: [blocks/blockedBy/relatedTo if any]
 Then **immediately use the Question tool** (`multiSelect: false`) — do NOT present this as plain text options:
 - "Create this issue" (Recommended)
 - "Edit before creating" — let the user specify what to change
-- "Cancel"
 
-**If you skip the Question tool here and just ask in prose, you are violating this skill's core requirement.**
+No "Cancel" option — if the user wants to bail, they'll say so naturally.
 
 **Assignment logic:**
 - Status Todo or In Progress → assign to "me"
 - Status Backlog → leave unassigned (it's an idea, not a commitment)
-- Default status: Backlog for new issues unless the user indicates they're starting work
+
+**Default status: Todo, not Backlog.** Most issues created during active work sessions represent concrete work the user intends to do. Use Backlog only when the issue is explicitly speculative, low-priority exploratory, or the user says "someday" / "maybe" / "backlog". When in doubt, default to Todo — it's easier to deprioritize than to forget about something stuck in Backlog.
 
 ## Step 5: Create
 
@@ -196,6 +178,7 @@ Call `save_issue` with all fields. After creation:
 - **Always include a type label** (Bug, Feature, Improvement, Refactoring) — it's the primary categorization
 - **Domain labels are contextual** — only add if the issue clearly belongs to a subsystem. "Frontend" on a purely backend issue is wrong even if the project has the label.
 - **Don't create new labels** without asking. Suggest creating if nothing fits, but default to using existing labels.
+- **Match labels by name, not description.** A label named "API" is the right label for API work even if its description says something narrow. The name is the primary signal; the description is context, not a filter.
 
 ## Priority Guidelines
 
@@ -208,4 +191,4 @@ Never default to High. The scale should feel meaningful:
 | **Medium** | Important improvement, non-blocking bug, planned feature work |
 | **Low** | Nice-to-have, cleanup, investigation spikes, future considerations |
 
-**Always explain your reasoning** in 1-2 sentences in the option description. Present the suggested priority AND one alternative with its reasoning. Let the user pick what resonates.
+Assign automatically based on these guidelines. Show your choice in the preview — the user will correct if wrong.

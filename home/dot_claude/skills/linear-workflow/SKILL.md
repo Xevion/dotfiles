@@ -25,6 +25,16 @@ This skill auto-activates based on pattern matching. The key distinction is **ac
 4. **Action keywords without ID** — "mark the issue as done", "update the Linear issue", "add a comment to the issue" (requires a previously-referenced issue in session)
 5. **Relevance queries** — "are there related issues?", "does this affect any Linear issues?", "check Linear"
 
+### Ambient (project-aware)
+
+**If the current project's CLAUDE.md contains a `## Linear Issue Tracking` section**, this skill is ambient for the entire session. This means:
+
+- **When completing a feature, fix, or significant change**, proactively ask: "Should I update any Linear issues to reflect this work?" — don't wait for the user to remember.
+- **When the user describes work that sounds like it maps to an existing issue**, check Linear and surface the match: "This looks like it could be XEV-### — want me to update it?"
+- **At natural session breakpoints** (commit, task completion, context switch), remind about in-progress issues that may need status updates.
+
+**This is NOT unprompted relevance detection** (Section 4 below still requires explicit asks for broad searches). Ambient activation is about **nudging the user** when their actions clearly imply an issue state change, so issues don't drift.
+
 **Do NOT auto-activate when:**
 
 - Issue ID appears in a **subordinate clause** providing context: "as discussed in XEV-123, we should..." → the subject is the discussion, not the issue
@@ -67,29 +77,15 @@ When an issue ID is mentioned with implied action:
 | Done | In Progress (reopen) |
 | Cancelled | Backlog (reopen) |
 
-#### Context-Aware Gate Checks
+#### Gate Checks (Lightweight)
 
-Before completing a status transition, run gate checks appropriate to the **issue type** (inferred from labels or title). Present warnings as soft checks via the Question tool — the user can always override.
+Before marking Done, draft a brief summary comment from conversation context and include it in the transition confirmation. Don't interrogate the user with separate questions about what caused the bug, what was descoped, etc. — extract that from the session context yourself.
 
-**Bug issues — before marking Done:**
-- "What caused the bug and what fixed it?" — if no fix description exists in comments or the conversation, warn and suggest adding one
-- If the conversation contains the fix context, draft a brief summary and propose it as a comment
+**Before marking Done:** Draft a comment summarizing what was done (and what wasn't, if applicable). Present the comment alongside the status change in one confirmation step.
 
-**Feature issues — before marking Done:**
-- "Was the full scope implemented, or was anything descoped?" — warn if the issue description mentions scope items that weren't addressed in the session
-- If descoped, suggest updating the issue description or creating a follow-up issue
+**Before marking In Progress:** Assign to "me" if unassigned. If assigned to someone else, warn before reassigning.
 
-**Spike / Investigation issues — before marking Done:**
-- "What were the findings?" — spikes should always have a conclusion comment
-- Draft a findings summary from the conversation context and propose it
-
-**All issues — before marking In Progress:**
-- Assign to "me" if unassigned
-- If assigned to someone else, warn before reassigning
-
-**All issues — before marking Cancelled:**
-- Always require confirmation with a reason
-- Suggest adding a cancellation comment explaining why
+**Before marking Cancelled:** Require confirmation with a reason. Draft a cancellation comment.
 
 #### Transition Flow
 
@@ -98,7 +94,6 @@ Before completing a status transition, run gate checks appropriate to the **issu
 3. **Confirm via Question tool** (`multiSelect: false`):
    - "Move to [status]" (Recommended if gates pass)
    - "Move to [status] + add comment first"
-   - "Cancel transition"
 4. **Execute** — update status, reassign if needed, add comment if specified
 
 ### 3. Comments
@@ -109,28 +104,12 @@ When adding a comment to an issue (whether prompted or as part of a transition):
 
 1. **Draft the comment** based on conversation context
 2. **Present it to the user** as plain text
-3. **Confirm via Question tool** (`multiSelect: true`) — always these exact 4 options:
+3. **Confirm via Question tool** (`multiSelect: false`):
    - "Post as written"
    - "Skip comment"
-   - First amendment suggestion — a specific alternative wording or addition you think improves the comment
-   - Second amendment suggestion — a different specific revision (e.g., adding a detail, removing a section, changing tone)
+   - "Edit before posting" — user specifies what to change
 
-The amendment suggestions must be **concrete and specific** — not "make it shorter" but an actual rewritten version or a specific change like "Add: 'Blocked by missing API endpoint'".
-
-#### Example: Comment Confirmation Flow
-
-Suppose the user fixed a race condition in `fetchGallery` and wants to mark XEV-89 (a bug) as Done.
-
-**Drafted comment presented as plain text:**
-> Fixed the race condition in `fetchGallery` — the resize event handler was firing multiple concurrent fetches. Added a debounce guard. Did not address the related thumbnail cache invalidation mentioned in the issue description; that's a separate concern.
-
-**Question tool call (`multiSelect: true`):**
-- **"Post as written"** — comment looks accurate and complete
-- **"Skip comment"** — mark Done without commenting
-- **"Add debounce duration"** — revise to: "...Added a 150ms debounce guard on the resize handler. Did not address..."
-- **"Remove thumbnail note"** — revise to: "Fixed the race condition in `fetchGallery` — the resize event handler was firing multiple concurrent fetches. Added a debounce guard."
-
-Each amendment option names the specific change and shows the resulting text, so the user can pick without rewriting anything. Selecting both amendments applies them together. "Post as written" and "Skip" are mutually exclusive with each other and with amendments — if an amendment is selected, the revised version is posted.
+Keep it simple. If the user wants amendments, they'll say what to change.
 
 #### Comment Style Rules
 
