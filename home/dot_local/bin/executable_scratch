@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Scratch pad — creates or attaches to a persistent tmux session running micro
+# on a single shared file. Designed to be called from a kitty overlay.
+#
+# Toggle behavior: tracks the overlay's kitty window ID in a lockfile per-tab.
+# Second press closes the existing overlay and exits.
+
+SCRATCH_FILE="${SCRATCH_FILE:-$HOME/Obsidian/Primary/scratch.md}"
+SESSION_NAME="scratch"
+
+# Get current tab ID from kitten @ ls (the active tab in the active OS window)
+TAB_ID=$(kitten @ ls 2>/dev/null | jq -r '.[].tabs[] | select(.is_active) | .id' | head -1)
+LOCKFILE="/tmp/kitty-scratch-tab-${TAB_ID}"
+
+# Toggle: if lockfile exists and the window is still alive, close it and exit
+if [[ -f "$LOCKFILE" ]]; then
+    overlay_wid=$(cat "$LOCKFILE")
+    if [[ "$overlay_wid" != "$KITTY_WINDOW_ID" ]]; then
+        if kitten @ close-window --match "id:${overlay_wid}" 2>/dev/null; then
+            rm -f "$LOCKFILE"
+            exit 0
+        fi
+        # Window no longer exists (crash/manual close) — stale lockfile
+        rm -f "$LOCKFILE"
+    fi
+fi
+
+# Record our window ID so the next press can close us
+echo "$KITTY_WINDOW_ID" > "$LOCKFILE"
+
+# Clean up lockfile when we exit (overlay closed, tmux detached, etc.)
+trap 'rm -f "$LOCKFILE"' EXIT
+
+# Ensure the scratch file exists
+if [[ ! -f "$SCRATCH_FILE" ]]; then
+    mkdir -p "$(dirname "$SCRATCH_FILE")"
+    touch "$SCRATCH_FILE"
+fi
+
+# If the session exists, attach to it. Otherwise create it with micro.
+if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+    exec tmux attach-session -t "$SESSION_NAME"
+else
+    exec tmux new-session -s "$SESSION_NAME" micro "$SCRATCH_FILE"
+fi
