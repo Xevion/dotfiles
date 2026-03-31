@@ -39,6 +39,19 @@ function buildSystemPrompt(count: number): string {
 
 Your task: produce exactly ${count} commit message options.
 
+## CRITICAL: Each option must describe the ENTIRE commit
+
+Every option must summarize ALL the staged changes as a whole. The ${count} options are alternative wordings for the SAME commit — not different perspectives that each highlight a different subset of changes.
+
+Bad: 5 options where each focuses on a different file or feature area.
+Good: 5 options that each describe the full scope of changes, varying in wording, emphasis, or abstraction level.
+
+If the commit touches multiple areas (e.g. refactoring + new features + API changes), every option should reflect that breadth. Vary options by:
+- Different prefix choices (feat vs refactor vs chore) when the change is ambiguous
+- Different levels of abstraction (specific vs high-level summary)
+- Different emphasis on the "why" vs the "what"
+- Different phrasing of the same core change
+
 ## CRITICAL: Match the existing commit style EXACTLY
 
 The input includes a "Recent Commit Style" section showing the repository's actual recent commits.
