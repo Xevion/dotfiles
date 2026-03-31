@@ -35,3 +35,9 @@ ollama = "latest"
 "go:mvdan.cc/sh/v3/cmd/shfmt" = "latest"
 btop = "latest"
 tmux = "latest"
+ruby = "latest"
+
+[settings]
+
+[settings.ruby]
+compile = false
