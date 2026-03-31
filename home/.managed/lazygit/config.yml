@@ -60,7 +60,7 @@ git:
   # Paging (use delta)
   pagers:
     - colorArg: always
-      pager: delta
+      pager: delta --paging=never
   # Auto-behaviors
   autoFetch: true
   autoRefresh: true
@@ -124,6 +124,12 @@ customCommands:
         title: "Commit message"
         key: "message"
     command: 'git commit --no-verify -m "{{.Form.message}}"'
+  - key: "P"
+    context: "commits"
+    description: "Push up to selected commit"
+    command: "git push origin {{.SelectedCommit.Sha}}:refs/heads/$(git rev-parse --abbrev-ref HEAD)"
+    loadingText: "Pushing..."
+    output: popup
   - key: "o"
     context: "commits"
     description: "Open commit in GitHub"

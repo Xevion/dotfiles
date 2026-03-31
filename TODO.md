@@ -291,7 +291,7 @@ These items were in the original TODO.md and need to be categorized/completed:
 - [ ] **hishtory executable not available on init** - Add to installation checklist
 - [x] **add GPG key to bw** - GPG configuration completed with WSL integration
 - [ ] **dracula theme tracking, kitty/micro** - Add to Priority 3, Item 10 (dev tools)
-- [ ] **lazygit fix difftool** - Add lazygit config to dotfiles
+- [x] **lazygit fix difftool** - Add lazygit config to dotfiles
 - [ ] **testing in github codespaces** - Add to Priority 4, Item 15 (testing)
 
 ---
