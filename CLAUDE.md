@@ -459,3 +459,4 @@ AI: *Uses Question tool with multiple: false* "Which file should I edit?
 @TODO.md
 @FAQ.md
 @ONBOARDING.md
+@ARCHITECTURE.md

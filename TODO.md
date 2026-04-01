@@ -35,7 +35,7 @@
 
 ### 3. Define Cross-Platform Strategy
 
-- [ ] Create platform detection reference (`.data.wsl`, `.data.chassis`, OS checks)
+- [x] Create platform detection reference (`.data.wsl`, `.data.chassis`, OS checks)
 - [ ] Document template conditionals strategy (when to use OS-specific blocks)
 - [ ] Define Windows vs WSL separation of concerns
 - [ ] Create decision matrix for which tools go where (Windows native vs WSL)
@@ -219,7 +219,7 @@
 ### 12. Enhanced Documentation
 
 - [x] Expand README.md with comprehensive sections (Major refactor completed)
-- [ ] Add ARCHITECTURE.md explaining repo structure
+- [x] Add ARCHITECTURE.md explaining repo structure
 - [ ] Create CONTRIBUTING.md for your future self
 - [ ] Add inline comments to all template files
 - [ ] Document all chezmoi hooks and their purposes
@@ -271,7 +271,7 @@
 - [x] Convert removed files to templates (nushell/env.nu → env.nu.tmpl, dot_gitconfig → dot_gitconfig.tmpl)
 - [x] Clean up commented-out code in commonrc.sh.tmpl (removed dead zsh/xset/todoist code)
 - [x] Review and update `.chezmoiignore` patterns
-- [ ] Audit and remove unused templates
+- [x] Audit and remove unused templates
 - [ ] Standardize file naming conventions across repo
 - [x] Remove deprecated hooks (old shell-based hooks if fully migrated to TS) - Migrated to TypeScript
 - [ ] Archive old/unused configuration files
