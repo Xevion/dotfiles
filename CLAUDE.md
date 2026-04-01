@@ -133,7 +133,7 @@ Some configs are stored in `home/.managed/` and deployed via chezmoi symlinks ra
 - Symlink target at: `home/dot_config/<tool>/symlink_config.toml.tmpl` (contains the source path)
 - Deployed result: `~/.config/<tool>/config.toml` → symlink → chezmoi source file
 
-⚠️ **Glob does NOT search hidden directories** (`.` prefix). When looking for files in `.managed/`, use `ls -la home/.managed/` via Bash instead of Glob. Known `.managed/` subdirectories: `cursor`, `git`, `intellij`, `lazygit`, `mise`, `share`, `vscode`, `zed`.
+⚠️ **Glob does NOT search hidden directories** (`.` prefix). When looking for files in `.managed/`, use `ls -la home/.managed/` via Bash instead of Glob. See [ARCHITECTURE.md § The `.managed/` Pattern](ARCHITECTURE.md#the-managed-pattern) for the current list of subdirectories.
 
 **Finding Files - Template Extension Patterns:**
 
@@ -171,8 +171,11 @@ Common patterns where `.tmpl` is added to the FULL filename:
 
 **Secret Management:**
 - Age encryption for sensitive files (recipient: `age1s3ctpj9lafl6qwyvd89sn448us7gdzd53d8yyhsc7zny78c0k4sqerrkze`)
-- Doppler integration for API keys/tokens
+- Doppler integration for API keys/tokens (project: `dotfiles`, config: `production`)
 - Encryption key bootstrapped via hooks from Doppler
+- **Doppler CLI**: Use `doppler secrets set -p dotfiles -c production KEY='value'` to add secrets directly
+- Key naming convention: `SCREAMING_SNAKE_CASE`, descriptive (e.g., `RBW_EMAIL`, `R2_FUSE_URL`, `SPOTIFY_CLIENT_ID`)
+- When templating a value with Doppler, create the secret via CLI in the same session — don't leave it for the user
 
 **Stale File Cleanup (`.chezmoiremove`):**
 - Chezmoi does NOT automatically remove target files when a source file is deleted or renamed
@@ -295,6 +298,39 @@ chezmoi add --encrypt ~/.ssh/config
 2. Add the OLD target path to `home/.chezmoiremove` so chezmoi cleans up the stale target
 3. Confirm with user before adding to `.chezmoiremove` (removal is destructive)
 4. Example: renaming `dot_config/fish/functions/z.fish` → add `.config/fish/functions/z.fish` to `.chezmoiremove`
+
+**Convert a static file to a Doppler-templated file:**
+1. Rename via `git mv home/dot_config/tool/file home/dot_config/tool/file.tmpl`
+2. Replace the literal value with `{{ dopplerProjectJson.KEY_NAME }}`
+3. Create the Doppler secret: `doppler secrets set -p dotfiles -c production KEY_NAME='literal-value'`
+4. Re-stage the renamed file: `git add home/dot_config/tool/file.tmpl`
+
+## Reviewing Staged Changes for Sensitive Data
+
+**When auditing staged files before commit, check for ALL of the following:**
+
+- API keys, client IDs, tokens (even "public" ones like Spotify client IDs)
+- Email addresses, usernames, account identifiers
+- Discord/Slack/platform user IDs, channel IDs, guild IDs
+- Tracking GUIDs, install IDs, analytics identifiers (e.g., OBS `InstallGUID`, `CookieId`)
+- Cloud account IDs embedded in URLs (e.g., Cloudflare account hash in R2 endpoint URLs)
+- Personally revealing metadata (category names, nicknames, relationship labels)
+- Session tokens, cookie values, sync timestamps
+
+**For each finding, recommend the appropriate action:**
+
+| Type | Action |
+|---|---|
+| Secrets, tokens, credentials | Doppler variable or age encryption |
+| PII (emails, user IDs, account IDs) | Doppler variable |
+| Tracking/analytics identifiers | Remove the line (app regenerates on next run) |
+| Endpoint URLs with embedded account info | Doppler variable |
+| Personally revealing but non-sensitive metadata | Flag to user, let them decide |
+
+**Also validate symlink integrity for staged changes:**
+- For every staged `symlink_*.tmpl`, verify the target file in `.managed/` is tracked or also staged
+- For every staged `.managed/` file, verify a corresponding `symlink_*.tmpl` exists
+- Flag broken symlinks (target untracked) or orphaned managed files (no symlink)
 
 ## Platform Coverage
 

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+URL='{{ dopplerProjectJson.R2_FUSE_URL }}'
+BUCKETNAME='private'
+CLOUDFLARE_TOKEN_FILE="$HOME/.passwd-s3fs"
+MOUNT_POINT='/mnt/r2_private/'
+
+[ ! -d $MOUNT_POINT ] && sudo mkdir -p $MOUNT_POINT
+sudo chown $USER:$USER $MOUNT_POINT
+sudo chmod u+rwx,g=,o= $MOUNT_POINT
+
+s3fs -o passwd_file=$CLOUDFLARE_TOKEN_FILE -o url=$URL -o use_path_request_style -o endpoint=auto $BUCKETNAME $MOUNT_POINT

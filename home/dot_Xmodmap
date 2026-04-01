@@ -1,0 +1,3 @@
+! Remap XF86Tools keys to F13 so GNOME doesn't open Settings
+keycode 179 = F13 NoSymbol F13
+keycode 191 = F13 NoSymbol F13

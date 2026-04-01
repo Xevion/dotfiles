@@ -5,7 +5,7 @@
 # Toggle behavior: tracks the overlay's kitty window ID in a lockfile per-tab.
 # Second press closes the existing overlay and exits.
 
-SCRATCH_FILE="${SCRATCH_FILE:-$HOME/Obsidian/Primary/scratch.md}"
+SCRATCH_FILE="${SCRATCH_FILE:-$HOME/obsidian/Primary/scratch.md}"
 SESSION_NAME="scratch"
 
 # Get current tab ID from kitten @ ls (the active tab in the active OS window)

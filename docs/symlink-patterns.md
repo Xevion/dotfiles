@@ -16,6 +16,8 @@ This repository uses four distinct symlink patterns for different use cases.
 ~/.config/lazygit/config.yml → .managed/lazygit/config.yml
 ~/.config/Code/User/settings.json → .managed/vscode/settings.linux.json
 ~/AppData/Roaming/Cursor/User/settings.json → .managed/cursor/settings.windows.json
+~/.config/nvim → .managed/nvim (directory symlink)
+~/.config/spicetify/config-xpui.ini → .managed/spicetify/config-xpui.ini
 ```
 
 **How it works**: 

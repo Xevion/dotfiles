@@ -1,0 +1,9 @@
+{
+  "integrations": {
+    "opencode": {
+      "models": [
+        "qwen3.5"
+      ]
+    }
+  }
+}

@@ -125,7 +125,7 @@ Some config files need to be editable in-place without running `chezmoi apply` (
 
 Edits made by the application write through the symlink directly to the source file, so they're immediately tracked by git without needing `chezmoi re-add`.
 
-> **Note**: Glob does not search hidden directories. Use `ls -la home/.managed/` to list managed subdirectories. Known subdirs: `cursor`, `git`, `intellij`, `lazygit`, `mise`, `share`, `vscode`, `zed`.
+> **Note**: Glob does not search hidden directories. Use `ls -la home/.managed/` to list managed subdirectories. Known subdirs: `cursor`, `git`, `intellij`, `lazygit`, `mise`, `nvim`, `share`, `spicetify`, `vscode`, `zed`.
 
 ## Secret Management
 
