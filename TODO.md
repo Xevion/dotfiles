@@ -92,7 +92,7 @@
 ### 7. Core Tool Standardization
 
 **mise (development environment manager):**
-- [ ] Add mise configuration file (`.mise.toml` or per-project configs)
+- [x] Add mise configuration file (`.mise.toml` or per-project configs)
 - [ ] Document mise setup and installation
 - [x] Integrate mise activation with shell configs
 - [ ] Document tool version management strategy
@@ -270,7 +270,7 @@
 
 - [x] Convert removed files to templates (nushell/env.nu → env.nu.tmpl, dot_gitconfig → dot_gitconfig.tmpl)
 - [x] Clean up commented-out code in commonrc.sh.tmpl (removed dead zsh/xset/todoist code)
-- [ ] Review and update `.chezmoiignore` patterns
+- [x] Review and update `.chezmoiignore` patterns
 - [ ] Audit and remove unused templates
 - [ ] Standardize file naming conventions across repo
 - [x] Remove deprecated hooks (old shell-based hooks if fully migrated to TS) - Migrated to TypeScript

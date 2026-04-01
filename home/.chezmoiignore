@@ -91,6 +91,7 @@ setup-wsl-gpg.sh
 .bashrc
 .profile
 .bash_aliases
+# Age encryption key (bootstrapped from Doppler via hooks - never managed by chezmoi)
 key.txt
 .tmux.conf
 

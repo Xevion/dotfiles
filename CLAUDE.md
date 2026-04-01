@@ -125,6 +125,16 @@ Project-specific CLAUDE.md files in other repositories take precedence over glob
 - `encrypted_*.age` age-encrypted files (safe to commit)
 - `run_onchange_*` executable scripts that run during apply
 
+**The `.managed/` Directory:**
+
+Some configs are stored in `home/.managed/` and deployed via chezmoi symlinks rather than as direct template files. This pattern is used when a file needs to be editable in-place without running `chezmoi apply` (e.g., `mise`, `lazygit`, `git/delta-config`).
+
+- Source lives at: `home/.managed/<tool>/config.toml`
+- Symlink target at: `home/dot_config/<tool>/symlink_config.toml.tmpl` (contains the source path)
+- Deployed result: `~/.config/<tool>/config.toml` → symlink → chezmoi source file
+
+⚠️ **Glob does NOT search hidden directories** (`.` prefix). When looking for files in `.managed/`, use `ls -la home/.managed/` via Bash instead of Glob. Known `.managed/` subdirectories: `cursor`, `git`, `intellij`, `lazygit`, `mise`, `share`, `vscode`, `zed`.
+
 **Finding Files - Template Extension Patterns:**
 
 ⚠️ **CRITICAL**: Most managed files have `.tmpl` extensions. Use wildcard patterns to find both base and `.tmpl` variants in one search.
