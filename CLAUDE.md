@@ -243,16 +243,10 @@ Common patterns where `.tmpl` is added to the FULL filename:
    - Conditional logic: `{{ if }}...{{ else }}...{{ end }}`
    - Example partial call: `{{ template "commonrc.sh.tmpl" . }}` (passes entire context as `data`)
 
-5. **Suggest TODO list updates** (but DO NOT modify automatically)
-   - When a task is completed, check if `TODO.md` exists in the repository
-   - If the completed task relates to items in TODO.md, **suggest** updating the file
-   - Examples of suggestions:
-     - "I've completed [task]. Would you like me to update TODO.md to mark this item as complete?"
-     - "This work relates to items in TODO.md. Should I update the relevant checkboxes?"
-   - **NEVER** modify TODO.md without explicit user approval
-   - User must explicitly approve (even if not specifically) before making changes
-   - Acceptable approvals: "yes", "go ahead", "update it", "sure", etc.
-   - If unclear, ask: "Should I update TODO.md to reflect this completion?"
+5. **Update TODO.md automatically after completing work**
+   - When a task is completed, update TODO.md as a required final step — do not re-ask
+   - Any prior approval in the session ("yes", "go ahead", "looks good") covers TODO updates too
+   - Only ask if it's genuinely unclear whether the work maps to any TODO item
 
 ## Ambiguous Phrases - Quick Reference
 

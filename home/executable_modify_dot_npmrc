@@ -1,0 +1,5 @@
+#!/bin/bash
+set -euo pipefail
+# Preserve all existing config (e.g., authTokens) except fund=, then enforce fund=false
+grep -v '^fund=' || true
+echo 'fund=false'

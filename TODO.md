@@ -179,9 +179,12 @@
 
 **Language Tools:**
 - [ ] Add Python development configs (pyproject.toml templates, .python-version)
-- [ ] Add Node.js configs (.npmrc, .nvmrc templates)
+  - [x] `~/.config/uv/uv.toml` — python-preference=managed, compile-bytecode
+- [x] Add Node.js configs (.npmrc) — fund=false via modify script (preserves authTokens)
 - [ ] Add Rust configs (rustfmt.toml, clippy settings)
-- [ ] Add Go configs (go.env, tool preferences)
+  - [x] `~/.cargo/config.toml` — mold linker on Linux, net.retry=3
+- [x] Add Go configs (`~/.config/go/env`) — GOBIN → ~/.local/bin
+- [x] Add Ruby configs (`~/.gemrc`) — --no-document
 - [ ] Add language-specific linter/formatter configs
 
 **Terminal Emulators:**
