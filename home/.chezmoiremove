@@ -14,3 +14,6 @@
 .config/opencode/agent/**
 .config/opencode/skill/**
 .config/opencode/superpowers/**
+
+# writing-plans skill disabled/deleted
+.claude/skills/writing-plans/SKILL.md
