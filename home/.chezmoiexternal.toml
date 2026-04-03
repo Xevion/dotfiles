@@ -11,6 +11,13 @@
     url = "https://raw.githubusercontent.com/Xevion/tempo/refs/heads/master/.claude/skills/tempo-config/SKILL.md"
     refreshPeriod = "24h"
 
+[".config/btop/themes"]
+    type = "archive"
+    url = "https://github.com/aristocratos/btop/archive/refs/heads/main.tar.gz"
+    stripComponents = 2
+    include = ["*/themes/**"]
+    refreshPeriod = "720h"
+
 [".tmux/plugins/tpm"]
     type = "git-repo"
     url = "https://github.com/tmux-plugins/tpm.git"
