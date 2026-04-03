@@ -21,17 +21,19 @@ exemplars:
 
 ## Philosophy
 
-<!-- Treat codegen as a build step. Generated files are build artifacts, not source code. Verify staleness in CI. -->
+Treat codegen as a build step. Generated files are build artifacts, not source code. Verify staleness in CI via regen+diff.
 
 ## Conventions
 
-<!-- What to generate, when to regenerate, what to commit, CI verification via regen+diff -->
+- **Commit generated output**: generated files are committed to the repo (not .gitignored) so consumers can use the package without running codegen. CI verifies staleness via `regenerate && git diff --exit-code`
+- **Justfile recipe for regeneration**: expose codegen as a `just` recipe (e.g., `just generate`, `just mocks`) so the command is discoverable and consistent
 
 ## Language-Specific
 
 ### Rust
 
-<!-- build.rs for compile-time codegen (PHF maps, embedded data), sqlx offline mode (.sqlx/ directory) -->
+- **build.rs for compile-time codegen**: generate static data structures (PHF maps from JSON atlases, embedded asset tables) at compile time. Output to `$OUT_DIR` and `include!` in source
+- **sqlx offline mode**: `cargo sqlx prepare` generates `.sqlx/` query metadata for offline compilation. Commit the `.sqlx/` directory; `SQLX_OFFLINE=true` in Docker builds avoids requiring a live database
 
 ### Go
 
@@ -41,12 +43,18 @@ exemplars:
 
 ### TypeScript
 
-<!-- ts-rs generated bindings, barrel index auto-generation -->
+- See [cross-language-type-generation](./cross-language-type-generation.md) for ts-rs barrel index generation
 
 ## Anti-Patterns
 
-<!-- Manually editing generated files, stale generated files not caught in CI, generating into source directories without .gitignore separation -->
+- Manually editing generated files (changes are overwritten on next regen)
+- Stale generated files not caught in CI
+- Generating into source directories without clear separation from hand-written code
+
+## Related Topics
+
+- [cross-language-type-generation](./cross-language-type-generation.md) — ts-rs and tygo conventions for backend→frontend type generation
 
 ## Open Questions
 
-<!-- When to commit generated files vs regenerate in CI, cross-language codegen orchestration -->
+- Cross-language codegen orchestration (ordering, dependency between generators)

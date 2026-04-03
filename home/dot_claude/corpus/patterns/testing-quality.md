@@ -78,8 +78,8 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 
 ### TypeScript
 
-- Vitest as the test framework. Named projects for different test environments in the same `vite.config.ts`
-- Storybook stories as browser component tests via `@storybook/addon-vitest` — stories run with Playwright in headless Chromium alongside jsdom unit tests
+- **Vitest dual-project setup**: configure two named test projects in `vite.config.ts` — (1) `unit` with jsdom environment for fast component/logic tests, (2) `storybook` with Playwright browser environment for visual Storybook tests via `@storybook/addon-vitest`. Both run from a single `vitest` invocation. Used in banner and glint
+- Storybook stories as browser component tests — stories run with Playwright in headless Chromium alongside jsdom unit tests
 - Playwright for E2E tests
 - MSW for API mocking when backend is unavailable
 - Global Vitest `setupFiles` recording sink: configure logger once with recording sink, auto-clear via `beforeEach`, export query helpers by category/level for asserting on structured log output
@@ -93,9 +93,7 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 ### Go
 
 - Options-struct builder for test factories: pointer fields for selective override, atomic sequence counters for collision-free defaults, `t.Helper()` + `t.Fatal` for single-line call sites. Factories call real DB queries, no mocks
-- pgtestdb + template-database cloning: per-test Postgres isolation. Single `NewEnv(t)` wires full stack (pool → queries → services → handler) for integration tests. Fast due to template cloning. CI env-var port-switching (`os.Getenv("CI")`) to select between local dev port and standard CI postgres is simpler than build-tag gating
-- **`createTestDb()` factory for embedded DuckDB**: create an in-memory DuckDB instance with schema initialized per test — the TypeScript equivalent of `openTestStore(t)`. Single-line call sites with zero teardown boilerplate
-- **`openTestStore(t)` factory for embedded K/V stores**: for bbolt, pebble, etc., create the DB in `t.TempDir()` and register cleanup via `t.Cleanup`. Single-line call sites, zero teardown boilerplate — analogous to pgtestdb template cloning for embedded stores
+- Database isolation patterns (pgtestdb, in-memory DuckDB, embedded K/V store factories): see [integration-test-db-isolation](./integration-test-db-isolation.md) for the full pattern catalog
 - **`countingHandler` slog test helper**: implement `slog.Handler` with `atomic.Int32` counting log records matching a pattern. Thread-safe, composable with any inner handler. Asserts log emission without full log capture infrastructure
 
 ### Kotlin

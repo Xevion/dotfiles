@@ -48,6 +48,10 @@ Zero-trust defaults. Validate at system boundaries. Secrets never in code — us
 - Client-side-only auth checks
 - Session cookies without the `Secure` flag when deployed behind TLS termination — `SameSite=Lax` alone is insufficient; `Secure` prevents the cookie from being sent over HTTP even if an attacker can downgrade the connection. Always set `.secure(true)` in production; gate on a config flag rather than hardcoding
 
+## Related Topics
+
+- [session-cookie-auth](./session-cookie-auth.md) — Server-side sessions, opaque cookies, role-based middleware
+
 ## Open Questions
 
 - Token rotation cadence and session expiry strategies

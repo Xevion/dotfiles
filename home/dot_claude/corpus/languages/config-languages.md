@@ -4,7 +4,7 @@ category: languages
 last_audited: 2026-03-26
 exemplars:
   - repo: local/maestro
-    path: config module
+    path: common/src/config/
     note: TOML config with ktoml + kotlinx.serialization, human-readable domain type serializers
   - repo: Xevion/tempo
     path: src/config.ts

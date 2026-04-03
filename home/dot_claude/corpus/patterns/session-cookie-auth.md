@@ -33,3 +33,8 @@ Server-side session state with opaque cookie tokens. The server is the source of
 
 - Cookie vs token trade-offs for mobile/native clients
 - Session clustering strategies for horizontally scaled backends
+
+## Related Topics
+
+- [security-auth](./security-auth.md) — Broader security patterns: token confinement, PKCE, header allowlists
+- [integration-test-db-isolation](./integration-test-db-isolation.md) — pgtestdb for auth integration tests

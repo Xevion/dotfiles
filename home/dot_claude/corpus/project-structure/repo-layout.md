@@ -4,7 +4,7 @@ category: project-structure
 last_audited: 2026-03-27
 exemplars:
   - repo: Xevion/banner
-    path: ""
+    path: "/"
     note: Rust + SvelteKit monorepo with scripts/, docs/ hierarchy, and auto-generated bindings
   - repo: local/maestro
     path: docs/
@@ -35,6 +35,7 @@ Convention over configuration. Predictable locations. Monorepo for tightly coupl
 - **Two-level `docs/`**: entry-point file (`docs/KOTLIN.md`, `docs/STYLE.md`) with a quick-reference table linking to `docs/patterns/` where each topic gets its own file with code examples. `docs/VOCABULARY.md` documents domain terminology AND naming anti-patterns to prevent naming drift across language stacks. In multilingual monorepos, models are the source of truth for structure; VOCABULARY.md is the source of truth for naming
 - **Standard field names table in STYLE.md**: document structured log field names (`duration_ms`, `shader_id`, etc.) in the style guide, ensuring consistent field names across all language stacks in a monorepo
 - **`fixtures/<name>/` for runnable consumer fixtures**: complete mini-projects at the project root, serving as integration test input and living documentation
+- **apps/ + packages/ monorepo split**: for npm/Bun monorepos, `apps/` contains deployable applications (SvelteKit, Electron, mobile), `packages/` contains internal libraries shared across apps. This mirrors the Turborepo convention and is the de-facto standard even when no monorepo tooling is used. See [monorepo-workspace-library](./monorepo-workspace-library.md) for intra-repo package boundary conventions
 
 ## Anti-Patterns
 
@@ -42,8 +43,6 @@ Convention over configuration. Predictable locations. Monorepo for tightly coupl
 - Deeply nested `src/` directories without clear module boundaries
 - Generated code mixed with hand-written code without clear separation
 - Build scripts without their own dependency tracking (polluting app dependencies)
-
-- **apps/ + packages/ monorepo split**: for npm/Bun monorepos, `apps/` contains deployable applications (SvelteKit, Electron, mobile), `packages/` contains internal libraries shared across apps. This mirrors the Turborepo convention and is the de-facto standard even when no monorepo tooling is used. See [monorepo-workspace-library](./monorepo-workspace-library.md) for intra-repo package boundary conventions
 
 ## Open Questions
 

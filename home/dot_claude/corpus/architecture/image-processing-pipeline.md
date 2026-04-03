@@ -31,7 +31,7 @@ Capture once, transform on demand. Store originals, derive variants via CDN/prox
 
 ### Kotlin
 
-<!-- Framebuffer capture, ARGB pixel array sharing between analysis and WebP writer -->
+- Framebuffer capture, ARGB pixel array sharing — to be populated from future project audits
 
 ### Rust
 

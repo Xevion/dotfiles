@@ -62,13 +62,47 @@ Svelte 5 runes exclusively — no legacy stores. Reactive state is explicit via 
 </script>
 ```
 
+## SvelteKit Configuration
+
+### Vite Config Conventions
+
+- **`logLevel: 'warn'`**: suppress Vite startup banner while keeping errors/warnings visible. Standard for all SvelteKit projects
+- **`clearScreen: false`**: preserve terminal output across recompiles. Essential when running alongside Rust/Go backends where compiler output matters
+- **`envPrefix: ['VITE_', 'LOG_']`**: extend beyond default `VITE_` to expose structured logging env vars (`LOG_LEVEL`, `LOG_JSON`) to the client
+- **`fs.allow: ['styled-system']`**: required for PandaCSS projects — Vite's FS sandbox blocks access to the generated `styled-system/` directory by default
+- **`server.watch` exclusions**: always exclude `.svelte-kit/generated/**` and `styled-system/**` (if using PandaCSS) from file watching to prevent rebuild loops
+- **`__APP_VERSION__` via `define`**: inject version from `Cargo.toml` or `package.json` at build time. Enables version display in frontend without manual sync
+- **Vitest resolve `conditions: ['browser']`**: when running under `VITEST`, set `resolve: { conditions: ["browser"] }` to ensure test environment resolves package exports using the browser condition field, matching production behavior
+
+### Adapter & Config
+
+- **`@xevion/svelte-adapter-bun`** as the default adapter for Bun-targeted deployments. Standard options: `out: "build"`, `serveAssets: false` (assets served by CDN/proxy). Use `@sveltejs/adapter-node` for Node.js targets, `@sveltejs/adapter-cloudflare` for Workers
+- **`dynamicCompileOptions` for runes gating**: `runes: (filename) => !filename.includes('node_modules')` enables runes mode for project code while letting third-party Svelte components compile without runes. Transitional pattern — remove when the dependency ecosystem catches up to Svelte 5
+- **`@xevion/ts-eslint-extra`** custom ESLint parser: resolves `.svelte` named exports for type-aware linting. Used alongside `svelte-eslint-parser` in all SvelteKit projects with ESLint
+
+### CSP (Content Security Policy)
+
+Start with `reportOnly` mode — observe violations without blocking. Directives include:
+- `script-src: 'self'` + analytics domains (PostHog)
+- `script-src-attr: 'unsafe-inline'` for inline event handlers
+- `img-src: 'self', 'data:'` + CDN domains (Cloudflare R2, Discord CDN, etc.)
+- `connect-src`: includes `ws://localhost:*` in dev for HMR
+- `report-uri: '/api/csp-report'` endpoint for violation collection
+
+Tighten from `reportOnly` to enforcing once the violation log is clean.
+
 ## Anti-Patterns
 
 - **Mixing Svelte 4 stores with rune-based components**: projects on Svelte 5 that retain `writable()`/`derived()` stores alongside `$state` runes in components are in a partial migration state. Module-scoped `$state` variables are the idiomatic replacement. The `$store` subscription syntax mixed with `$derived` in the same component is the primary Svelte 5 anti-pattern
 - Using `$effect` for derived state that `$derived` can express
 - Global mutable singletons instead of context-scoped state (exception: bare module-scoped `$state` is acceptable for single-route SPAs — see Conventions)
 
+## Related Topics
+
+- [state-management](../architecture/state-management.md) — Cross-framework state patterns (page-scoped factories, cursor-paginated stores, $effect.root)
+- [css-styling](./css-styling.md) — Tailwind/PandaCSS patterns used alongside Svelte components
+
 ## Open Questions
 
 - Svelte 5 snippet composition patterns
-- Server-only vs shared state boundaries in SvelteKit
+- Server-only vs shared state boundaries in SvelteKit (also tracked in [state-management](../architecture/state-management.md))

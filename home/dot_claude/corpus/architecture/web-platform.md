@@ -30,6 +30,16 @@ Prefer native web platform APIs over library abstractions when browser support i
 - **Breakpoint reactive store via matchMedia**: track responsive breakpoints (isMobile, isDesktop) as reactive `$state` values driven by `window.matchMedia` listeners with SSR guards. Components read breakpoint state directly for conditional rendering (drawer vs sidebar, bottom sheet vs panel)
 - **Worker-side preprocessing before inference**: perform all data transformation (resize, normalize, format conversion) inside the Web Worker rather than the main thread. The main thread passes only raw pixel data; tensor manipulation happens worker-side. Keeps the UI thread free during expensive preprocessing phases
 
+### Content Security Policy
+
+Start SvelteKit projects with CSP in `reportOnly` mode — observe violations without breaking functionality. Standard directives:
+- `script-src: 'self'` + analytics domains
+- `img-src: 'self', 'data:'` + CDN domains (Cloudflare R2, Discord CDN, etc.)
+- `connect-src`: include `ws://localhost:*` in dev for HMR WebSocket
+- `report-uri: '/api/csp-report'` for server-side violation collection
+
+Tighten from `reportOnly` to enforcing once the violation log is clean. Configure in `svelte.config.js` via `kit.csp`.
+
 ## Anti-Patterns
 
 - Polyfilling APIs that have >95% browser support

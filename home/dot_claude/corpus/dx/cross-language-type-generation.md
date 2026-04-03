@@ -21,11 +21,11 @@ exemplars:
 
 ## Philosophy
 
-<!-- Generated types are the single source of truth for API contracts. Backend defines the canonical type; frontend consumes the generated binding. No hand-maintained TypeScript interfaces that mirror backend types. -->
+Generated types are the single source of truth for API contracts. Backend defines the canonical type; frontend consumes the generated binding. No hand-maintained TypeScript interfaces that mirror backend types.
 
 ## Conventions
 
-<!-- ts-rs (Rust→TS), tygo (Go→TS), protobuf as language-agnostic alternative. Barrel index generation, staleness detection, CI verification via regen+diff -->
+- **CI verification via regen+diff**: regenerate bindings in CI and `git diff --exit-code` the output. Stale generated files are a build failure, not a warning
 
 ## Language-Specific
 
@@ -53,4 +53,6 @@ exemplars:
 
 ## Open Questions
 
-<!-- Protobuf vs language-specific codegen, OpenAPI as an intermediate representation, handling breaking changes in generated types -->
+- Protobuf vs language-specific codegen trade-offs
+- OpenAPI as an intermediate representation
+- Handling breaking changes in generated types

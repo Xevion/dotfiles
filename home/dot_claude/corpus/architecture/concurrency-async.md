@@ -96,9 +96,8 @@ pub async fn shutdown(self, timeout: Duration) -> bool {
 
 ### Go
 
-- **Lightweight shutdown tracker**: `sync.WaitGroup` + `sync.Once`-protected close channel. `Add()`/`Done()` bracket in-flight critical operations; `Stop()` signals shutdown via `once.Do(func() { close(stopping) })`; `Wait(timeout)` drains with a bounded timeout using a goroutine + `select`. No per-subsystem interface required — the Go equivalent of the Rust RAII ShutdownTracker pattern
-- **Two-phase shutdown**: `Stop()` halts new ticks, then a bounded drain (select on done-channel vs timeout) precedes context cancellation. Avoids a fixed-sleep anti-pattern between phases — prefer signalling the scheduler's internal done-channel or waiting on a WaitGroup with a timeout
 - **Independent housekeeping goroutines**: housekeeping tasks (heartbeat, self-metrics emission) that must not be gated by the primary work path run on independent goroutines with their own tickers, racing the same `stopCh` and `ctx.Done()` signals as the main loop. Prevents rate-limiter or API stalls from delaying observability data
+- See [graceful-shutdown](../patterns/graceful-shutdown.md) for Go shutdown tracker, two-phase shutdown, and bounded drain patterns
 
 ### Kotlin
 
@@ -110,6 +109,11 @@ pub async fn shutdown(self, timeout: Duration) -> bool {
 - Unbounded channels/queues (memory pressure under load)
 - Blocking in async context (use `spawn_blocking` for CPU-bound work)
 - Relying on async Drop for cleanup (not yet stable in Rust)
+
+## Related Topics
+
+- [graceful-shutdown](../patterns/graceful-shutdown.md) — Signal handling, bounded drain, Go two-phase shutdown
+- [rust](../languages/rust.md) — Rust-specific async/sync patterns and thread pool conventions
 
 ## Open Questions
 

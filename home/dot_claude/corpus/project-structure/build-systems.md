@@ -46,13 +46,25 @@ test *args:
 
 - **Language-native builds**: Cargo for Rust, Bun for TypeScript, Gradle KTS for Kotlin
 - **mise for tool versions**: pin tool versions per-project via `.mise.toml`. Pin only tools not managed by the project's primary package manager — for Node/Bun projects use `package.json` `engines` for runtime constraints and mise for the rest
+- **mise tool installation patterns**: `"cargo:cargo-nextest" = "latest"` for Rust dev tools, `"npm:@xevion/tempo" = "latest"` for npm-based tools. Use `[settings.npm] package_manager = "bun"` to force mise to use Bun for npm: tool installations. Use `"latest"` for primary runtimes (rust, bun) but exact pins for CI-sensitive tools whose output changes frequently
+- **mise env injection**: `[env] RUSTUP_TOOLCHAIN = "nightly"` for project-scoped nightly Rust — cleaner than `rustup override` or `rust-toolchain.toml` when the nightly requirement is development-only
+- **CI/local tool version drift**: CI-sensitive tools (Go linters, formatters) must be pinned to the same version in `mise.toml` and CI config. `"latest"` resolves at install time — if CI resolves it a week later than local, lint rules may differ. See [dependency-management](../dx/dependency-management.md#cilocal-tool-version-synchronization) for the full convention
 - **Typed TypeScript orchestrator config**: own subsystem definitions, autoFix pairing, dev process specs, and preflight checks in a config file (like `tempo.config.ts`). Justfile as pure pass-through. Enables IDE completion and cross-subsystem coordination
 - **Justfile self-delegation**: tools that manage dev workflows should use themselves for their own development. Validates the tool in real use
 - **Pre-commit partial-staging detection**: build the set of partially-staged files before formatting; abort if the formatter modifies files in that set. Only re-stage files from the original staged set
 - **Delegated check scripts**: parallel execution of independent checks (format, compile, lint, test) with auto-fix loop — if only formatting failed and all peers passed, apply the formatter and re-verify
-- **Justfile as pure passthrough to tempo**: for Rust projects using tempo as the typed config-driven runner, every Justfile recipe is a one-liner delegating to `tempo check`, `tempo fmt`, `tempo lint`, etc. No logic in Justfile at all — tempo drives all orchestration
+- **tempo as the primary dev workflow tool**: `@xevion/tempo` is the strongly recommended default for all new projects. Provides typed subsystem definitions, check/test/dev orchestration, preflight hooks, custom commands with flag parsing, and auto-fix pairing — all via `tempo.config.ts`. Justfile serves as a thin passthrough only (`check *args: bunx tempo check {{args}}`)
+- **tempo subsystem architecture**: define subsystems (frontend, backend, infra) with aliases, per-subsystem commands (`format-check`, `format-apply`, `lint`, `type-check`, `build`), auto-fix mappings (`format-check` → `format-apply`), and `requires` for optional tool dependencies. Each subsystem declares its directory and runtime
 - **tempo preset-override-extend pattern**: in `tempo.config.ts`, spread a typed preset (`presets.rust()`), selectively override commands that need workspace flags, and extend with additional checks (cargo-deny, cargo-machete, doc-check with `RUSTDOCFLAGS=-D warnings`). The `requires` field on each check communicates optional tool dependencies and skips gracefully when absent
+- **tempo preflights**: pre-check hooks that run before commands — node_modules existence, PandaCSS codegen staleness, ts-rs bindings generation, SQLx query preparation. Preflights ensure derived artifacts are fresh before checks run
+- **tempo custom commands**: extend beyond check/test/dev with project-specific commands (`deploy`, `db`, `migrate`, `bindings`, `docker-build`) with typed flag definitions. Commands can have hooks (`before:dev`, `before:check`) for conditional setup
 - **`set dotenv-load` in Justfile**: standard header for projects that need environment-specific paths (GPU library locations, custom SDK roots). Auto-loads `.env` variables into recipe execution
+
+### Justfile Micro-Patterns
+
+- **Alias shortcuts**: map single-letter aliases to frequent recipes (`c := check`, `d := dev`, `t := test`, `l := lint`). Saves keystrokes in daily use
+- **`[script("bun")]` for complex recipes**: embed TypeScript directly in Justfile recipes for medium-complexity logic that doesn't warrant a separate script file. Use for benchmark harnesses, dynamic port allocation, or conditional workflows
+- **Randomized infrastructure ports**: use random high-numbered ports (10000-60000) for Docker Compose services to avoid conflicts when multiple compose stacks run in parallel. Ports are hardcoded in `docker-compose.yml` and exposed via `.env` as `PORT`, `FRONTEND_PORT`, `DB_PORT`, etc. for Justfile/tempo consumption
 
 ## Anti-Patterns
 

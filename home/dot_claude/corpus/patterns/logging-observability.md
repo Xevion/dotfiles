@@ -99,6 +99,11 @@ let filter = EnvFilter::new(format!(
 - Log-and-throw (double reporting the same error)
 - Using `--quiet` on commands you're trying to diagnose
 
+## Related Topics
+
+- [go](../languages/go.md) — slog LogValuer, LevelTrace, FilteringHandler, handler chain patterns
+- [python](../languages/python.md) — stdlib logging conventions, level discipline, centralized setup
+
 ## Open Questions
 
 - OpenTelemetry integration for tracing across service boundaries

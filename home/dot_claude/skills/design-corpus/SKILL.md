@@ -43,7 +43,7 @@ digraph consult {
 
 ## Rules
 
-- **Read-only.** Never modify corpus files during a project session. Updates happen through the `design-corpus-maintain` skill in the chezmoi repo.
+- **Read-only.** Never modify corpus files during a project session. Use `design-corpus-audit` to check project conformance or `design-corpus-bootstrap` to generate scaffolding.
 - **Lazy loading.** Only read topics relevant to the current task. The index tells you which ones matter.
 - **Conventions are defaults, not mandates.** If a project has its own CLAUDE.md or conventions that conflict, project-local conventions win.
 - **Mention conflicts.** If the project diverges from corpus conventions, mention it briefly — the user may want to update the corpus or the project.

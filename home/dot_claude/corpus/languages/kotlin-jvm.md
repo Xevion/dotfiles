@@ -4,10 +4,10 @@ category: languages
 last_audited: 2026-03-26
 exemplars:
   - repo: local/maestro
-    path: common module
+    path: common/src/
     note: "@JvmInline value classes for domain types, ReadWriteProperty config delegation, Kotest DescribeSpec with property-based pathfinding tests"
   - repo: Xevion/glint
-    path: mod/common orchestration + API modules
+    path: mod/common/src/
     note: "Tick-driven state machine with CompletableFuture polling, sealed ApiError with companion factory"
 ---
 

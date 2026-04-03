@@ -12,18 +12,23 @@ exemplars:
 
 ## Philosophy
 
-<!-- Ship ESM only. Conditional exports for Bun/Node/types. Cross-runtime compatibility testing. Automated releases gated on CI. -->
+Ship ESM only. Conditional exports for Bun/Node/types. Cross-runtime compatibility testing. Automated releases gated on CI.
 
 ## Conventions
 
-- **Bun workspace source exports for internal consumers**: within a Bun workspace, point `exports` at raw `.ts` source files (`"import": "./src/index.ts"`). Bun resolves TypeScript natively, eliminating the build step during development. The build script (tsc + tsc-alias) produces `dist/` only for external publishing
-- **Dual export modes**: workspace-internal consumption uses source exports. Before `npm publish`, exports must point at compiled `dist/` files with conditional `types`/`import` fields. The `tsc-alias` tool rewrites path aliases in the compiled output
+- **Workspace source exports and dual modes**: see [monorepo-workspace-library](../project-structure/monorepo-workspace-library.md) for Bun workspace source exports and the dual export mode pattern
 - Bun build pipeline, conditional exports (bun/types/default), package.json fields (files, bin, engines), release-please, are-the-types-wrong validation
 
 ## Anti-Patterns
 
-<!-- CJS-only packages, missing types field, no engines constraint, manual version bumps, publishing without CI gate -->
+- CJS-only packages without ESM entry point
+- Missing `types` field in package.json exports
+- No `engines` constraint (consumers discover compat issues at runtime)
+- Manual version bumps (use release-please or similar)
+- Publishing without CI gate
 
 ## Open Questions
 
-<!-- Dual CJS/ESM publishing when consumers require it, JSR as npm alternative, provenance attestations -->
+- Dual CJS/ESM publishing when consumers require it
+- JSR as npm alternative
+- Provenance attestations

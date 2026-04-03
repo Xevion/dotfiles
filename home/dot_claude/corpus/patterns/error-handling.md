@@ -73,6 +73,11 @@ enum JobError {
 - `panic!`/`throw` for control flow — only for bugs/invariant violations
 - Implicit retry logic scattered across callers instead of typed at the error level
 
+## Related Topics
+
+- [rust](../languages/rust.md) — Rust-specific error patterns (multi-level hierarchies, miette::Diagnostic, help() methods)
+- [api-design](../architecture/api-design.md) — Error types at API boundaries (IntoResponse, dual-surface mapping)
+
 ## Open Questions
 
 - Error telemetry standards (when to emit metrics vs just log)

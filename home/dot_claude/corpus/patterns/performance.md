@@ -39,7 +39,8 @@ Measure first. Profile-guided optimization. Avoid premature optimization. Budget
 - **Cached results for interactive re-processing**: cache raw output (logits, masks, scores) from expensive inference calls. Post-processing functions (re-threshold, smoothing) operate on cached results without re-running inference, enabling sub-millisecond interactive parameter adjustment
 
 ### Go
-<!-- pprof for profiling, benchmarks with testing.B, sync.Pool for allocation reduction -->
+
+- pprof profiling, `testing.B` benchmarks, `sync.Pool` for allocation reduction — to be populated from future project audits
 
 ## Anti-Patterns
 
@@ -49,3 +50,5 @@ Measure first. Profile-guided optimization. Avoid premature optimization. Budget
 - Unbounded memory growth
 
 ## Open Questions
+
+- Flamegraph-driven optimization workflow and tooling

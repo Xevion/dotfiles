@@ -30,11 +30,13 @@ exemplars:
 
 ## Philosophy
 
-<!-- Docker for reproducible deploys and local dev parity. Compose for multi-service local development. Layer caching as a first-class optimization concern. -->
+Docker for reproducible deploys and local dev parity. Compose for multi-service local development. Layer caching as a first-class optimization concern.
 
 ## Conventions
 
-<!-- Multi-stage builds, deps-only layers, runtime base matching entrypoint, Compose for local dev -->
+- **Multi-stage builds**: separate dependency installation from application build. Each stage has a clear purpose (planner → deps → build → runtime)
+- **Deps-only layers**: install dependencies in a cached layer before copying application source. Invalidation happens only when lockfiles change
+- **Runtime base matching entrypoint**: use the actual runtime image (Bun, Node, etc.) as the final stage, not a generic Alpine
 
 ## Language-Specific
 
@@ -52,14 +54,25 @@ exemplars:
 - **6-stage Dockerfile with placeholder frontend**: planner → builder (placeholder assets for dep cache) → frontend builder → final-builder (real assets + `SQLX_OFFLINE=true`) → runtime. The placeholder stage allows Rust dependency caching to work even though the final binary embeds frontend assets
 - **WASM dual-target build**: for projects targeting both native and WASM, use a separate `emscripten/emsdk` base image as a parallel cargo-chef stage. Include build-artifact size verification (`test -f ./static/pacman.wasm && [ $(stat -c%s ...) -gt ... ]`) before proceeding — zero-byte WASM artifacts are a common silent failure mode
 
-### Python
+## Build Optimization Micro-Patterns
 
-<!-- uv for fast installs, multi-stage with build deps separated from runtime -->
+- **UPX binary compression**: post-build UPX on static Go/Rust binaries for significant size reduction. Appropriate for container deploys where startup time is not critical (Railway, Fly.io). Combine with `CGO_ENABLED=0` (Go) or `strip = true` (Rust) before UPX
+- **BuildKit cache mounts**: `--mount=type=cache,target=/root/.cache/go-build` and `--mount=type=cache,target=/go/pkg/mod` preserve build/module caches across Docker builds without bloating image layers. The Rust equivalent targets `~/.cargo/registry` and `target/`
+- **`bun --smol` flag**: for SvelteKit SSR builds in containers, trades startup speed for smaller memory footprint. Appropriate for memory-constrained environments
+- **`SQLX_OFFLINE=true`**: set as env var in Docker build stages for Rust+SQLx projects. Pre-checked queries compile without a live database connection. Requires `cargo sqlx prepare` to generate `.sqlx/` query metadata beforehand
+
+## Infrastructure Port Allocation
+
+Use random high-numbered ports (10000-60000) for Docker Compose service mappings to avoid conflicts when multiple compose stacks run in parallel across projects. Ports are hardcoded per-project in `docker-compose.yml` (not ephemeral) and exposed via `.env` as `PORT`, `DB_PORT`, `FRONTEND_PORT`, etc. for consumption by Justfile/tempo recipes. Named volumes use project-prefixed names (e.g., `rekuma-pgdata`) for the same isolation reason.
 
 ## Anti-Patterns
 
-<!-- Fat images with build toolchains, rebuilding heavy ML deps for code changes, hardcoded secrets in Dockerfiles -->
+- Fat images with build toolchains in the runtime stage
+- Rebuilding heavy ML deps for code-only changes
+- Hardcoded secrets in Dockerfiles
+- Sequential/well-known ports (5432, 3000, 8080) in compose — conflicts when running multiple stacks
 
 ## Open Questions
 
-<!-- Docker BuildKit cache mounts vs layer caching, Podman compatibility, rootless containers -->
+- Podman compatibility considerations
+- Rootless container patterns

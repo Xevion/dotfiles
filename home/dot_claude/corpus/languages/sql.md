@@ -41,6 +41,10 @@ CREATE INDEX idx_courses_meeting_times ON courses USING GIN (meeting_times);
 - Schema changes without migrations
 - Modifying applied migration files (SQLx tracks checksums)
 
+## Related Topics
+
+- [data-modeling](../architecture/data-modeling.md) — JSONB sub-entities, materialized views, and migration strategy at the architecture level
+
 ## Open Questions
 
 - ORM vs query builder vs raw SQL decision criteria per project size

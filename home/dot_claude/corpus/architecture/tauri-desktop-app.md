@@ -17,7 +17,7 @@ Thin Rust backend, rich web frontend. The Rust layer owns state, parsing, and sy
 ## Conventions
 
 - **Typed command errors**: implement `serde::Serialize` on a dedicated error enum (or the domain error type) so Tauri commands return `Result<T, CommandError>` instead of `Result<T, String>`. This preserves typed errors at the IPC boundary and lets the frontend match on error variants
-- **ts-rs for IPC contracts**: `#[derive(TS)]` + `#[ts(export)]` + `#[serde(rename_all = "camelCase")]` at the struct level on all types crossing the IPC boundary. Use struct-level `rename_all` instead of per-field `#[serde(rename)]` to eliminate maintenance burden
+- **ts-rs for IPC contracts**: apply ts-rs to all types crossing the IPC boundary. See [cross-language-type-generation](../dx/cross-language-type-generation.md) for detailed conventions
 - **Tracing instrumentation**: Tauri backends benefit from `tracing` even in desktop apps. Add `#[instrument(skip(state, handle))]` on commands and initialize `tracing_subscriber` in the Tauri `setup()` callback before `run()`. Gives structured visibility into command execution without a log server
 - **State management**: `Arc<Mutex<T>>` behind Tauri's `State` extractor. Drop the lock before any `.await` point. Emit events via `app_handle.emit("event", payload)?` for real-time frontend updates
 

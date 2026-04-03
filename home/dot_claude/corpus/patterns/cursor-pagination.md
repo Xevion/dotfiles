@@ -30,5 +30,4 @@ Opaque cursors over offset-based pagination. Cursors are stable across concurren
 
 ## Open Questions
 
-- Bidirectional cursor pagination (previous page support)
 - Cursor pagination with complex sort orders (multi-column, mixed direction)

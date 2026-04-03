@@ -60,8 +60,10 @@ Tailwind utility-first. Design tokens as CSS custom properties. Minimal custom C
 - **View Transition conflict suppression**: when triggering a full-page theme transition, temporarily suppress all element-level `view-transition-name` assignments by adding a class (e.g., `.theme-transitioning *`) that sets `view-transition-name: none !important` on all descendants. Also reset the root group animation to prevent default crossfade conflicts
 - **VT keyframes in PandaCSS config**: define View Transition keyframes in `panda.config.ts` (keyframes block) and reference them from `globalCss`, keeping all animation definitions co-located with the token system rather than mixing `@keyframes` into a separate CSS file
 - **Responsive-first**: mobile-first breakpoints, avoid fixed widths
-- **PandaCSS as an alternative to Tailwind v4**: define tokens in `panda.config.ts` using `oklch()`, with semantic aliases using `{ base: ..., _dark: ... }` condition variants. Same oklch + class-strategy dark mode philosophy as Tailwind v4, different implementation
+- **PandaCSS preferred for new SvelteKit projects**: define tokens in `panda.config.ts` using `oklch()`, with semantic aliases using `{ base: ..., _dark: ... }` condition variants. Same oklch + class-strategy dark mode philosophy as Tailwind v4, different implementation. Tailwind v4 (via `@tailwindcss/vite`) is acceptable for simpler projects or when PandaCSS adds unnecessary complexity
 - **PandaCSS dark mode**: use `_dark` semantic token conditions — equivalent to Tailwind's `dark:` variant. `.dark` class toggle on `documentElement` is the same activation mechanism as the Tailwind class strategy
+- **PandaCSS standard config conventions**: `outdir: 'styled-system'`, `preflight: true`, `include: ['./src/**/*.{js,ts,svelte}']`. Primary color with 11 oklch shades, neutral with 12 shades (including 850 for intermediate dark values). Standard semantic tokens: bg, fg, border (with strong variant), primary (with subtleFg), danger, success, warning, accent, info, tint. Standard breakpoints: 640/768/1024/1280px
+- **PandaCSS recipe pattern**: define component recipes (button, badge, toggle, etc.) as separate imports. Use `staticCss` to pre-generate variant combinations for SSR/static builds where dynamic class generation isn't available
 
 ## Anti-Patterns
 

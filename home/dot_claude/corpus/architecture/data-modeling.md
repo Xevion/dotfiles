@@ -45,7 +45,7 @@ ALTER TABLE courses ADD CONSTRAINT chk_enrollment_nonneg CHECK (enrollment >= 0)
 
 ### TypeScript
 
-<!-- Placeholder: Drizzle/Prisma patterns, migration tooling -->
+- Drizzle/Prisma patterns and migration tooling — to be populated from future project audits
 
 ### Go
 
@@ -62,6 +62,10 @@ ALTER TABLE courses ADD CONSTRAINT chk_enrollment_nonneg CHECK (enrollment >= 0)
 - EAV (Entity-Attribute-Value) tables
 - Non-idempotent migrations
 - Storing structured data as JSON-encoded TEXT columns
+
+## Related Topics
+
+- [sql](../languages/sql.md) — SQL conventions, JSONB patterns, and migration tooling per stack
 
 ## Open Questions
 

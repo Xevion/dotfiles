@@ -1,7 +1,7 @@
 ---
 name: typescript
 category: languages
-last_audited: 2026-03-27
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/banner
     path: web/src/lib/bindings/
@@ -22,7 +22,9 @@ Strict mode always. Types as documentation. Functional patterns preferred. Let t
 
 ## Conventions
 
-- **Strict compiler options**: `strict: true`, `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`
+- **Strict compiler options (two tiers)**:
+  - **Baseline** (all projects): `strict: true`, `skipLibCheck: true`, `moduleResolution: "bundler"`. For Bun projects add `"types": ["bun-types"]`, `allowImportingTsExtensions: true`, `verbatimModuleSyntax: true`
+  - **Aggressive** (libraries, CLI tools, mature projects): baseline + `noUnusedLocals: true`, `noUnusedParameters: true`, `noUncheckedIndexedAccess: true`, `noFallthroughCasesInSwitch: true`. tempo and recall use this tier. Catches more bugs but adds friction during prototyping — enable when the codebase stabilizes
 - **ts-rs replaces Zod for backend-driven types**: when the backend generates TypeScript bindings (via ts-rs, protobuf, etc.), trust those types as the source of truth. No redundant Zod schemas for API response shapes
 - **Discriminated unions**: use a string-literal field as the discriminant. The field name need not be `"type"` — any domain-native literal field works (e.g., `objectClassName` for RDAP objects). The key convention is that the field is a string literal union and narrowing is done via `switch`/`if` without casts
 
@@ -55,6 +57,15 @@ type InstructionalMethod =
 - **Inline types in component scripts**: when a type and its associated data constants are large enough to constitute a domain concept, extract to a co-located utility module rather than embedding in a component script block
 - Barrel exports (`index.ts`) in large projects — causes circular dependencies and tree-shaking issues
 - Hand-maintaining TypeScript interfaces that mirror backend types when a code-gen pipeline exists
+
+### Linting & Formatting
+
+- **Biome preferred** for new JS/TS projects as both formatter and linter. Standard config: VCS integration (`useIgnoreFile: true`), tab indentation, `noConsole` with `allow: ["assert", "error", "warn"]`, `noExcessiveCognitiveComplexity` at warning level. Biome replaces both Prettier and ESLint for pure TS projects
+- **Biome formatter + ESLint linter** for SvelteKit projects — Biome's Svelte linting support is incomplete. Use Biome for formatting (.ts, .json, .css) and ESLint with `svelte-eslint-parser` + `@xevion/ts-eslint-extra` for linting .svelte files. Prettier+ESLint is legacy but acceptable for existing projects
+- **Underscore prefix for intentionally-unused params**: configure ESLint's `no-unused-vars` (or `@typescript-eslint/no-unused-vars`) with `argsIgnorePattern: "^_"`, `varsIgnorePattern: "^_"`. Standard across all projects
+- **`--max-warnings 0` in lint scripts**: zero-tolerance warning policy. Combined with `--cache` for incremental speed. Prevents warnings from accumulating
+- **Type-aware ESLint** (`parserOptions: { project: "./tsconfig.json" }`): enables rules like `consistent-type-imports`, `no-floating-promises`, `no-misused-promises`. Slower startup but catches real bugs. Enable for mature projects; skip for rapid prototyping
+- **`svelte/no-navigation-without-resolve` disabled**: this rule conflicts with SPA routing patterns (Tauri, static adapters). Disable project-wide in Svelte projects that don't use server-side navigation resolution
 
 ## Open Questions
 

@@ -44,14 +44,13 @@ pub struct ApiError {
 ### Rust
 
 - **IntoResponse for errors**: implement `IntoResponse` on the error type to centralize HTTP status code mapping. Handlers return `Result<Response, ApiError>`
-- **Extension traits for handler ergonomics**: `.or_not_found("Course", &crn)?` on `Option<T>`, `.conflict_on_unique(msg)?` on SQLx results. A `db_error()` boundary function is the single place that logs raw DB errors and returns a sanitized 500
-- **`or_not_found` two-argument form**: takes entity name + `impl Display` ID, produces uniform `"<Entity> '<id>' not found"` messages. More reusable than raw string `.or_not_found(msg)` when the same pattern repeats across handlers
+- **Extension traits for handler ergonomics**: `.or_not_found("Course", &crn)?` on `Option<T>`, `.conflict_on_unique(msg)?` on SQLx results. See [error-handling](../patterns/error-handling.md) for the full extension trait pattern
 - **Central `From<sqlx::Error>` with inline DB error code detection**: map DB-level error codes (SQLite unique constraint = "2067", Postgres = "23505") in one place. Better than per-callsite `.conflict_on_unique()` extension trait when the mapping is exhaustive
-- **ts-rs for contract generation**: derive `TS` on all request/response types. `#[ts(export)]` + `serde(rename_all = "camelCase")` ensures the TypeScript contract stays in sync at compile time — no hand-maintained interface files
+- **ts-rs for contract generation**: see [cross-language-type-generation](../dx/cross-language-type-generation.md) for ts-rs conventions
 
 ### TypeScript
 
-<!-- Placeholder: Express/Hono patterns, Zod request validation -->
+- Express/Hono patterns and Zod request validation — to be populated from future project audits
 
 ### Go
 

@@ -34,11 +34,11 @@ func (r *Request) AssembleQuery() (string, map[string]any) {
 
 ### Rust (async-graphql)
 
-<!-- SimpleObject vs Object, ErrorExtensions for typed error codes, subscription via broadcast channels -->
+- async-graphql patterns (SimpleObject, ErrorExtensions, broadcast subscriptions) — to be populated from future project audits
 
 ### TypeScript (gql-tada + urql)
 
-<!-- gql-tada for compile-time typed documents, urql for client with exchange pipeline, graphql-ws for subscriptions -->
+- gql-tada for compile-time typed documents, urql exchange pipeline — to be populated from future project audits
 
 ### Go (genqlient)
 

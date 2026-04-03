@@ -53,14 +53,30 @@ pub enum ClientError {
 - **Iterator combinators**: `.map()`, `.filter()`, `.find_map()`, `.collect()` over explicit for loops
 - **Lifetime-bound filter structs**: short-lived query/filter structs borrow from the request context (`&'a str`, `&'a [String]`) rather than cloning into owned Strings
 - **SQLx QueryBuilder**: use `QueryBuilder<Postgres>` for dynamic multi-condition queries instead of string interpolation
-- **ts-rs for TypeScript contracts**: `#[derive(TS)]` + `#[ts(export)]` + `serde(rename_all = "camelCase")` on all shared API types. Generated bindings are the frontend's source of truth
-- **ts-rs optional fields**: `#[ts(optional_fields)]` on structs with `Option<T>` fields produces `field?: T` in TypeScript output. Use `#[ts(type = "string")]` for types like `NaiveDateTime` that have no automatic TS mapping
+- **ts-rs for TypeScript contracts**: `#[derive(TS)]` + `#[ts(export)]` on API types. See [cross-language-type-generation](../dx/cross-language-type-generation.md) for optional fields, type overrides, and casing conventions
 - **Manual `From` for domain-logic conversions**: prefer `#[from]` for transparent catch-alls, but write manual `From<sqlx::Error>` impls when conversion carries domain logic (e.g., mapping DB error codes to `NotFound`/`Conflict`)
 - **`Params<'a>` naming suffix**: consider `Params<'a>` for insert/upsert input structs that borrow from request context — distinguishes them from read-only filter structs
 - **thiserror + miette::Diagnostic for user-facing library crates**: derive both `thiserror::Error` and `miette::Diagnostic` on error enums. Attach machine-readable codes via `#[diagnostic(code(crate::module::variant))]` on each variant. Callers get structured error codes for programmatic handling; end-users get miette's rich display with source spans and hints
 - **Extension traits for non-sqlx error conversion**: the extension trait pattern generalizes beyond database errors — use it for any third-party crate with `Display`-but-not-`std::Error` error types. E.g., `OrtResultExt` with `.ort()` converts opaque ONNX Runtime errors to `anyhow::Error`
 - **Dual-channel error separation for thread pools**: separate result and error into distinct `crossbeam-channel` channels rather than `Result<T, E>`-wrapping results. The error channel carries fatal worker state; the coordinator uses `select!` to race both with a timeout arm
 - **Typed errors at Tauri IPC boundary**: implement `serde::Serialize` on command error enums so Tauri commands return `Result<T, CommandError>` instead of `Result<T, String>`. Eliminates stringly-typed failure paths across the IPC boundary
+
+## Project Defaults
+
+- **Edition 2024**: always use the latest stable edition. All active projects (12+) are on edition 2024
+- **Mold linker** via `.cargo/config.toml`: `linker = "clang"` + `rustflags = ["-C", "link-arg=-fuse-ld=mold"]` on `x86_64-unknown-linux-gnu`. Significant compile-time improvement for iterative development
+- **Explicit rustls-tls**: disable reqwest default features and enable `rustls-tls` specifically to avoid OpenSSL dependency. For fine-grained control, use `rustls-no-provider` + manual `ring`/`aws-lc-rs` + TLS version selection
+- **`TS_RS_EXPORT_DIR` in `.cargo/config.toml`**: set `TS_RS_EXPORT_DIR = { value = "web/src/lib/bindings/", relative = true }` as an env var to centralize where ts-rs outputs TypeScript bindings. Cross-cuts with the ts-rs convention above
+- **Pedantic clippy with selective allow-list**: enable `clippy::pedantic` at `warn` priority, then explicitly `allow` inapplicable rules (`doc_markdown`, `missing_errors_doc`, `missing_panics_doc`). Stricter than default without being noisy
+
+### Custom Cargo Profiles
+
+Define reusable profiles beyond dev/release:
+
+- **`dev-release`**: `inherits = "dev"`, `debug-assertions = false`. Dev compilation speed with release-mode assertion behavior — useful for performance-sensitive iteration without full release optimization. Used in banner, Pac-Man, time-banner
+- **`profile` (profiling)**: `inherits = "release"`, `debug = true`, `lto = false`, `strip = "symbols"`. Full optimization with debug info retained for profiling tools
+- **`wasm-release`**: `opt-level = "s"`, `lto = true`, `strip = true`, `panic = "abort"`. Aggressively size-optimized for WASM targets. Combine with `wasm-opt -Oz` post-processing
+- **`mutant`**: `inherits = "dev"`, `opt-level = 1`, `debug = 0`, `codegen-units = 256`, `incremental = false`. Maximum parallelism with no debug info — optimized for cargo-mutants throughput
 
 ## Anti-Patterns
 
@@ -70,6 +86,12 @@ pub enum ClientError {
 - Manual `From` impls when `#[from]` or `#[source]` suffice — but this is the right choice when conversion carries domain logic (see Conventions above)
 
 - **cfg on individual enum variants**: use `#[cfg(not(target_arch = "wasm32"))]` on specific enum variants (e.g., `NetworkMode::Remote`) rather than gating the entire module. The type compiles on all targets with platform-specific variants restricted. Match arms referencing cfg-gated variants must also be cfg-gated
+
+## Related Topics
+
+- [error-handling](../patterns/error-handling.md) — Cross-language error philosophy and extension trait pattern
+- [concurrency-async](../architecture/concurrency-async.md) — Service lifecycle, CancellationToken, singleflight patterns
+- [cross-language-type-generation](../dx/cross-language-type-generation.md) — ts-rs conventions for TypeScript contract generation
 
 ## Open Questions
 
