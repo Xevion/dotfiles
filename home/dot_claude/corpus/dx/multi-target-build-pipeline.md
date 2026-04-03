@@ -1,11 +1,14 @@
 ---
 name: multi-target-build-pipeline
 category: dx
-last_audited: 2026-03-27
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/borde.rs
     path: Justfile + .github/workflows/builds.yml
     note: "WASM + Tauri desktop + server from one codebase, 5-platform CI matrix, Vite build modes"
+  - repo: Xevion/dynamic-preauth
+    path: Dockerfile
+    note: "Dual-target cross-compilation (Linux + Windows x64) in Docker with cargo-chef per target"
 ---
 
 # Multi-Target Build Pipeline
@@ -20,6 +23,8 @@ Coordinate a single codebase that compiles to multiple distinct targets (WASM br
 - **Per-target Cargo profiles**: define separate Cargo profiles for each WASM build mode (wasm-dev, wasm-release, wasm-debug) with target-appropriate settings (opt-level, lto, strip, panic=abort). Native builds use the standard dev/release profiles
 - **Mtime-based incremental build detection**: compare artifact timestamps before/after `cargo build` to skip redundant postprocessing steps (wasm-bindgen, wasm-opt) during incremental development
 - **Multi-platform CI matrix**: build for all target platforms (Linux/macOS x86+arm/Windows x86+arm64) plus browser WASM as separate parallel jobs. Gate deployment jobs on build success with `needs:` + `if: github.event_name == 'push'`
+
+- **Cross-compilation in Docker with cargo-chef**: for projects that build the same Rust crate for multiple targets (e.g., `x86_64-unknown-linux-gnu` + `x86_64-pc-windows-gnu`), use a single Docker stage with cargo-chef dependency caching per target. Apply `strip` to the final binaries. This adapts the WASM dual-target pattern to cross-compilation without requiring separate build environments
 
 ## Anti-Patterns
 

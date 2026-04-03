@@ -1,7 +1,7 @@
 ---
 name: object-storage-patterns
 category: architecture
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: local/inkwell
     path: internal/storage/ + docker-compose.yml
@@ -9,6 +9,9 @@ exemplars:
   - repo: Xevion/xevion.dev
     path: src/r2.rs
     note: "opendal S3 adapter with OnceCell graceful degradation, best-effort delete with orphan logging"
+  - repo: Xevion/WebSAM
+    path: scripts/upload.ts
+    note: "R2 upload with HeadObject idempotency check, immutable cache headers"
 ---
 
 # Object Storage Patterns
@@ -36,7 +39,7 @@ S3-compatible APIs as the storage abstraction. Local dev parity via MinIO. DB re
 
 ### TypeScript
 
-<!-- Frontend direct-to-R2 upload via presigned URL, progressive image loading with blur placeholders -->
+- **Idempotent upload via HeadObject size-match**: before uploading large objects (model weights, binary assets), issue a `HeadObjectCommand` check. If the object exists and `ContentLength` matches the expected size, skip the upload entirely. Safe for immutable objects with `Cache-Control: public, max-age=31536000, immutable`. Prevents re-uploading multi-hundred-MB files on script re-runs
 
 ## Anti-Patterns
 

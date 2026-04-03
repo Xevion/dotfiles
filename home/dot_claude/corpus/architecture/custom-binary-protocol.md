@@ -1,7 +1,7 @@
 ---
 name: custom-binary-protocol
 category: architecture
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: local/bose-re
     path: crates/bose-protocol/
@@ -35,6 +35,7 @@ Encode the protocol specification into the type system so invalid packets are un
 - Stringly-typed protocol fields — every field that has a fixed set of values should be an enum
 - Panicking on unknown values — protocols evolve; use a catch-all variant
 - Mixing parse logic with I/O — the parser should work on `&[u8]`, not on streams
+- **Raw index fields without newtype bounds**: using `usize` fields for protocol region boundaries (start, end) without a newtype that validates `start < end <= data.len()` at construction. Callers must re-check bounds on every use. Wrap in a newtype (e.g., `KeyRegion { start: usize, end: usize }`) with a validating constructor
 
 ## Open Questions
 

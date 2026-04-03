@@ -1,7 +1,7 @@
 ---
 name: image-processing-pipeline
 category: architecture
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: local/inkwell
     path: internal/server/generate_stream.go + web/src/lib/stores/generation.svelte.ts
@@ -9,6 +9,9 @@ exemplars:
   - repo: Xevion/xevion.dev
     path: src/media_processing.rs + src/og.rs
     note: "Upload-time variant generation (thumb/medium/full + blurhash), SSR-rendered OG images via internal endpoint"
+  - repo: Xevion/WebSAM
+    path: src/lib/inference/
+    note: "Encode-once decode-many SAM pipeline with iterative mask feedback, cached logits for interactive re-threshold"
 ---
 
 # Image Processing Pipeline
@@ -38,6 +41,7 @@ Capture once, transform on demand. Store originals, derive variants via CDN/prox
 ### TypeScript
 
 - Model multi-phase image generation as a discriminated union state type where each phase carries its data (preview, step, dimensions). Carry preview data forward across transitions to prevent UI blank flashes. Use `AbortSignal.timeout` + `Promise.race` on each stream chunk read to detect stalled connections
+- **Encode-once, decode-many pipeline**: for segmentation models (SAM), separate the expensive encode phase (image→embedding, cached per image) from the cheap decode phase (embedding+prompt→masks). The decoder accepts a `lowResMasks` input from the previous result for iterative refinement — each click refines the previous mask. Cache raw logits so threshold/smooth re-processing can run without re-inference
 
 ### Go
 

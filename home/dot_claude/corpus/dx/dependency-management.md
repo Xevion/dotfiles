@@ -1,7 +1,7 @@
 ---
 name: dependency-management
 category: dx
-last_audited: 2026-03-27
+last_audited: 2026-04-03
 exemplars:
   - repo: local/inkwell
     path: renovate.json
@@ -9,6 +9,9 @@ exemplars:
   - repo: Xevion/Pac-Man
     path: .github/renovate.json
     note: "allowedVersions blocks with inline rationale, minimumReleaseAge, pinGitHubActionDigests"
+  - repo: Xevion/rustdoc-mcp
+    path: deny.toml
+    note: "cargo-deny with 4 target triples, license allowlist, yanked=deny, unknown-registry=deny"
 ---
 
 # Dependency Management

@@ -1,7 +1,7 @@
 ---
 name: docker-multi-service
 category: dx
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: Dockerfile + docker-compose.yml
@@ -21,6 +21,9 @@ exemplars:
   - repo: Xevion/Pac-Man
     path: pacman-server/Dockerfile
     note: "9-stage dual-target (WASM + native) with emsdk base, artifact size verification"
+  - repo: Xevion/dynamic-preauth
+    path: Dockerfile
+    note: "cargo-chef dual-target (Linux + Windows x64) demo build, non-root runtime user, stripped binaries"
 ---
 
 # Docker & Multi-Service Orchestration

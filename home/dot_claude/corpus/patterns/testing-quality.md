@@ -1,7 +1,7 @@
 ---
 name: testing-quality
 category: patterns
-last_audited: 2026-03-27
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/banner
     path: tests/
@@ -39,6 +39,12 @@ exemplars:
   - repo: Xevion/railway-collector
     path: internal/state/store_test.go
     note: "openTestStore(t) factory for bbolt, countingHandler slog test helper"
+  - repo: Xevion/rustdoc-mcp
+    path: tests/common/mod.rs
+    note: "IsolatedWorkspace two-layer fixture (TempWorkspace + DocState), rstest fixtures, assert2 throughout"
+  - repo: Xevion/recall
+    path: tests/
+    note: "createTestDb() in-memory DuckDB factory, behavioral triage tests with shared fixture defaults"
 ---
 
 # Testing & Quality
@@ -67,6 +73,7 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 - **Runtime hardware-feature gate for SIMD tests**: use `is_x86_feature_detected!` guard and early-return in the test body (not `#[cfg]`) for hardware-dependent tests. Keeps tests compiled and visible on all machines, avoiding both false failures and CI configuration complexity
 - **Temp-file recording sink for structured output tests**: write events to a named tempfile (using `process::id()` for collision avoidance), drop the sink to flush, then parse NDJSON lines as `serde_json::Value` for field-level assertions
 - **ECS World fixture builders**: for Bevy ECS tests, use `create_*_world()` to initialize required resources, named `spawn_*_entity()` helpers to abstract component bundles, and a `run_*_system()` driver to encapsulate system invocation. Each test body reads as Arrange → Act → Assert against a single variable
+- **Two-layer fixture composition for MCP/server tests**: compose test isolation from two layers — a lightweight filesystem fixture (`TempWorkspace`) for cold-cache scenarios plus a stateful fixture (`IsolatedWorkspace`) wrapping it with domain-specific setup (doc generation state, cache seeding). `with_deps(&[...])` parameterizes external dependency inclusion. This is "containerless integration test isolation" — the Rust equivalent of pgtestdb template cloning without requiring an external database process
 - **testcontainers + typed builder for app-state integration tests**: combine `testcontainers` (isolated DB) with a typed builder (e.g. `bon::builder`) to compose full app state (router, auth, health). Gate behind a Cargo feature (`postgres-tests`) so CI runs both fast in-memory and full Postgres variants. Complements `#[sqlx::test]` by covering router/extractor/auth layers
 
 ### TypeScript
@@ -87,6 +94,7 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 
 - Options-struct builder for test factories: pointer fields for selective override, atomic sequence counters for collision-free defaults, `t.Helper()` + `t.Fatal` for single-line call sites. Factories call real DB queries, no mocks
 - pgtestdb + template-database cloning: per-test Postgres isolation. Single `NewEnv(t)` wires full stack (pool → queries → services → handler) for integration tests. Fast due to template cloning. CI env-var port-switching (`os.Getenv("CI")`) to select between local dev port and standard CI postgres is simpler than build-tag gating
+- **`createTestDb()` factory for embedded DuckDB**: create an in-memory DuckDB instance with schema initialized per test — the TypeScript equivalent of `openTestStore(t)`. Single-line call sites with zero teardown boilerplate
 - **`openTestStore(t)` factory for embedded K/V stores**: for bbolt, pebble, etc., create the DB in `t.TempDir()` and register cleanup via `t.Cleanup`. Single-line call sites, zero teardown boilerplate — analogous to pgtestdb template cloning for embedded stores
 - **`countingHandler` slog test helper**: implement `slog.Handler` with `atomic.Int32` counting log records matching a pattern. Thread-safe, composable with any inner handler. Asserts log emission without full log capture infrastructure
 

@@ -1,7 +1,7 @@
 ---
 name: cli-tool-design
 category: dx
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/tempo
     path: src/cli.ts
@@ -9,6 +9,9 @@ exemplars:
   - repo: local/bose-re
     path: crates/bose-cli/src/main.rs
     note: "clap global = true for -v flag, three-tier log level override, OutputBuffer for async output"
+  - repo: Xevion/recall
+    path: src/utils/validation.ts
+    note: "resolveEnumOption prefix matching, Commander preAction global flags, verbosity mapping"
 ---
 
 # CLI Tool Design

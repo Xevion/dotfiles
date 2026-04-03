@@ -1,7 +1,7 @@
 ---
 name: error-handling
 category: patterns
-last_audited: 2026-03-27
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/banner
     path: src/banner/errors.rs
@@ -18,6 +18,9 @@ exemplars:
   - repo: Xevion/glint
     path: backend/src/error.rs
     note: "Dual-surface status_and_code() for REST + GraphQL, extension traits with entity interpolation"
+  - repo: Xevion/rustdoc-mcp
+    path: src/error.rs
+    note: "help() method on typed error enums for actionable user-facing guidance, five-level thiserror hierarchy"
 ---
 
 # Error Handling
@@ -42,6 +45,7 @@ enum JobError {
 - **Error context at boundaries**: attach context (status codes, URLs, entity names) to errors at the boundary where it's available, not at the catch site
 - **Single sanitization point**: a boundary function (e.g. `db_error()`) logs the raw error and returns a sanitized message. Handlers never log-and-throw
 - **`status_and_code()` helper on error enums**: returns both HTTP status and stable machine-readable code in one match arm. When a single error type serves both REST and GraphQL surfaces, both `IntoResponse` and `ErrorExtensions` impls call it, keeping error-to-HTTP mapping single-source across API surfaces
+- **`help()` method for actionable user-facing guidance**: each error sub-enum carries `help() → Option<&'static str>` returning resolution guidance (e.g., "Use inspect_crate without arguments to list available crates"). A top-level `user_message()` fuses `Display` + `help` into a single response string. Distinct from `status_and_code()` — this is for CLI/MCP/tool surfaces where the consumer needs actionable next steps, not HTTP status mapping
 
 ## Language-Specific
 

@@ -40,6 +40,7 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [scoring-ranking-algorithms](./architecture/scoring-ranking-algorithms.md) — Weighted multi-factor scoring, log-scale proximity, adaptive priority
 - [platform-abstraction-layer](./architecture/platform-abstraction-layer.md) — Transport interface, build-time platform selection, separate entry points
 - [scheduling](./architecture/scheduling.md) — Priority-queue dispatch, optimistic stamping, activity-adaptive polling
+- [search-index-tfidf](./architecture/search-index-tfidf.md) — Custom inverted TF-IDF index vs managed FTS extensions, build-vs-buy
 
 ## Patterns
 
@@ -50,6 +51,10 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [device-code-auth-flow](./patterns/device-code-auth-flow.md) — RFC 8628 for headless clients, polling with backoff, session token exchange
 - [performance](./patterns/performance.md) — Measure first, profile-guided optimization, ISR caching
 - [bot-abuse-defense](./patterns/bot-abuse-defense.md) — Tarpit streaming, per-IP semaphore limits, active defense
+- [graceful-shutdown](./patterns/graceful-shutdown.md) — Signal escalation, AbortSignal threading, bounded drain, CancellationToken
+- [session-cookie-auth](./patterns/session-cookie-auth.md) — Server-side sessions, opaque cookies, role-based middleware, pgtestdb auth tests
+- [cursor-pagination](./patterns/cursor-pagination.md) — Opaque base64 cursors, keyset WHERE clauses, N+1 page detection
+- [integration-test-db-isolation](./patterns/integration-test-db-isolation.md) — pgtestdb template cloning, in-memory factories, two-layer fixture composition
 - [binary-reverse-engineering](./patterns/binary-reverse-engineering.md) — Documentation-driven RE, implementation-as-validation, static analysis workflow
 
 ## Project Structure

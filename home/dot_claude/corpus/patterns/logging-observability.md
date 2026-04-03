@@ -1,7 +1,7 @@
 ---
 name: logging-observability
 category: patterns
-last_audited: 2026-03-27
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/banner
     path: src/logging/
@@ -33,6 +33,12 @@ exemplars:
   - repo: Xevion/ferrite
     path: src/tui/
     note: "Channel-backed tracing Layer for ratatui TUI"
+  - repo: Xevion/rustdoc-mcp
+    path: src/tracing.rs
+    note: "NEXTEST env detection for test-mode tracing, runtime format selection with TTY detection"
+  - repo: Xevion/recall
+    path: src/logging/sink.ts
+    note: "Used-key deduplication in colored stderr sink, LogTape structured logging"
 ---
 
 # Logging & Observability
@@ -66,6 +72,7 @@ let filter = EnvFilter::new(format!(
 - **Field-level transforms via builder pattern**: `CompactFields` builder registers per-field transforms (e.g., truncate high-cardinality ULIDs to `4..6` chars in pretty mode) without affecting JSON output. Use `writer.has_ansi_escapes()` rather than `is_tty()` for the ANSI-safe check in custom `FormatEvent` impls
 - **Three-tier log level override for CLIs**: `RUST_LOG` takes full control (verbatim filter string), `LOG_LEVEL` sets per-crate level while holding external crates at `warn`, `-v` flag controls verbosity when neither env var is set. All tracing routed to stderr explicitly (`.with_writer(std::io::stderr)`) so stdout is reserved for structured program output
 - **OutputBuffer for async CLI output integrity**: when a command performs async I/O before printing results, buffer all stdout writes and flush atomically after async work completes. Prevents stderr (tracing) and stdout interleaving. Companion `buf_println!` macro provides `println!`-compatible ergonomics. Streaming commands (monitoring, tailing) are exempt
+- **NEXTEST env detection for test-mode tracing**: detect test runner context via `NEXTEST` or `CARGO_TARGET_TMPDIR` env vars and switch to `DEBUG` level with `.with_test_writer()` for cargo test capture. Extends the "interactive vs non-interactive" subscriber selection to test runners — test output gets captured by the test framework rather than polluting stderr
 - **Interactive vs non-interactive tracing**: runtime-selectable subscriber layers — TUI layer (ratatui channel-backed) if TTY, plain `fmt` layer if not. Extends "format is a deployment concern" beyond dev/prod to interactive vs non-interactive environments
 - **Channel-backed tracing Layer for TUI**: implement a custom `tracing::Layer` that serializes log records into an `mpsc` channel; the TUI rendering thread drains the channel each frame. Keeps log records in-process and lets the TUI control presentation
 - **WASM tracing with build-profile-gated filters**: for Rust compiled to WASM, use `wasm-tracing` with `tracing-subscriber::EnvFilter` for browser console output. Use `#[cfg(debug_assertions)]` to select debug vs production log levels at compile time (no runtime overhead). `set_report_logs_in_timings(true)` integrates logs with the browser performance timeline. This is the WASM-specific equivalent of "runtime format selection" for native targets
@@ -73,6 +80,7 @@ let filter = EnvFilter::new(format!(
 
 ### TypeScript
 
+- **Used-key deduplication in formatted sinks**: when a structured log formatter interpolates `{key}` references into the message template, extract those key names from the raw message and filter them out of the trailing `properties` display. Avoids showing `key=value` twice — once inlined in the message, once in the suffix. Keeps formatted output clean without losing structured data in the underlying record
 - Batching dev-forward sink: browser/worker log records serialized to flat format, batched (count threshold or debounce timer), POSTed to dev server relay for unified terminal output
 - E2E console.debug sentinel capture: build-flag-gated sink emits structured logs as `'__LOGTAPE__' + JSON`, Playwright intercepts via `page.on('console')`, tests assert on structured records
 

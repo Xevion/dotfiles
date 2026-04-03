@@ -1,7 +1,7 @@
 ---
 name: wasm-compilation-targets
 category: architecture
-last_audited: 2026-03-27
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/Pac-Man
     path: pacman/src/platform/
@@ -9,6 +9,9 @@ exemplars:
   - repo: Xevion/borde.rs
     path: crates/borders-wasm/ + Justfile
     note: "wasm-bindgen target, three WASM Cargo profiles, mtime-based wasm-bindgen skip, cfg-gated deps"
+  - repo: Xevion/WebSAM
+    path: src/lib/inference/ + src/routes/wasm/
+    note: "ONNX Runtime Web (consumer-side WASM), .ort pre-optimization, stable /wasm/ API route bypassing Vite hashing"
 ---
 
 # WASM Compilation Targets
@@ -31,6 +34,11 @@ Write once, compile to multiple targets. Platform abstraction at the module boun
 
 - `wasm32-unknown-emscripten`: `emscripten_set_main_loop_arg` for browser game loop, ASYNCIFY for async operations, platform module with cfg-gated impls
 - `wasm32-unknown-unknown` + wasm-bindgen: manual update loop with `gloo-timers::future::sleep` for browser game loop in Web Worker context. `wasm-bindgen --target web` for ES module output
+
+### Consumer-Side WASM (ONNX Runtime Web)
+
+- **Stable API route for WASM file serving**: when WASM files are resolved by name at runtime (e.g., onnxruntime-web), Vite's content-hashing breaks the resolution. Serve WASM files through a SvelteKit API route (e.g., `/wasm/[filename]/+server.ts`) at stable paths, fetching from object storage (R2). This separates WASM runtime resolution from the build tool's asset pipeline
+- **.ort pre-optimization for WebGPU EP**: convert `.onnx` models offline to `.ort` format via `python3 -m onnxruntime.tools.convert_onnx_models_to_ort` before deployment. Raw ONNX models with shape annotation mismatches crash the WebGPU EP's transpose optimizer. Baking runtime optimizations offline sidesteps the crash. Keep decoders as `.onnx` when they work without issues
 
 ## Anti-Patterns
 

@@ -1,7 +1,7 @@
 ---
 name: build-systems
 category: project-structure
-last_audited: 2026-03-27
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/banner
     path: Justfile
@@ -18,6 +18,9 @@ exemplars:
   - repo: local/bose-re
     path: Justfile + tempo.config.ts
     note: "Justfile as pure passthrough to tempo, preset-override-extend pattern"
+  - repo: Xevion/rustdoc-mcp
+    path: Justfile + tempo.config.ts
+    note: "tempo preset-override-extend with dep-check (cargo-machete) and deny (cargo-deny), fix-first autofix"
 ---
 
 # Build Systems

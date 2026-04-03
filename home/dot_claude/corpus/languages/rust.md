@@ -1,7 +1,7 @@
 ---
 name: rust
 category: languages
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/banner
     path: src/banner/errors.rs
@@ -21,6 +21,9 @@ exemplars:
   - repo: Xevion/ferrite
     path: src/alloc.rs
     note: thiserror with #[source] nix::Error wrapping, anyhow Context at application entry point
+  - repo: Xevion/rustdoc-mcp
+    path: src/error.rs
+    note: "Five-level thiserror hierarchy with help() guidance method, shared futures singleflight"
 ---
 
 # Rust
@@ -46,6 +49,7 @@ pub enum ClientError {
 
 - **Extension traits for domain-specific conversions**: attach methods like `.or_not_found()` to `Option<T>` and `.conflict_on_unique()` to `Result<T, sqlx::Error>` via extension traits, centralizing error mapping instead of scattering match arms
 - **Named constructors on error types**: `ApiError::not_found(msg)`, `ApiError::bad_request(msg)` instead of direct struct construction
+- **`help()` method on error sub-enums**: each error variant carries a `help() → Option<&'static str>` returning actionable resolution guidance. A top-level `user_message()` fuses `Display` + `help()` into a single consumer-facing string. Useful for MCP/CLI tools where callers need actionable next steps alongside the error description
 - **Iterator combinators**: `.map()`, `.filter()`, `.find_map()`, `.collect()` over explicit for loops
 - **Lifetime-bound filter structs**: short-lived query/filter structs borrow from the request context (`&'a str`, `&'a [String]`) rather than cloning into owned Strings
 - **SQLx QueryBuilder**: use `QueryBuilder<Postgres>` for dynamic multi-condition queries instead of string interpolation

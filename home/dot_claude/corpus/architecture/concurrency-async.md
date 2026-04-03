@@ -1,7 +1,7 @@
 ---
 name: concurrency-async
 category: architecture
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/banner
     path: src/services/
@@ -12,6 +12,9 @@ exemplars:
   - repo: Xevion/glint
     path: backend/src/services/lifecycle.rs
     note: "TaskTracker + CancellationToken with ServiceContext tick/sleep helpers"
+  - repo: Xevion/rustdoc-mcp
+    path: src/worker.rs
+    note: "ServiceContext pattern (independently derived), Shared<BoxFuture> singleflight for doc generation dedup"
   - repo: local/inkwell
     path: internal/shutdown/
     note: Go shutdown tracker with WaitGroup + sync.Once + select/timeout drain
@@ -80,6 +83,7 @@ pub async fn shutdown(self, timeout: Duration) -> bool {
 - `broadcast` for fan-out shutdown signals (each receiver gets its own copy)
 - `tokio::time::timeout` for bounded waits
 - **RAII shutdown token pattern**: `ShutdownTracker` hands out drop-on-complete `ShutdownToken` guards. Atomic counter tracks in-flight operations. `wait(timeout)` provides bounded draining. Complement to the Service trait — no lifecycle interface required per subsystem
+- **`Shared<BoxFuture>` for singleflight deduplication**: use `futures::future::Shared` to allow multiple concurrent callers to await the same in-flight async operation (e.g., doc generation, cache warming) without triggering duplicate work. Store `SharedDocFuture` in a `HashMap` keyed by request identity; clean up after resolution. This is a Rust-native singleflight pattern — no external crate required. Note: the `Shared` trait bound requires `'static`, which may force error type erasure to `String` for `Result`-based futures
 - **CPU-bound thread pool with crossbeam**: use `std::thread` + `crossbeam-channel` (bounded work queue, unbounded result/error queues) rather than Tokio tasks for long-running blocking work (e.g., ONNX inference). Named threads via `thread::Builder::new().name(...)` for traceability. Use Rayon `par_iter` for data-parallel CPU work within each task unit
 - **Serial fan-out/collect for serial I/O channels**: for RFCOMM, UART, or other serial protocols, batch sends followed by deadline-bounded collect. Use `tokio::time::Instant` + `saturating_duration_since` for the remaining-time calculation in the recv loop — correctly handles expired deadlines without panic. `JoinSet` is not applicable since work is sequentially serialized on a single stream
 - **`Arc<AtomicBool>` for cooperative cancellation**: appropriate for synchronous thread-based loops where `CancellationToken` would require polling `is_cancelled()` anyway. Lower overhead and no external dependency. Reserve CancellationToken for async contexts where `.cancelled().await` is genuinely useful

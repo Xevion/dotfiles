@@ -1,7 +1,7 @@
 ---
 name: css-styling
 category: languages
-last_audited: 2026-03-27
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/banner
     path: web/src/routes/layout.css
@@ -72,7 +72,7 @@ Tailwind utility-first. Design tokens as CSS custom properties. Minimal custom C
 - CSS class-toggling or JS-driven opacity fades for page transitions when View Transitions API is available
 - **Blanket CSS transitions for theme changes**: broad `transition` rules on structural selectors (`div`, `section`, `body`) for dark mode animation conflict with the View Transitions approach and impose a compositing cost. View Transition API handles theme-change animation via a single crossfade on the root snapshot
 - **Radix UI color system exception**: when a project delegates its full color system to a component library (Radix Themes), the oklch token pattern does not apply — use Radix's semantic CSS variables for color and Tailwind only for layout/spacing. The anti-pattern to avoid is mixing Radix variables with Tailwind color classes
-- **SSR theme flash prevention**: in SSR frameworks (Next.js, SvelteKit), native `window.matchMedia` + class-toggle alone is insufficient — a blocking inline script or library (e.g., `next-themes`) is needed to prevent flash-of-incorrect-theme. The "native API over library" preference applies to client-only contexts; SSR changes the tradeoff
+- **SSR theme flash prevention**: in SSR frameworks (Next.js, SvelteKit), native `window.matchMedia` + class-toggle alone is insufficient — a blocking inline script or library (e.g., `next-themes`) is needed to prevent flash-of-incorrect-theme. The "native API over library" preference applies to client-only contexts; SSR changes the tradeoff. For SvelteKit specifically, inject a blocking IIFE via `{@html}` in `<svelte:head>` that reads localStorage and toggles the dark class before hydration — without this, dark-mode users on prerendered pages flash white on first load
 
 ## Open Questions
 
