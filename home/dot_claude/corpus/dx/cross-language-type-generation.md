@@ -1,7 +1,7 @@
 ---
 name: cross-language-type-generation
 category: dx
-last_audited: 2026-03-27
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/instant-upscale
     path: crates/server/ + frontend/src/lib/bindings/
@@ -44,6 +44,11 @@ Generated types are the single source of truth for API contracts. Backend define
 - **`type_mappings` for pgx nullable types**: `pgtype.Text` → `"string | null"`, `pgtype.Int4` → `"number | null"`, `pgtype.Timestamptz` → `"string | null"`. Also map `time.Time` and `uuid.UUID` → `"string"` for database scalar overrides
 - `json.RawMessage` maps to `any` by default — override with `tstype` struct tag for known shapes
 - CI verification: `tygo generate && git diff --exit-code -- web/src/lib/types.gen.ts`
+
+### Kotlin (schemars JSON Schema intermediary)
+
+- For multi-language systems without a shared IDL (e.g., Rust backend + Kotlin mod), derive `#[derive(schemars::JsonSchema)]` alongside `#[derive(TS)]` on mod-facing types. Export JSON schemas via a test (`export_all_schemas`). Kotlin reads them in `SchemaCompatibilityTest` to validate deserialization compatibility. This is a third cross-language type generation path — complementary to ts-rs (Rust→TS) and tygo (Go→TS)
+- Pair with mtime-based schema regeneration in CI to catch drift
 
 ## Anti-Patterns
 

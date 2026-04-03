@@ -23,21 +23,21 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [data-modeling](./architecture/data-modeling.md) — JSONB sub-entities, materialized views, safe constraint migrations
 - [state-management](./architecture/state-management.md) — Signals/runes for reactivity, page-scoped factories, server vs client state
 - [concurrency-async](./architecture/concurrency-async.md) — Service trait lifecycle, TaskTracker/CancellationToken, Shared singleflight, crossbeam thread pools
-- [graphql-schema-design](./architecture/graphql-schema-design.md) — Runtime aliased-batch queries, breadth-based budget packing, genqlient codegen
+- [graphql-schema-design](./architecture/graphql-schema-design.md) — Runtime aliased-batch queries, breadth-based budget packing, DataLoader N+1, async-graphql subscriptions
 - [object-storage-patterns](./architecture/object-storage-patterns.md) — S3-compatible uploads, imgproxy/cdn-cgi transforms, orphan cleanup
 - [image-processing-pipeline](./architecture/image-processing-pipeline.md) — Capture→transform→progressive loading, thumbhash placeholders
 - [real-time-subscriptions](./architecture/real-time-subscriptions.md) — GraphQL WS, typed domain events, connectivity state
 - [wasm-compilation-targets](./architecture/wasm-compilation-targets.md) — Dual-target Rust (native + Emscripten), platform-gated modules
-- [isr-caching-proxy-patterns](./architecture/isr-caching-proxy-patterns.md) — *(stub)* Stale-while-revalidate, lazy multi-encoding compression, singleflight
+- [isr-caching-proxy-patterns](./architecture/isr-caching-proxy-patterns.md) — Stale-while-revalidate, DashSet singleflight, lazy per-encoding compression, session-aware bypass
 - [game-loop-ecs-architecture](./architecture/game-loop-ecs-architecture.md) — Bevy ECS standalone, fixed-tick scheduling, SDL2 graphics
-- [minecraft-mod-architecture](./architecture/minecraft-mod-architecture.md) — *(stub)* Architectury cross-loader, Mixin injection, tick-driven state machines
+- [minecraft-mod-architecture](./architecture/minecraft-mod-architecture.md) — Architectury cross-loader, Mixin injection, reflection integrations, KSP codegen, in-game tests
 - [asset-pipeline-atlas](./architecture/asset-pipeline-atlas.md) — *(stub)* Sprite atlas packing, build.rs PHF maps, typed asset handles
 - [custom-binary-protocol](./architecture/custom-binary-protocol.md) — Protocol framing, dispatch enums, newtype invariants, proptest roundtrip
 - [ml-inference-pipeline](./architecture/ml-inference-pipeline.md) — ONNX Runtime, tiled spatial inference, crossbeam thread pool, EMA outlier detection
 - [tauri-desktop-app](./architecture/tauri-desktop-app.md) — Rust command/event IPC, typed errors at boundary, Pest PEG parser
 - [linux-hardware-interfaces](./architecture/linux-hardware-interfaces.md) — /proc/pagemap, EDAC sysfs, SMBIOS, mlock, AVX-512 non-temporal stores
 - [deterministic-simulation](./architecture/deterministic-simulation.md) — Seeded RNG, context-keyed streams, deterministic client-side execution
-- [scoring-ranking-algorithms](./architecture/scoring-ranking-algorithms.md) — Weighted multi-factor scoring, log-scale proximity, adaptive priority
+- [scoring-ranking-algorithms](./architecture/scoring-ranking-algorithms.md) — Weighted multi-factor scoring, log-scale proximity, adaptive priority, epsilon escalation, feedback-driven cost
 - [platform-abstraction-layer](./architecture/platform-abstraction-layer.md) — Transport interface, build-time platform selection, separate entry points
 - [scheduling](./architecture/scheduling.md) — Priority-queue dispatch, optimistic stamping, activity-adaptive polling
 - [search-index-tfidf](./architecture/search-index-tfidf.md) — Custom inverted TF-IDF index vs managed FTS extensions, build-vs-buy
@@ -48,9 +48,9 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [logging-observability](./patterns/logging-observability.md) — Structured logging, tracing spans, OutputBuffer, slog handler chains, TUI channel layer
 - [testing-quality](./patterns/testing-quality.md) — TDD, Vitest dual-project setup, proptest roundtrip, assert2 chaining, recording sinks
 - [security-auth](./patterns/security-auth.md) — Zero-trust defaults, token rotation, secret management
-- [device-code-auth-flow](./patterns/device-code-auth-flow.md) — *(stub)* RFC 8628 for headless clients, polling with backoff, session token exchange
+- [device-code-auth-flow](./patterns/device-code-auth-flow.md) — RFC 8628 device code issuance, typed polling states, dual-source session model
 - [performance](./patterns/performance.md) — Lazy per-encoding compression, runtime SIMD dispatch, asymmetric EMA, promise-chain mutex
-- [bot-abuse-defense](./patterns/bot-abuse-defense.md) — *(stub)* Tarpit streaming, per-IP semaphore limits, active defense
+- [bot-abuse-defense](./patterns/bot-abuse-defense.md) — Multi-mode tarpit streaming, dual semaphore RAII, malicious path detection
 - [graceful-shutdown](./patterns/graceful-shutdown.md) — Signal escalation, AbortSignal threading, bounded drain, CancellationToken
 - [session-cookie-auth](./patterns/session-cookie-auth.md) — Server-side sessions, opaque cookies, role-based middleware, pgtestdb auth tests
 - [cursor-pagination](./patterns/cursor-pagination.md) — Opaque base64 cursors, keyset WHERE clauses, N+1 page detection
@@ -72,9 +72,9 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [ci-cd-deployment](./dx/ci-cd-deployment.md) — GitHub Actions, Railway, Docker conventions
 - [ai-assisted-dev](./dx/ai-assisted-dev.md) — CLAUDE.md patterns, skill design, subagent strategies
 - [project-automation](./dx/project-automation.md) — Command registries, staleness detection, smart auto-fix
-- [cross-language-type-generation](./dx/cross-language-type-generation.md) — ts-rs (Rust→TS), tygo (Go→TS), CI verification via regen+diff
+- [cross-language-type-generation](./dx/cross-language-type-generation.md) — ts-rs (Rust→TS), tygo (Go→TS), schemars (Rust→Kotlin), CI verification via regen+diff
 - [docker-multi-service](./dx/docker-multi-service.md) — Compose orchestration, multi-stage builds, UPX/BuildKit/bun-smol, randomized ports
 - [headless-gpu-rendering](./dx/headless-gpu-rendering.md) — *(stub)* Xvfb + VirtualGL, NVIDIA passthrough, containerized GPU workloads
 - [npm-library-publishing](./dx/npm-library-publishing.md) — ESM builds, conditional exports, cross-runtime testing, release-please
-- [build-time-codegen](./dx/build-time-codegen.md) — build.rs, sqlc/tygo, sqlx offline, CI verification via regen+diff
+- [build-time-codegen](./dx/build-time-codegen.md) — build.rs, sqlc/tygo, sqlx offline, KSP+KotlinPoet, CI verification via regen+diff
 - [multi-target-build-pipeline](./dx/multi-target-build-pipeline.md) — WASM + Tauri + native from one codebase, Vite build modes, mtime detection

@@ -1,11 +1,14 @@
 ---
 name: graphql-schema-design
 category: architecture
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/railway-collector
     path: internal/collector/loader/ + internal/railway/
     note: Runtime aliased-batch queries with breadth packing, genqlient codegen, Cloudflare workaround
+  - repo: Xevion/glint
+    path: backend/src/graphql/
+    note: "async-graphql DataLoader N+1 prevention, BroadcastStream subscriptions with lag handling, gql-tada typed documents"
 ---
 
 # GraphQL Schema Design
@@ -34,11 +37,13 @@ func (r *Request) AssembleQuery() (string, map[string]any) {
 
 ### Rust (async-graphql)
 
-- async-graphql patterns (SimpleObject, ErrorExtensions, broadcast subscriptions) — to be populated from future project audits
+- **DataLoader for N+1 prevention**: implement `async_graphql::Loader` per relationship (e.g., `ShaderAuthorsLoader`, `ShaderThumbnailLoader`). Batch queries via `list_by_ids()` functions keyed by parent ID. DataLoader automatically coalesces concurrent field resolutions into a single batch query per loader
+- **BroadcastStream subscriptions with typed domain events**: define a `DomainEvent` enum with typed struct variants. Services publish via `event_tx().send()`. Subscription resolvers subscribe via `BroadcastStream::new(rx)` and `filter_map` to select relevant event types. Handle lag via `Err(BroadcastStreamRecvError::Lagged)` with a warning log rather than disconnecting the client
+- **Dual-surface error mapping via ErrorExtensions**: when `AppError` serves both REST (`IntoResponse`) and GraphQL (`ErrorExtensions`), a shared `status_and_code()` method returns `(StatusCode, &'static str)`. Both impls call it, keeping error codes single-source across API surfaces
 
 ### TypeScript (gql-tada + urql)
 
-- gql-tada for compile-time typed documents, urql exchange pipeline — to be populated from future project audits
+- **gql-tada for compile-time typed documents**: gql-tada provides compile-time type inference for GraphQL documents including subscriptions. Combined with urql's `subscriptionExchange` and `graphql-ws` transport for typed WebSocket connections. No runtime codegen step required — types are inferred from the schema at build time
 
 ### Go (genqlient)
 

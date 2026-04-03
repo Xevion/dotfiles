@@ -9,6 +9,9 @@ exemplars:
   - repo: Xevion/WebSAM
     path: src/lib/stores/ + src/lib/inference/
     note: "OPFS binary caching, Web Worker via Comlink, breakpoint matchMedia store, custom window events"
+  - repo: Xevion/instant-upscale
+    path: frontend/src/lib/pipeline/
+    note: "Typed Web Worker discriminated unions, EngineTestHarness mock factory, WebCodecs + WebGPU rendering"
 ---
 
 # Web Platform
@@ -29,6 +32,7 @@ Prefer native web platform APIs over library abstractions when browser support i
 - **Custom window events for cross-component communication**: dispatch custom events on `window` (e.g., `'app:load-file'`) carrying typed payloads in `detail` to communicate between unrelated components without prop drilling or shared state. The listener co-locates handling logic with the consuming component
 - **Breakpoint reactive store via matchMedia**: track responsive breakpoints (isMobile, isDesktop) as reactive `$state` values driven by `window.matchMedia` listeners with SSR guards. Components read breakpoint state directly for conditional rendering (drawer vs sidebar, bottom sheet vs panel)
 - **Worker-side preprocessing before inference**: perform all data transformation (resize, normalize, format conversion) inside the Web Worker rather than the main thread. The main thread passes only raw pixel data; tensor manipulation happens worker-side. Keeps the UI thread free during expensive preprocessing phases
+- **Typed Web Worker message protocol via discriminated unions**: define `MainToWorker` and `WorkerToMain` as TypeScript discriminated unions with string-literal `type` fields. Create typed `postToWorker()` / `postToMain()` wrapper functions that enforce the union at the call site. The main-thread `WorkerController` dispatches via exhaustive `switch(msg.type)`. This replaces Comlink when you need explicit message control (e.g., transferable ownership, streaming results). Pair with an `EngineTestHarness` mock factory that installs all global mocks (Worker, ResizeObserver, HTMLAudioElement) and exposes typed `Controls` interfaces for test assertions
 
 ### Content Security Policy
 

@@ -22,7 +22,7 @@ Every long-running process must handle termination signals cleanly. In-flight wo
 
 ## Conventions
 
-- **Signal handler with escalation**: first SIGINT/SIGTERM signals graceful shutdown (finish current unit of work). Second signal force-quits via `process.exit(1)`. Auto force-quit after a context-dependent timeout (e.g., 5s for fast commands, 30s for analysis pipelines)
+- **Signal handler with escalation (required, not optional)**: first SIGINT/SIGTERM signals graceful shutdown (finish current unit of work). Second signal force-quits via `process.exit(1)`. Auto force-quit after a context-dependent timeout (e.g., 5s for fast commands, 30s for analysis pipelines). Single-signal handling without escalation is incomplete — if the graceful shutdown hangs, the process is unrecoverable without `kill -9`
 - **AbortSignal threading through write pipelines**: pass an `AbortSignal` through every write operation in the pipeline. Check `signal.aborted` between units of work. Read-only commands rely on the force-quit timeout instead of explicit signal checks
 - **Bounded drain with timeout**: after signaling shutdown, wait for in-flight operations to complete with a bounded timeout. Use `select!` (Rust), `Promise.race` (TypeScript), or `select` on a done-channel (Go) to race completion against the timeout
 - **Singleton shutdown controller**: a process-wide singleton coordinates signal handlers, timeout configuration, and abort signal distribution. Per-command timeouts are set in a `preAction` hook or equivalent

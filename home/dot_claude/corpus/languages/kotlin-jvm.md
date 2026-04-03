@@ -1,7 +1,7 @@
 ---
 name: kotlin-jvm
 category: languages
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: local/maestro
     path: common/src/
@@ -119,6 +119,16 @@ fun tick() {
     val op = pending ?: return
     if (!op.future.isDone) return
     // advance state based on result
+}
+```
+
+**Alternative: inline sealed state interface** — when state data is heterogeneous and the separation into `State` enum + `PendingOp` adds unnecessary indirection, use a single nested sealed interface inside the service class. Each variant carries all transition data directly. This is more Kotlin-idiomatic when the state machine has few states with very different data shapes:
+
+```kotlin
+private sealed interface State {
+    data object Idle : State
+    data class Searching(val handle: SearchHandle, val target: Vec3) : State
+    data class Following(val route: Route, val supervisor: RouteSupervisor) : State
 }
 ```
 

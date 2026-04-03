@@ -6,6 +6,9 @@ exemplars:
   - repo: Xevion/motophoto
     path: internal/session/ + internal/middleware/
     note: "scs session manager backed by PostgreSQL, role-based middleware guards, pgtestdb integration tests"
+  - repo: Xevion/glint
+    path: backend/src/auth/
+    note: "Bearer-or-cookie dual extraction for mixed web/headless clients, role-based typed Axum extractors"
 ---
 
 # Session & Cookie Authentication

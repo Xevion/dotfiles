@@ -1,7 +1,7 @@
 ---
 name: build-time-codegen
 category: dx
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/Pac-Man
     path: pacman/build.rs
@@ -15,6 +15,9 @@ exemplars:
   - repo: Xevion/railway-collector
     path: internal/railway/generate.go + genqlient.yaml
     note: "genqlient with scalar bindings, gomock from interfaces.go"
+  - repo: local/maestro
+    path: codegen/src/ + common/src/config/
+    note: "KSP + KotlinPoet annotation processor for config snapshot codegen"
 ---
 
 # Build-Time Code Generation
@@ -40,6 +43,11 @@ Treat codegen as a build step. Generated files are build artifacts, not source c
 - **genqlient for type-safe GraphQL client**: `go:generate go run github.com/Khan/genqlient` directive. Scalar bindings in `genqlient.yaml` map API types to Go types (`DateTime` → `string`, `BigInt` → `int64`, `JSON` → `any`). Generated file is committed; regenerate after schema or query edits
 - **gomock for interface-driven mocks**: `go:generate mockgen -source=interfaces.go -destination=mocks/mocks.go`. Define interfaces in a dedicated file, commit output to `mocks/`, expose regeneration as a Justfile recipe (`just mocks`). Mock staleness should be verified in CI like other codegen
 - sqlc for SQL→Go, tygo for Go→TypeScript, codegen outputs committed and CI-verified
+
+### Kotlin (KSP)
+
+- **KSP + KotlinPoet for annotation-driven codegen**: use a dedicated `codegen/` Gradle subproject as a KSP processor applied to the main module. Generate typed snapshot data classes, `snapshot()` extension functions, and TOML-compatible `@TomlComments` annotations from `@PropertyDoc`/`@GenerateConfigSnapshot` annotations. KotlinPoet handles code generation. This is the Kotlin-native equivalent of Rust's `build.rs` — annotation processing as a compile-time artifact generator
+- Generated output lives in the build directory (`common/build/`), not committed — KSP re-runs on each build
 
 ### TypeScript
 

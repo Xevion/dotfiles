@@ -72,6 +72,7 @@ Pin CI-sensitive tools (especially Go linters like `golangci-lint`) to exact ver
 - Ignoring audit warnings
 - Adding deps for trivial functions
 - Blocking major version upgrades without documenting the reason
+- **Bare Renovate config (`{ "dependencyDashboard": true }`)**: produces noisy per-package PRs without release-age guards, ecosystem grouping, or SHA-pinned GitHub Actions. A bare config is worse than no Renovate because it creates false confidence in dependency management. Use the baseline config documented above
 
 ## Open Questions
 

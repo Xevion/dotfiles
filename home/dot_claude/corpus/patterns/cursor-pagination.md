@@ -23,7 +23,7 @@ Opaque cursors over offset-based pagination. Cursors are stable across concurren
 
 ## Anti-Patterns
 
-- Offset-based pagination (`OFFSET N`) — performance degrades linearly with page depth and results shift when rows are inserted/deleted
+- Offset-based pagination (`OFFSET N`) on large or frequently-mutated tables — performance degrades linearly with page depth and results shift when rows are inserted/deleted. OFFSET is acceptable for small, stable tables (e.g., admin lists with <1K rows) where the simplicity tradeoff is worth it
 - Exposing raw database IDs in pagination tokens
 - No limit cap — clients can request millions of rows
 - Silently resetting to page 1 on invalid cursor (masks client bugs)

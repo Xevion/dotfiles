@@ -1,7 +1,7 @@
 ---
 name: python
 category: languages
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: sidecar/
@@ -78,7 +78,7 @@ except binascii.Error as e:
 
 ### Structured Logging
 
-Use stdlib `logging` via `logger = logging.getLogger(__name__)`. Never `print()` for operational output — reserve `print()` for user-facing CLI output to stdout, with logging going to stderr.
+Use stdlib `logging` via `logger = logging.getLogger(__name__)`. Never `print()` for operational output — reserve `print()` for user-facing CLI output to stdout, with logging going to stderr. **Exception**: `structlog` is a valid alternative when cross-service log format parity with non-Python services (Go slog, Rust tracing) is a priority. structlog's stdlib bridge mode (`ProcessorFormatter`) routes records through stdlib handlers, so existing handler configuration still applies. Use structlog when the multi-service coordination benefit outweighs the added dependency.
 
 Level discipline: `DEBUG` for per-item detail, `INFO` for request-level flow, `WARNING` for fallbacks and degraded behavior, `ERROR` for failures that will surface to the caller.
 

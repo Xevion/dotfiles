@@ -1,7 +1,7 @@
 ---
 name: ci-cd-deployment
 category: dx
-last_audited: 2026-03-27
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/banner
     path: .github/workflows/
@@ -15,6 +15,9 @@ exemplars:
   - repo: Xevion/ferrite
     path: .github/workflows/
     note: "workflow_run gating for release-please, Dependabot for cargo + github-actions"
+  - repo: Xevion/xevion.dev
+    path: .github/workflows/ci.yml
+    note: "5-job parallel CI with binding-verification, security job (cargo-audit + zizmor + Trivy SARIF)"
 ---
 
 # CI/CD & Deployment

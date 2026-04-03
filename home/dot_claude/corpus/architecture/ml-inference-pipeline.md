@@ -1,11 +1,14 @@
 ---
 name: ml-inference-pipeline
 category: architecture
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: local/topaz-video-ai-re
     path: inference/src/pipeline.rs
     note: Tiled ONNX inference with cosine-window blending, parallel workers, EMA outlier detection
+  - repo: Xevion/instant-upscale
+    path: crates/inference/src/pipeline.rs
+    note: "Same tiled ONNX pattern with crossbeam thread pool, dual result/error channels, first-tile extended timeout"
 ---
 
 # ML Inference Pipeline

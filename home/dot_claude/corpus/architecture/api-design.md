@@ -1,7 +1,7 @@
 ---
 name: api-design
 category: architecture
-last_audited: 2026-03-26
+last_audited: 2026-04-03
 exemplars:
   - repo: Xevion/banner
     path: src/web/
@@ -65,6 +65,7 @@ pub struct ApiError {
 - Inline cache header strings instead of named constants
 - Rate limiting only at the global level without endpoint-specific controls
 - Logging raw DB errors to the client response
+- **Flat `{"error": string}` without typed error codes (Go)**: when Go API errors are plain `map[string]string{"error": msg}` without a stable machine-readable discriminant, the frontend must resort to string matching on error messages — fragile and untranslatable. Define a typed error code enum and include it alongside the human message in every error response
 
 ## Open Questions
 
