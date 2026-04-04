@@ -80,6 +80,8 @@ allow(
     "eslint",
     "prettier",
     "dotnet",
+    "mise",
+    "fish",
   ),
   "go version", // go uses "go version" not "go --version"
 );
@@ -130,7 +132,7 @@ allow(
 
 // -- Node / Bun --
 allow(
-  ...subs("npm", ["run", "audit", "ci", "list", "outdated"]),
+  ...subs("npm", ["run", "audit", "ci", "list", "outdated", "info"]),
   ...subs("pnpm", ["run", "list", "exec", "audit", "outdated", "install", "add", "remove", "uninstall"]),
   "bun",
   "bunx",
@@ -138,7 +140,8 @@ allow(
 
 // -- Python --
 allow(
-  ...subs("uv", ["sync", "run", "pip list", "pip show"]),
+  ...subs("uv", ["sync", "run", "pip list", "pip show", "pip install", "venv", "tool"]),
+  "python3",
   "pytest",
   "mypy",
   "ruff check",
@@ -185,6 +188,7 @@ tool("git", {
     "push",
     "stash",
     "switch",
+    "clone",
   ],
   deny: [
     "push --force",
@@ -215,6 +219,8 @@ tool("gh", {
     "issue list",
     "issue view",
     "search",
+    "repo view",
+    "repo list",
   ],
   ask: [
     "pr close",
@@ -295,6 +301,12 @@ allow(
   "fc-cache",
   "fd",
   "bat",
+  "tar",
+  "java",
+  "journalctl",
+  "whois",
+  "apt-cache",
+  "7z",
 );
 
 // -- DB / query tools --
@@ -336,6 +348,12 @@ allow(
   "opencode",
   "mise install",
   "mise exec",
+  "mise ls",
+  "mise ls-remote",
+  "mise registry",
+  "mise trust",
+  "mise use",
+  "mise run",
   "claude mcp add",
 );
 
@@ -345,6 +363,10 @@ ask(
   ...subs("pnpm", ["update", "store prune"]),
   "cargo uninstall",
   "cargo update",
+  "cargo install",
+  "snap install",
+  "snap remove",
+  "sudo apt",
 );
 
 // -- Destructive file operations --
@@ -359,6 +381,8 @@ ask(
   "npm run deploy",
   "bun run deploy",
   "Move-Item",
+  "ssh",
+  "scp",
 );
 
 // -- Cargo dangerous --
