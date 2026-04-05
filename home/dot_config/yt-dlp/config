@@ -1,0 +1,14 @@
+# yt-dlp default config
+
+# Use Vivaldi cookies for age-gated/auth-required content
+--cookies-from-browser vivaldi
+
+# Pick best quality by default
+--format bestvideo+bestaudio/best
+
+# Embed metadata and thumbnail
+--embed-thumbnail
+--embed-metadata
+
+# Output template
+--output "%(title)s [%(id)s].%(ext)s"
