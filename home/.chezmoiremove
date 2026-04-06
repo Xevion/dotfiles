@@ -18,5 +18,9 @@
 # writing-plans skill disabled/deleted
 .claude/skills/writing-plans/SKILL.md
 
-# bash-discipline rewritten from Python to compiled Bun binary
+# Old hook files replaced by compiled bash-guard and banner-comment-lint binaries
 .claude/hooks/bash-discipline.py
+.claude/hooks/bash-discipline.ts
+.claude/hooks/bash-discipline
+.claude/hooks/approve-compound-bash.sh
+.claude/hooks/banner-comment-lint.py

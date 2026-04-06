@@ -1,11 +1,18 @@
-// PreToolUse hook: enforce bash command discipline via shfmt AST analysis.
+// PreToolUse hook: discipline checks + compound command auto-approval.
 //
-// Parses Bash commands into a structured AST using shfmt, then checks each
-// command segment against a data-driven rule set. This avoids regex false
-// positives (patterns inside strings) and false negatives (commands behind
-// prefixes like sudo/env/command or via absolute paths).
+// Phase 1 (Discipline): Parses Bash via shfmt AST, checks each command
+// against data-driven rules. Blocks misuse of cat/grep/head/tail/find
+// and bad redirect patterns.
 //
-// Exit codes:  0 = allow,  2 = block (stderr shown to Claude as feedback)
+// Phase 2 (Approval): If discipline passes, checks compound commands
+// against Claude Code permission settings. Auto-approves when all
+// sub-commands match the allow list, denies when any match the deny list.
+//
+// Single shfmt parse shared between both phases.
+// Exit codes: 0 = allow/fall-through, 2 = block
+
+import { readFileSync } from "fs";
+import { dirname } from "path";
 
 const TRUNCATION_LIMIT = 100;
 
@@ -32,7 +39,6 @@ const OP_OR = 14;
 // shfmt redirect op codes
 const REDIR_OUT = 63; // >
 const REDIR_DUP_OUT = 68; // >&
-
 
 interface CommandCtx {
   name: string; // effective command name (basename, prefix-stripped)
@@ -63,7 +69,6 @@ const rules: Rule[] = [
 
   (ctx) => {
     if (ctx.name === "cat" && !ctx.isRightOfPipe) {
-      // Allow heredoc usage (cat <<EOF) — that's writing, not reading
       if (ctx.args.some((a) => a.startsWith("<<"))) return null;
       return (
         "Use the Read tool instead of cat. " +
@@ -143,29 +148,24 @@ const rules: Rule[] = [
   },
 ];
 
-// Parse -n N, -N, -n+N (offset, allowed) from head/tail args
 function parseTruncationN(args: string[]): number | null {
   for (let i = 1; i < args.length; i++) {
     const a = args[i];
     // -n +N is offset syntax — not truncation, allow it
     if (a === "-n" && args[i + 1]?.startsWith("+")) return null;
     if (a.startsWith("-n+") || a.startsWith("+")) return null;
-    // -n N
     if (a === "-n" && i + 1 < args.length) {
       const n = parseInt(args[i + 1], 10);
       return isNaN(n) ? null : n;
     }
-    // -nN (combined)
     if (a.startsWith("-n") && a.length > 2) {
       const n = parseInt(a.slice(2), 10);
       return isNaN(n) ? null : n;
     }
-    // -N (bare number)
     if (/^-\d+$/.test(a)) return parseInt(a.slice(1), 10);
   }
   return null;
 }
-
 
 interface AstNode {
   Type?: string;
@@ -191,14 +191,13 @@ interface AstNode {
   Array?: { Elems?: AstNode[] };
 }
 
-
 function wordValue(word: AstNode | undefined): string {
   if (!word?.Parts) return word?.Value ?? "";
   return word.Parts.map((p) => {
     if (p.Value !== undefined) return p.Value;
     if (p.Type === "DblQuoted" || p.Type === "SglQuoted")
       return p.Parts?.map((pp) => pp.Value ?? "").join("") ?? p.Value ?? "";
-    if (p.Type === "ParamExp") return "$" + (p as any).Param?.Value ?? "";
+    if (p.Type === "ParamExp") return "$" + ((p as any).Param?.Value ?? "");
     if (p.Type === "CmdSubst") return "$(..)";
     return "";
   }).join("");
@@ -208,17 +207,17 @@ function extractArgs(call: AstNode): string[] {
   return (call.Args ?? []).map(wordValue);
 }
 
-function basename(s: string): string {
+function pathBasename(s: string): string {
   const i = s.lastIndexOf("/");
   return i >= 0 ? s.substring(i + 1) : s;
 }
 
 function effectiveName(args: string[]): string {
   for (const a of args) {
-    const name = basename(a);
+    const name = pathBasename(a);
     if (!TRANSPARENT.has(name)) return name;
   }
-  return args.length > 0 ? basename(args[args.length - 1]) : "";
+  return args.length > 0 ? pathBasename(args[args.length - 1]) : "";
 }
 
 function extractRedirects(stmt: AstNode): Redirect[] {
@@ -269,7 +268,6 @@ function* walkNode(
     return;
   }
 
-  // TimeClause wraps a Stmt — recurse into it transparently
   if (type === "TimeClause" && node.Stmt) {
     yield* walkStmt(node.Stmt, opts);
     return;
@@ -295,7 +293,7 @@ function* walkNode(
     return;
   }
 
-  // Container types — recurse into their statements
+  // Container types — recurse into their statement lists
   const stmtLists: (AstNode[] | undefined)[] = [
     node.Stmts,
     node.Cond,
@@ -313,10 +311,8 @@ function* walkNode(
     for (const s of list) yield* walkStmt(s, opts);
   }
 
-  // If none of the above matched but there's a Cmd, walk it
   if (node.Cmd) yield* walkNode(node.Cmd, opts);
 }
-
 
 function parseAst(command: string): AstNode {
   const proc = Bun.spawnSync(["shfmt", "-ln", "bash", "-tojson"], {
@@ -331,6 +327,164 @@ function parseAst(command: string): AstNode {
   return JSON.parse(proc.stdout.toString());
 }
 
+// Approval: find the git root for project-level settings
+function findGitRoot(): string | null {
+  const toplevel = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], {
+    stderr: "pipe",
+  });
+  if (toplevel.exitCode !== 0) return null;
+
+  // Handle worktrees: common-dir differs from git-dir
+  const gitDir = Bun.spawnSync(["git", "rev-parse", "--git-dir"], {
+    stderr: "pipe",
+  });
+  const commonDir = Bun.spawnSync(["git", "rev-parse", "--git-common-dir"], {
+    stderr: "pipe",
+  });
+  if (gitDir.exitCode === 0 && commonDir.exitCode === 0) {
+    const gd = gitDir.stdout.toString().trim();
+    const cd = commonDir.stdout.toString().trim();
+    if (gd !== cd) return dirname(cd);
+  }
+
+  return toplevel.stdout.toString().trim();
+}
+
+// Extract the command prefix from a Bash(...) permission pattern
+function extractBashPrefix(pattern: string): string | null {
+  if (!pattern.startsWith("Bash(")) return null;
+  let s = pattern.slice(5);
+  s = s.replace(/( \*|\*|:\*)\)$/, "");
+  s = s.replace(/\)$/, "");
+  return s || null;
+}
+
+interface PermissionPrefixes {
+  allowed: string[];
+  denied: string[];
+}
+
+function loadPrefixes(): PermissionPrefixes {
+  const home = process.env.HOME ?? "";
+  const gitRoot = findGitRoot();
+
+  const files = [
+    `${home}/.claude/settings.json`,
+    `${home}/.claude/settings.local.json`,
+  ];
+  if (gitRoot) {
+    files.push(
+      `${gitRoot}/.claude/settings.json`,
+      `${gitRoot}/.claude/settings.local.json`,
+    );
+  } else {
+    files.push(".claude/settings.json", ".claude/settings.local.json");
+  }
+
+  const allowedSet = new Set<string>();
+  const deniedSet = new Set<string>();
+
+  for (const file of files) {
+    let data: any;
+    try {
+      data = JSON.parse(readFileSync(file, "utf-8"));
+    } catch {
+      continue;
+    }
+    for (const p of data?.permissions?.allow ?? []) {
+      const prefix = extractBashPrefix(p);
+      if (prefix !== null) allowedSet.add(prefix);
+    }
+    for (const p of data?.permissions?.deny ?? []) {
+      const prefix = extractBashPrefix(p);
+      if (prefix !== null) deniedSet.add(prefix);
+    }
+  }
+
+  return { allowed: [...allowedSet], denied: [...deniedSet] };
+}
+
+// Approval: prefix matching against permission lists
+function matchesPrefix(cmd: string, prefix: string): boolean {
+  return (
+    cmd === prefix ||
+    cmd.startsWith(prefix + " ") ||
+    cmd.startsWith(prefix + "/")
+  );
+}
+
+function matchesPrefixList(cmd: string, prefixes: string[]): boolean {
+  return prefixes.some((p) => matchesPrefix(cmd, p));
+}
+
+// Generate candidate command strings for prefix matching.
+// Includes the full arg string and a version with transparent prefixes stripped.
+function commandCandidates(ctx: CommandCtx): string[] {
+  const full = ctx.args.join(" ");
+  const candidates = [full];
+
+  let i = 0;
+  while (i < ctx.args.length && TRANSPARENT.has(pathBasename(ctx.args[i])))
+    i++;
+  if (i > 0 && i < ctx.args.length) {
+    candidates.push(ctx.args.slice(i).join(" "));
+  }
+
+  return candidates;
+}
+
+function checkPermission(
+  ctx: CommandCtx,
+  prefixes: PermissionPrefixes,
+): "allowed" | "denied" | "unknown" {
+  const candidates = commandCandidates(ctx);
+  for (const c of candidates) {
+    if (matchesPrefixList(c, prefixes.denied)) return "denied";
+  }
+  for (const c of candidates) {
+    if (matchesPrefixList(c, prefixes.allowed)) return "allowed";
+  }
+  return "unknown";
+}
+
+// Quick check for shell metacharacters that indicate compound structure.
+// Simple commands don't need approval — Claude Code handles them natively.
+function hasCompoundStructure(cmd: string): boolean {
+  return (
+    /[|&;`]/.test(cmd) ||
+    cmd.includes("$(") ||
+    cmd.includes("<(") ||
+    cmd.includes(">(")
+  );
+}
+
+// Recursively expand sh -c / bash -c into inner commands for approval checking
+function expandShellC(contexts: CommandCtx[]): CommandCtx[] {
+  const expanded: CommandCtx[] = [];
+  for (const ctx of contexts) {
+    expanded.push(ctx);
+    const base = pathBasename(ctx.args[0] ?? "");
+    if (base !== "bash" && base !== "sh") continue;
+    const cIdx = ctx.args.indexOf("-c");
+    if (cIdx < 0 || cIdx + 1 >= ctx.args.length) continue;
+    try {
+      const innerAst = parseAst(ctx.args[cIdx + 1]);
+      for (const stmt of innerAst.Stmts ?? []) {
+        for (const inner of walkStmt(stmt)) expanded.push(inner);
+      }
+    } catch {
+      // Inner parse failure — outer command stays for checking
+    }
+  }
+  return expanded;
+}
+
+const ALLOW_JSON = JSON.stringify({
+  hookSpecificOutput: {
+    hookEventName: "PreToolUse",
+    permissionDecision: "allow",
+  },
+});
 
 interface HookInput {
   tool_name: string;
@@ -343,35 +497,56 @@ if (input.tool_name !== "Bash") process.exit(0);
 const command = input.tool_input?.command;
 if (!command) process.exit(0);
 
-let issues: string[];
-
+let ast: AstNode;
 try {
-  const ast = parseAst(command);
-  const contexts: CommandCtx[] = [];
-  for (const stmt of ast.Stmts ?? []) {
-    for (const ctx of walkStmt(stmt)) {
-      contexts.push(ctx);
-    }
-  }
-
-  // Deduplicate: same message shouldn't appear twice
-  const seen = new Set<string>();
-  issues = [];
-  for (const ctx of contexts) {
-    for (const rule of rules) {
-      const msg = rule(ctx);
-      if (msg && !seen.has(msg)) {
-        seen.add(msg);
-        issues.push(msg);
-      }
-    }
-  }
+  ast = parseAst(command);
 } catch {
-  // shfmt unavailable or parse failure — allow through rather than block
+  // shfmt unavailable or parse failure — allow through
   process.exit(0);
 }
 
+const contexts: CommandCtx[] = [];
+for (const stmt of ast.Stmts ?? []) {
+  for (const ctx of walkStmt(stmt)) contexts.push(ctx);
+}
+
+// Phase 1: Discipline — block bad tool usage patterns
+const seen = new Set<string>();
+const issues: string[] = [];
+for (const ctx of contexts) {
+  for (const rule of rules) {
+    const msg = rule(ctx);
+    if (msg && !seen.has(msg)) {
+      seen.add(msg);
+      issues.push(msg);
+    }
+  }
+}
+
 if (issues.length > 0) {
-  console.error(issues.map((i) => `• ${i}`).join("\n"));
+  console.error(issues.map((i) => `\u2022 ${i}`).join("\n"));
   process.exit(2);
 }
+
+// Phase 2: Approval — auto-approve compound commands when all segments are allowed
+if (!hasCompoundStructure(command)) process.exit(0);
+
+const prefixes = loadPrefixes();
+if (prefixes.allowed.length === 0) process.exit(0);
+
+const allContexts = expandShellC(contexts);
+if (allContexts.length === 0) process.exit(0);
+
+const statuses = allContexts.map((ctx) => checkPermission(ctx, prefixes));
+
+if (statuses.every((s) => s === "allowed")) {
+  console.log(ALLOW_JSON);
+  process.exit(0);
+}
+
+if (statuses.some((s) => s === "denied")) {
+  console.error("Compound command contains a denied sub-command.");
+  process.exit(2);
+}
+
+process.exit(0);

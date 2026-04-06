@@ -1,19 +1,22 @@
 {{ if eq .chezmoi.os "linux" -}}
 #!/bin/bash
-# hash: {{ include "dot_claude/hooks/bash-discipline.ts" | sha256sum }}
+# hash: {{ include "dot_claude/hooks/bash-guard.ts" | sha256sum }}
+# hash: {{ include "dot_claude/hooks/banner-comment-lint.ts" | sha256sum }}
 set -euo pipefail
 
 HOOKS_DIR="{{ .chezmoi.homeDir }}/.claude/hooks"
-SRC="$HOOKS_DIR/bash-discipline.ts"
-OUT="$HOOKS_DIR/bash-discipline"
 
 if ! command -v bun &>/dev/null; then
   echo "[compile-hooks] bun not found, skipping compilation"
   exit 0
 fi
 
-echo "[compile-hooks] Compiling bash-discipline.ts → binary"
-bun build --compile "$SRC" --outfile "$OUT" 2>&1
-chmod +x "$OUT"
-echo "[compile-hooks] Done: $OUT"
+for src in "$HOOKS_DIR"/bash-guard.ts "$HOOKS_DIR"/banner-comment-lint.ts; do
+  name="${src%.ts}"
+  echo "[compile-hooks] Compiling $(basename "$src") → binary"
+  bun build --compile "$src" --outfile "$name" 2>&1
+  chmod +x "$name"
+done
+
+echo "[compile-hooks] Done"
 {{ end -}}

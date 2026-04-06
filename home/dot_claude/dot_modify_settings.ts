@@ -34,16 +34,7 @@ const desired: Record<string, unknown> = {
         hooks: [
           {
             type: "command",
-            command: "~/.claude/hooks/bash-discipline",
-          },
-        ],
-      },
-      {
-        matcher: "Bash",
-        hooks: [
-          {
-            type: "command",
-            command: "~/.claude/hooks/approve-compound-bash.sh",
+            command: "~/.claude/hooks/bash-guard",
             timeout: 3000,
           },
         ],
@@ -55,7 +46,7 @@ const desired: Record<string, unknown> = {
         hooks: [
           {
             type: "command",
-            command: "python3 ~/.claude/hooks/banner-comment-lint.py",
+            command: "~/.claude/hooks/banner-comment-lint",
           },
         ],
       },
