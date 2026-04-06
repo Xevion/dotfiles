@@ -1,0 +1,19 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# hash: {{ include "dot_claude/hooks/bash-discipline.ts" | sha256sum }}
+set -euo pipefail
+
+HOOKS_DIR="{{ .chezmoi.homeDir }}/.claude/hooks"
+SRC="$HOOKS_DIR/bash-discipline.ts"
+OUT="$HOOKS_DIR/bash-discipline"
+
+if ! command -v bun &>/dev/null; then
+  echo "[compile-hooks] bun not found, skipping compilation"
+  exit 0
+fi
+
+echo "[compile-hooks] Compiling bash-discipline.ts → binary"
+bun build --compile "$SRC" --outfile "$OUT" 2>&1
+chmod +x "$OUT"
+echo "[compile-hooks] Done: $OUT"
+{{ end -}}

@@ -34,7 +34,7 @@ const desired: Record<string, unknown> = {
         hooks: [
           {
             type: "command",
-            command: "python3 ~/.claude/hooks/bash-discipline.py",
+            command: "~/.claude/hooks/bash-discipline",
           },
         ],
       },

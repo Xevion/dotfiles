@@ -17,3 +17,6 @@
 
 # writing-plans skill disabled/deleted
 .claude/skills/writing-plans/SKILL.md
+
+# bash-discipline rewritten from Python to compiled Bun binary
+.claude/hooks/bash-discipline.py
