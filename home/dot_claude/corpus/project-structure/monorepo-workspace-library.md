@@ -1,7 +1,7 @@
 ---
 name: monorepo-workspace-library
 category: project-structure
-last_audited: 2026-03-27
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/relatives
     path: packages/core/
@@ -9,6 +9,9 @@ exemplars:
   - repo: Xevion/borde.rs
     path: frontend/
     note: "pnpm workspaces with shared game protocol types consumed by multiple frontend targets"
+  - repo: local/Applyhelm
+    path: crates/ + packages/
+    note: "Cross-language monorepo: Cargo workspace (crates/) alongside Bun workspace (packages/), shared via ts-rs bindings"
 ---
 
 # Monorepo Workspace Library
@@ -23,6 +26,7 @@ Structure monorepos with clear package boundaries: `apps/` for deployable applic
 - **Source exports for internal consumers**: within a Bun workspace, point `exports` at raw `.ts` source files. Bun resolves TypeScript natively, eliminating the build step during development. The build script (tsc + tsc-alias) produces `dist/` only for external publishing
 - **Dual export modes**: workspace-internal consumption uses source exports (`"import": "./src/index.ts"`). Before npm publish, exports must point at compiled `dist/` files with conditional `types`/`import` fields
 - **Root package.json orchestration**: for Bun monorepos without a Justfile, root `scripts` with `bun run --cwd` commands serve as the task runner surface. Loses tab-completion and parameterization compared to Justfile recipes
+- **Cross-language monorepos: language-boundary split, not apps/packages split**: when a monorepo combines a Cargo workspace with a Bun workspace, use `crates/` for all Rust packages and `packages/` for all TypeScript packages regardless of the apps-vs-libraries distinction within each language. The language boundary takes precedence because Cargo and Bun each need a flat workspace member list, and introducing an `apps/crates/backend/` nesting breaks Cargo's workspace discovery. Document the choice explicitly in an ADR — it diverges from the single-language Turborepo convention for a concrete tooling reason. `packages/extension` and `packages/web` are still "apps" in the Turborepo sense; `packages/api-client` and `packages/shared-types` are still "libraries"; the split lives in naming and documentation, not directory structure
 
 ## Anti-Patterns
 

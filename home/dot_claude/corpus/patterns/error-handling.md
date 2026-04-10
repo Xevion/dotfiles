@@ -1,7 +1,7 @@
 ---
 name: error-handling
 category: patterns
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/banner
     path: src/banner/errors.rs
@@ -21,6 +21,9 @@ exemplars:
   - repo: Xevion/rustdoc-mcp
     path: src/error.rs
     note: "help() method on typed error enums for actionable user-facing guidance, five-level thiserror hierarchy"
+  - repo: local/Applyhelm
+    path: crates/common/src/error.rs + crates/backend/src/error.rs
+    note: "Feature-gated IntoResponse on shared ApiError (keeps axum out of common crate), OptionNotFoundExt + SqlxResultExt extension traits"
 ---
 
 # Error Handling
@@ -46,6 +49,7 @@ enum JobError {
 - **Single sanitization point**: a boundary function (e.g. `db_error()`) logs the raw error and returns a sanitized message. Handlers never log-and-throw
 - **`status_and_code()` helper on error enums**: returns both HTTP status and stable machine-readable code in one match arm. When a single error type serves both REST and GraphQL surfaces, both `IntoResponse` and `ErrorExtensions` impls call it, keeping error-to-HTTP mapping single-source across API surfaces
 - **`help()` method for actionable user-facing guidance**: each error sub-enum carries `help() → Option<&'static str>` returning resolution guidance (e.g., "Use inspect_crate without arguments to list available crates"). A top-level `user_message()` fuses `Display` + `help` into a single response string. Distinct from `status_and_code()` — this is for CLI/MCP/tool surfaces where the consumer needs actionable next steps, not HTTP status mapping
+- **Feature-gated `IntoResponse` for shared error crates**: when a shared types crate (`crates/common`) defines the project's canonical `ApiError`/`ApiErrorCode` enum AND needs to be consumed by both the backend and by non-backend contexts (WASM target, CLI tool, ts-rs type generation), place the `axum::response::IntoResponse` impl behind a Cargo feature (`#[cfg(feature = "axum")]`). The backend enables the feature; other consumers don't, keeping `axum` out of their dependency graph. Same pattern applies to any web-framework trait impl (`actix-web::Responder`, `warp::Reply`) that would otherwise force the framework as a mandatory dependency of the shared crate
 
 ## Language-Specific
 

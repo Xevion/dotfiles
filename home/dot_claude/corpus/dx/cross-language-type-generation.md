@@ -1,7 +1,7 @@
 ---
 name: cross-language-type-generation
 category: dx
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/instant-upscale
     path: crates/server/ + frontend/src/lib/bindings/
@@ -15,6 +15,9 @@ exemplars:
   - repo: local/inkwell
     path: tygo.yaml + web/src/lib/types.gen.ts
     note: "tygo type_mappings for pgx nullable types, dual codegen verification (sqlc + tygo) in CI"
+  - repo: local/Applyhelm
+    path: tempo.config.ts + packages/shared-types/bindings/
+    note: "Reference mtime-gated ts-rs preflight: tmpdir isolation, file-by-file Buffer.compare diff, stale cleanup, idempotent barrel generator, CI verify via runner.temp + diff -r"
 ---
 
 # Cross-Language Type Generation
@@ -26,6 +29,7 @@ Generated types are the single source of truth for API contracts. Backend define
 ## Conventions
 
 - **CI verification via regen+diff**: regenerate bindings in CI and `git diff --exit-code` the output. Stale generated files are a build failure, not a warning
+- **mtime-gated auto-regen preflight with tmpdir isolation**: rather than regenerating bindings manually or in a pre-commit hook, wire the regen into a typed build-tool preflight (`tempo.config.ts`, `scripts/bindings.ts`) that compares source mtime to artifact mtime. When source is newer: create a tmpdir, set `TS_RS_EXPORT_DIR` to the tmpdir, run `cargo test export_bindings`, diff the tmpdir against the committed output file-by-file via `Buffer.compare`, clean up files that no longer exist in the new output, and write only the changed files back. Tmpdir isolation prevents partial regeneration from corrupting the workspace on failure. Pair with an idempotent barrel generator (skip write when content unchanged) to avoid spurious git diffs on re-run. CI runs the same preflight with `TS_RS_EXPORT_DIR=$RUNNER_TEMP/bindings` and then `diff -r` against the committed output — catches drift without depending on a pre-commit hook being installed
 
 ## Language-Specific
 

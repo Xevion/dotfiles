@@ -1,7 +1,7 @@
 ---
 name: repo-layout
 category: project-structure
-last_audited: 2026-03-27
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/banner
     path: "/"
@@ -15,6 +15,12 @@ exemplars:
   - repo: Xevion/glint
     path: docs/
     note: "STYLE.md with per-subsystem links, VOCABULARY.md for domain terminology and anti-patterns"
+  - repo: local/Applyhelm
+    path: docs/
+    note: "Full docs/ hierarchy with decisions/ (ADRs) + plans/ (in-flight design work) + STYLE.md + VOCABULARY.md"
+  - repo: local/game-hacking
+    path: targets/
+    note: "targets/<game>/analysis/ + research/ + source/ for per-target knowledge bases separate from tool workspace"
 ---
 
 # Repo Layout
@@ -29,7 +35,8 @@ Convention over configuration. Predictable locations. Monorepo for tightly coupl
 - **Justfile at root**: the entry point for all project commands (see [build-systems](../project-structure/build-systems.md))
 - **CLAUDE.md at root**: AI agent context document (see [ai-assisted-dev](../dx/ai-assisted-dev.md))
 - **scripts/ with independent dependencies**: build scripts live in `scripts/` with a `scripts/lib/` for shared utilities. Give scripts their own `package.json`/lockfile so dependencies are tracked separately from the application
-- **docs/ hierarchy**: a top-level `STYLE.md` that links to language-specific guides (`RUST.md`, `SVELTE.md`). In-flight design work goes in `docs/plans/`. CLAUDE.md references these as required reading
+- **docs/ hierarchy**: a top-level `STYLE.md` that links to language-specific guides (`RUST.md`, `SVELTE.md`). Settled architectural choices go in `docs/decisions/` as ADRs (numbered `001-*.md`, `002-*.md`). In-flight design work — active implementation plans, not yet committed — goes in `docs/plans/`. Keeping `plans/` and `decisions/` separate lets agents and humans distinguish "still being figured out" from "already decided"; once a plan lands, promote the decision into `decisions/`. CLAUDE.md references both directories as required reading for architectural work
+- **`targets/<subject>/` for RE and research knowledge bases**: in reverse-engineering, security research, or other projects built around knowledge about an external subject, scope all per-subject knowledge under `targets/<subject>/`. Sub-structure: `analysis/` for structured findings (`structs.h`, `pointer_chains.json`, confidence-tiered artifacts — see [binary-reverse-engineering](../patterns/binary-reverse-engineering.md)), `research/` for unstructured notes and reading, `source/` for source checkouts when the target is open source (typically gitignored). Keeps *tool code* in `crates/` or `src/` and *target knowledge* in `targets/` — both independently navigable, and a new target is added by creating a subdirectory without touching the tool workspace
 - **Auto-generated code in `lib/bindings/`**: cross-language generated types (ts-rs, protobuf, etc.) live in a dedicated bindings directory with an auto-maintained barrel index. The build system must remove stale files when source types are renamed or deleted
 - **`lib/bindings/` barrel generator**: companion script with idempotent write (skip when content unchanged) to avoid spurious git diffs. Justfile `bindings` recipe chains type generation and barrel regeneration
 - **Two-level `docs/`**: entry-point file (`docs/KOTLIN.md`, `docs/STYLE.md`) with a quick-reference table linking to `docs/patterns/` where each topic gets its own file with code examples. `docs/VOCABULARY.md` documents domain terminology AND naming anti-patterns to prevent naming drift across language stacks. In multilingual monorepos, models are the source of truth for structure; VOCABULARY.md is the source of truth for naming

@@ -1,7 +1,7 @@
 ---
 name: logging-observability
 category: patterns
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/banner
     path: src/logging/
@@ -18,6 +18,18 @@ exemplars:
   - repo: local/inkwell
     path: internal/middleware/ + web/vite-plugin-json-logger.ts
     note: "Three-layer LOG_JSON coordination (Go + SvelteKit + Vite plugin), LevelTrace named constant"
+  - repo: local/Applyhelm
+    path: crates/backend/src/logging.rs + packages/web/src/lib/logging.ts + entrypoint.ts
+    note: "Three-layer LOG_JSON across Rust tracing + SvelteKit LogTape + Bun entrypoint supervisor, console-logger preload"
+  - repo: local/stashapp-rapid-tag
+    path: vite-plugin-json-logger.ts
+    note: "Standalone SvelteKit variant of coordinated LOG_JSON — customLogger + server.printUrls override + handleHotUpdate capture"
+  - repo: local/rekuma
+    path: internal/logging/logging.go
+    note: "Pps rate LogValuer, formatURL CDN prefix stripping, formatHash truncation, formatBytes humanize, ParseLevel with LevelTrace"
+  - repo: local/game-hacking
+    path: crates/game-core/src/tracing_init.rs
+    note: "RawStderr + RawFileTee for .init_array-safe tracing in injected .so, breadcrumb() libc::write fallback"
   - repo: Xevion/xevion.dev
     path: src/middleware/request_id.rs + web/console-logger.js
     note: "RequestIdLayer with upstream header trust + ULID fallback, console-logger preload"
@@ -77,6 +89,7 @@ let filter = EnvFilter::new(format!(
 - **Channel-backed tracing Layer for TUI**: implement a custom `tracing::Layer` that serializes log records into an `mpsc` channel; the TUI rendering thread drains the channel each frame. Keeps log records in-process and lets the TUI control presentation
 - **WASM tracing with build-profile-gated filters**: for Rust compiled to WASM, use `wasm-tracing` with `tracing-subscriber::EnvFilter` for browser console output. Use `#[cfg(debug_assertions)]` to select debug vs production log levels at compile time (no runtime overhead). `set_report_logs_in_timings(true)` integrates logs with the browser performance timeline. This is the WASM-specific equivalent of "runtime format selection" for native targets
 - **EMA-based outlier detection in hot paths**: use exponential moving average (α=0.05) as a running baseline and emit a structured warning when a measurement exceeds 5×EMA. Lighter than a sliding window and naturally adapts to warm-up
+- **Injected-library tracing initialization**: in a `cdylib` `.so` loaded via `dlopen` into a foreign process, Rust's standard `Stderr` takes a global lock that can deadlock inside `.init_array` (the dynamic loader holds the linker lock; the first `println!` tries to take the stderr lock). Implement a `RawStderr` writer that calls `libc::write(2, ...)` directly and skip `EnvFilter` — regex compilation touches TLS that may not be set up in a freshly-loaded `.so`. Use a static `LevelFilter` instead. Provide a `breadcrumb()` function that calls `write(2, ...)` with no allocation for pre-subscriber diagnostics. Each `RTLD_LOCAL`-loaded `cdylib` has its own `tracing-core` statics and must register its own subscriber. See [linux-process-memory-injection](../architecture/linux-process-memory-injection.md)
 
 ### TypeScript
 
@@ -91,6 +104,9 @@ let filter = EnvFilter::new(format!(
 - Context-based logger propagation: attach pre-seeded `*slog.Logger` (with request_id) to context in middleware, retrieve with `LoggerFromContext` helper with default fallback
 - **Composable slog handler chain**: base handler (tint or JSON) → slog-formatter middleware → FilteringHandler. Each layer is a distinct concern — formatting, value transforms, noise suppression. The FilteringHandler silently drops records matching known-noisy substrings (e.g., `net/http` idle connection chatter)
 - **Status-proportional levels in RoundTripper**: apply status-proportional log levels inside `http.RoundTripper` implementations, not just at HTTP handler middleware layers. Debug for normal responses, Warn for rate limits and errors. Keeps transport-level noise at Debug while surfacing rate limit events at Warn without requiring the caller to inspect every response
+- **Typed rate wrapper `Pps`**: extend the `Pct` LogValuer pattern to per-second rates. `type Pps float64` implements `LogValue()` returning a formatted string (`"1.2k req/s"`, `"342 req/s"`). Keeps rate values consistent across call sites without manual formatting. Pair with a windowed-counter helper so call sites log `slog.Any("rate", Pps(count/window.Seconds()))`
+- **Key-based formatter registration**: rekuma's `FormatByKey("hash", formatHash)`, `FormatByKey("url", formatURL)`, `FormatByKey("bytes", formatBytes)` register per-key transforms inside the slog-formatter middleware chain. `formatHash` truncates long hex strings to ~12 chars; `formatURL` strips known CDN domain prefixes in dev mode (skipped under JSON handler); `formatBytes` humanizes byte counts via `go-humanize`. The key-based dispatch keeps call sites writing `slog.String("hash", full)` while the middleware applies display transforms conditional on the active handler
+- **`ParseLevel` with `LevelTrace` support**: a `ParseLevel(s string) (slog.Level, bool)` helper that accepts `"trace"/"debug"/"info"/"warn"/"error"` and returns the project-defined `LevelTrace = slog.LevelDebug - 4` constant for `"trace"`. Pairs with `InitLogger(base *slog.Logger, componentType, name string)` for enriching component-scoped loggers — falls back to `slog.Default()` when `base` is nil and attaches `componentType=name` as an attribute
 
 ## Value Display Patterns
 

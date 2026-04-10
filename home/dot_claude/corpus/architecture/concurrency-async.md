@@ -1,7 +1,7 @@
 ---
 name: concurrency-async
 category: architecture
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/banner
     path: src/services/
@@ -30,6 +30,15 @@ exemplars:
   - repo: Xevion/ferrite
     path: src/main.rs
     note: thread::scope + AtomicBool, Rayon two-phase write-verify
+  - repo: local/rekuma
+    path: internal/framework/backoff.go + internal/server/handlers_media.go
+    note: "DBBackoff state machine for resilient polling loops; chan-based singleflight with context.WithoutCancel for side effects"
+  - repo: local/game-hacking
+    path: crates/ac/external/src/daemon.rs
+    note: "Raw OS thread force-shutdown watchdog surviving tokio runtime teardown; top-level select! racing signals + cancel token + accept"
+  - repo: local/Applyhelm
+    path: entrypoint.ts
+    note: "Bun Promise.race supervisor over Rust backend + SvelteKit, coordinated exit via monitor(proc)"
 ---
 
 # Concurrency & Async
@@ -89,6 +98,7 @@ pub async fn shutdown(self, timeout: Duration) -> bool {
 - **`Arc<AtomicBool>` for cooperative cancellation**: appropriate for synchronous thread-based loops where `CancellationToken` would require polling `is_cancelled()` anyway. Lower overhead and no external dependency. Reserve CancellationToken for async contexts where `.cancelled().await` is genuinely useful
 - **`thread::scope` for OS-thread structured concurrency**: ensures all spawned threads join before the scope exits. Share a single `Arc<AtomicBool>` cancellation flag. Appropriate for CPU-bound parallel workers where async overhead is undesirable
 - **Rayon two-phase write-then-verify**: separate `par_chunks_mut` write and `par_chunks` verify sweeps for cache-bypassed parallel memory access. Rayon's join barrier guarantees sfence visibility before the verify phase begins
+- **Raw OS thread force-shutdown watchdog**: when `tokio`'s runtime `Drop` would block on uncancellable `spawn_blocking` tasks (GLFW event loops, GPU render loops, OpenGL overlays that own their own thread), spawn a raw `std::thread` watchdog *before* awaiting async tasks. The watchdog sleeps to a deadline then calls `std::process::exit(1)`. On entry, reset SIGINT/SIGTERM handlers to `SIG_DFL` so any subsequent Ctrl+C bypasses Rust's signal handling and kills immediately. This avoids a hang on runtime drop while preserving a grace period for clean async shutdown. Pair with `wait()` only on the async task set — not the blocking workers — because the blocking workers can't be cancelled cleanly
 
 ### TypeScript
 
@@ -97,6 +107,9 @@ pub async fn shutdown(self, timeout: Duration) -> bool {
 ### Go
 
 - **Independent housekeeping goroutines**: housekeeping tasks (heartbeat, self-metrics emission) that must not be gated by the primary work path run on independent goroutines with their own tickers, racing the same `stopCh` and `ctx.Done()` signals as the main loop. Prevents rate-limiter or API stalls from delaying observability data
+- **`DBBackoff` state machine for resilient polling loops**: wraps a `*time.Ticker` to substitute a one-shot `*time.Timer` when the downstream (database, API) goes down. `Wait(ticker) <-chan time.Time` returns the appropriate channel for the `select` arm. `RecordResult(err, ticker)` drives the state machine and calls `onDown`/`onUp` callbacks exactly once per transition. Timer cleanup (`Stop` + drain) on recovery prevents channel leaks. Composes with the independent-housekeeping-goroutines pattern without special cases for outage handling
+- **Chan-based singleflight for HTTP handlers**: `map[string]*flight{done: make(chan struct{})}` guarded by a `sync.Mutex`. `acquireOnDemand(key)` returns `(flight, isOwner bool)`; the owner performs the work and calls `completeOnDemand(key, result, err)` which closes `done` and unblocks all waiters. Waiters block on `<-flight.done` then read `flight.result`. Pair with `defer completeOnDemand(key, ..., err)` as a safety net for panics. Simpler than `golang.org/x/sync/singleflight` and more controllable for HTTP handlers that want explicit access to the in-flight state
+- **`context.WithoutCancel` for side effects that must outlive client disconnect**: when an HTTP handler performs side effects (object storage uploads, DB writes) that must complete even if the client disconnects, derive `sideEffectCtx := context.WithoutCancel(ctx)` and pass that to the side-effect call. The original `ctx` still cancels when the HTTP request ends; the derived context carries the request's values (request ID, logger) without the cancellation. Available since Go 1.21 — previously required a manual `detachedCtx` struct
 - See [graceful-shutdown](../patterns/graceful-shutdown.md) for Go shutdown tracker, two-phase shutdown, and bounded drain patterns
 
 ### Kotlin

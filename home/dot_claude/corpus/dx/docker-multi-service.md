@@ -1,7 +1,7 @@
 ---
 name: docker-multi-service
 category: dx
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: Dockerfile + docker-compose.yml
@@ -24,6 +24,9 @@ exemplars:
   - repo: Xevion/dynamic-preauth
     path: Dockerfile
     note: "cargo-chef dual-target (Linux + Windows x64) demo build, non-root runtime user, stripped binaries"
+  - repo: local/Applyhelm
+    path: Dockerfile + entrypoint.ts
+    note: "5-stage chef/planner/builder/frontend/runtime, Bun entrypoint with 15s health-gate poll + Promise.race supervisor + 3-layer LOG_JSON env propagation"
 ---
 
 # Docker & Multi-Service Orchestration
@@ -50,7 +53,7 @@ Docker for reproducible deploys and local dev parity. Compose for multi-service 
 - **cargo-chef for dependency caching**: three-stage pattern — `planner` (generates `recipe.json` from dependency tree), `cook` (builds dependencies only from recipe), `build` (compiles application code). Dependency layer changes only when `Cargo.toml`/`Cargo.lock` change
 - **Co-located services with shared runtime base**: when running a Rust binary alongside a Node/Bun frontend in one container, use the frontend runtime image (e.g., `oven/bun:1-slim`) as the final stage. Copy the compiled Rust binary in. A single entrypoint script orchestrates both processes
 - **Console-logger preload**: inject a preload script that captures stray `console.*` calls from SSR code and reformats them to match the structured logging format
-- **Bun-orchestrated co-hosting entrypoint**: a TypeScript entrypoint that health-gates SSR before starting the backend binary, propagates shared env vars (`LOG_JSON`, `LOG_LEVEL`) to both processes, and monitors with `Promise.race` for first-to-exit shutdown
+- **Bun-orchestrated co-hosting entrypoint**: a TypeScript entrypoint that health-gates SSR before starting the backend binary, propagates shared env vars (`LOG_JSON`, `LOG_LEVEL`) to both processes, and monitors with `Promise.race` for first-to-exit shutdown. Canonical shape: (1) spawn the Rust binary first, (2) poll the backend health endpoint every 500ms with a 15s ceiling before starting the SvelteKit server, (3) propagate `LOG_JSON`, `LOG_LEVEL`, `BACKEND_URL` to the Bun process env, (4) `Promise.race([monitor(rustProc), monitor(bunProc)])` where `monitor` resolves when the child exits, (5) on resolution, kill the surviving process (ideally with SIGTERM + timeout before SIGKILL — see [graceful-shutdown](../patterns/graceful-shutdown.md)). Use `--smol` on the Bun process for memory-constrained SSR
 - **6-stage Dockerfile with placeholder frontend**: planner → builder (placeholder assets for dep cache) → frontend builder → final-builder (real assets + `SQLX_OFFLINE=true`) → runtime. The placeholder stage allows Rust dependency caching to work even though the final binary embeds frontend assets
 - **WASM dual-target build**: for projects targeting both native and WASM, use a separate `emscripten/emsdk` base image as a parallel cargo-chef stage. Include build-artifact size verification (`test -f ./static/pacman.wasm && [ $(stat -c%s ...) -gt ... ]`) before proceeding — zero-byte WASM artifacts are a common silent failure mode
 

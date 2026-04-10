@@ -1,7 +1,7 @@
 ---
 name: sql
 category: languages
-last_audited: 2026-03-26
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/banner
     path: migrations/

@@ -1,11 +1,17 @@
 ---
 name: isr-caching-proxy-patterns
 category: architecture
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/xevion.dev
     path: src/cache.rs + src/proxy.rs
     note: "DashSet singleflight, lazy per-encoding compression with RwLock, session-aware bypass, URL normalization"
+  - repo: local/ts-chan
+    path: src/services/api.ts
+    note: "Client-side If-Modified-Since with per-URL Last-Modified Map, nullable HttpResponse.data signals 304"
+  - repo: local/rekuma
+    path: web/src/lib/autoRefresh.svelte.ts + internal/server/middleware_etag.go
+    note: "Client-side ETag auto-refresh composable paired with server-side weak-ETag middleware"
 ---
 
 # ISR & Caching Proxy Patterns
@@ -25,6 +31,15 @@ Cache in front of slow renderers. Stale-while-revalidate for responsiveness — 
 - **Session-aware cache bypass**: authenticated requests skip ISR caching entirely (`use_cache = !is_authenticated`). Strip incoming `X-Session-User` headers before the proxy and re-inject them only after server-side session validation. This prevents both cache poisoning (serving authenticated content to anonymous users) and session spoofing (client-provided session headers)
 
 - **URL normalization before cache lookup**: normalize trailing slashes (permanent redirect), `.html` extensions, and query string ordering before computing the cache key. Prevents duplicate cache entries for semantically equivalent URLs
+
+## Client-Side Conditional GET
+
+Server-side ISR caches content for *all* clients; client-side conditional GET avoids re-fetching *already-seen* content for a *single* client. The two patterns compose — a conditional GET against an ISR-cached endpoint is free on both ends.
+
+- **Per-URL header cache in `Map<url, string>`**: store `Last-Modified` (and/or `ETag`) response headers keyed by URL. On the next request to the same URL, send as `If-Modified-Since` (or `If-None-Match`). Update the cached header from the response. A `Map<string, string>` is sufficient — no TTL is needed because the server will reject the conditional on content changes
+- **Nullable response wrapper signals 304**: return `HttpResponse<T>` with `data: T | null`. `null` means "not modified, nothing to do"; non-null means new data. The polling layer or consumer checks `response.data != null` before re-rendering. Throwing on 304 is wrong — 304 is a successful response, not an error
+- **Weak ETags for revalidation-friendly content**: server generates weak ETags (`W/"hash"`) when byte-identical responses aren't guaranteed (gzip variations, timestamp drift) but semantic content is stable. Clients compare with `If-None-Match` and accept the weak semantics
+- **Pair with visibility-aware polling**: the conditional GET is cheapest when polling is also aware of tab visibility. Resume on visible → immediate conditional poll → 304 if nothing changed → no re-render. This is the full hot path for a responsive auto-refresh UI. See [scheduling](./scheduling.md) browser polling engine
 
 ## Language-Specific
 

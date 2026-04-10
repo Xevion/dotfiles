@@ -1,7 +1,7 @@
 ---
 name: svelte
 category: languages
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/banner
     path: web/src/lib/
@@ -24,6 +24,15 @@ exemplars:
   - repo: Xevion/WebSAM
     path: src/lib/stores/ + src/lib/inference/
     note: "RAF-batched canvas render, runed FSM pipeline, stale-request-ID pattern, module-scoped $state for SPA"
+  - repo: local/ts-chan
+    path: src/stores/settings.svelte.ts + src/stores/threads.svelte.ts
+    note: "Module-scoped $state singletons forced by Shadow DOM mount isolation — multiple mount() calls share state across shadow roots"
+  - repo: local/stashapp-rapid-tag
+    path: src/lib/stores/session.svelte.ts
+    note: "Prefetch-and-swap batch pagination pattern — zero-loading-flash swap on submit"
+  - repo: local/rekuma
+    path: web/src/lib/autoRefresh.svelte.ts + web/src/lib/ondemand.svelte.ts
+    note: "createAutoRefresh ETag composable; SvelteMap-backed per-entry promise deduplication"
 ---
 
 # Svelte
@@ -48,6 +57,10 @@ Svelte 5 runes exclusively — no legacy stores. Reactive state is explicit via 
 - **FSM pipeline orchestration with `runed` FiniteStateMachine**: for multi-phase async pipelines (download→model-ready→encoding→ready→decoding), use `runed`'s `FiniteStateMachine` as the primary state machine. `$derived` reads `pipeline.current` to compute boolean gates. `_enter` lifecycle hooks trigger async side effects on state transitions. Distinct from discriminated-union `$state` phases — externalizes transition logic to a library
 - **Stale-request-ID for async concurrency control**: track a module-level integer counter. Each async call captures the ID at launch and checks against the current counter on resolution — if they differ, the result is discarded as stale. Useful for async Worker calls where multiple decode requests can overlap
 - **Single-inflight + drain-latest pattern**: for pointer-tracking workloads (hover decode, mouse-move inference), maintain a single in-flight slot plus a pending-latest slot. If a call is in flight, store only the latest coordinates; on completion, drain the pending slot. Discards all intermediates — "latest-wins" with no backlog
+- **Prefetch-and-swap for batch pagination**: network-request variant of the single-inflight pattern for discrete batch loading. Maintain a `prefetchedBatch` slot alongside the current batch; as the user consumes the current batch, fire a background fetch into `prefetchedBatch`. On submit, swap the prefetched result in instantly rather than triggering a new fetch. Zero loading flash for batch-driven UIs (tagging queues, paginated review workflows). Distinct from drain-latest because *every* prefetch is served, not only the latest
+- **SvelteMap-backed per-entry promise deduplication**: when multiple components may independently request the same async resource (on-demand media, lazy-loaded entities), use `SvelteMap<K, State>` from `svelte/reactivity` as the reactive backing. Track in-flight promises per entry; callers that arrive during an in-flight operation receive the existing promise and all complete together. Distinct from single-inflight+drain-latest — that pattern is for pointer-tracking where stale intermediates should be dropped; promise dedup is for discrete resource fetches where every caller should receive the result
+- **ETag-aware auto-refresh composable**: `createAutoRefresh<T>({ endpoint: () => string, interval?, transform? })` factory encapsulates polling-based server state without a query library. Implements: (1) `If-None-Match` / 304 handling for cheap polls, (2) exponential backoff capped at ~5 minutes on consecutive errors, (3) `visibilitychange` pause/resume with immediate re-fetch on tab focus, (4) `$effect` on `endpoint()` to reset ETag and re-fetch when reactive deps change, (5) `untrack()` inside the effect to prevent internal `$state` reads from becoming tracked dependencies. Preferred over ad-hoc polling for any derived-from-server-state value that needs to stay fresh while the tab is visible
+- **Shadow DOM mount isolation forces module-scoped `$state`**: when Svelte components are mounted into multiple disconnected Shadow DOM roots on the same page (userscript, extension content script, per-post decoration), `createContext()` cannot propagate across `mount()` boundaries — each shadow root is an independent tree. Module-scoped `$state` singletons in `.svelte.ts` files are the only correct shared-state pattern in this context. This extends the "bare module-scoped $state" exception beyond single-route SPAs: it applies any time multiple independent `mount()` calls need to share state. See [shadow-dom-hostile-page-injection](../patterns/shadow-dom-hostile-page-injection.md)
 - **Debounced `$effect` pattern**: when reactive inputs must trigger a debounced side effect (not a derived value), use `$effect` with an outer timeout ref, list dependencies explicitly on separate lines, and return cleanup that clears the pending timeout. This is distinct from the anti-pattern of using `$effect` for pure derived state
 - **Browser API wiring via `$effect`**: for imperative browser APIs (IntersectionObserver, ResizeObserver) tied to reactive state, use `$effect` with a null-guard on the bound element ref and a boolean reactive gate. Return cleanup that calls the API's teardown method and clears any associated timers
 - **Theme flash prevention via `{@html}` inline script**: for static SvelteKit sites without SSR, inject an IIFE in `<svelte:head>` via `{@html}` that reads localStorage and toggles the dark class on `documentElement` before hydration. This is the client-only complement to `transformPageChunk`. Note: bypasses CSP nonces and runs on every SPA navigation

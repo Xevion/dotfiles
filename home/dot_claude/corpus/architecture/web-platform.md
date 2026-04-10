@@ -1,7 +1,7 @@
 ---
 name: web-platform
 category: architecture
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/xevion.dev
     path: web/src/lib/stores/theme.svelte.ts + web/src/hooks.server.ts
@@ -12,6 +12,9 @@ exemplars:
   - repo: Xevion/instant-upscale
     path: frontend/src/lib/pipeline/
     note: "Typed Web Worker discriminated unions, EngineTestHarness mock factory, WebCodecs + WebGPU rendering"
+  - repo: local/ts-chan
+    path: src/ui/mount.ts + src/services/api.ts
+    note: "Shadow DOM mount with adoptedStyleSheets + MutationObserver autoMount; client-side If-Modified-Since polling with nullable HttpResponse"
 ---
 
 # Web Platform
@@ -33,6 +36,8 @@ Prefer native web platform APIs over library abstractions when browser support i
 - **Breakpoint reactive store via matchMedia**: track responsive breakpoints (isMobile, isDesktop) as reactive `$state` values driven by `window.matchMedia` listeners with SSR guards. Components read breakpoint state directly for conditional rendering (drawer vs sidebar, bottom sheet vs panel)
 - **Worker-side preprocessing before inference**: perform all data transformation (resize, normalize, format conversion) inside the Web Worker rather than the main thread. The main thread passes only raw pixel data; tensor manipulation happens worker-side. Keeps the UI thread free during expensive preprocessing phases
 - **Typed Web Worker message protocol via discriminated unions**: define `MainToWorker` and `WorkerToMain` as TypeScript discriminated unions with string-literal `type` fields. Create typed `postToWorker()` / `postToMain()` wrapper functions that enforce the union at the call site. The main-thread `WorkerController` dispatches via exhaustive `switch(msg.type)`. This replaces Comlink when you need explicit message control (e.g., transferable ownership, streaming results). Pair with an `EngineTestHarness` mock factory that installs all global mocks (Worker, ResizeObserver, HTMLAudioElement) and exposes typed `Controls` interfaces for test assertions
+- **Shadow DOM injection into third-party pages**: when injecting UI into a hostile host page (userscript, extension content script), mount Svelte/React into a Shadow DOM root to prevent CSS bleed. Canonical pattern: `createElement("div")` → `attachShadow({ mode: "open" })` → `new CSSStyleSheet()` + `replaceSync(css)` → assign to `shadowRoot.adoptedStyleSheets` → mount the framework into a child `div` of the shadow root. Wrap with a `MutationObserver` when the mount target appears/disappears dynamically; return a cleanup function for unmount. Override headless component portal targets (bits-ui, Radix) to point inside the shadow root rather than `document.body`. Full treatment in [shadow-dom-hostile-page-injection](../patterns/shadow-dom-hostile-page-injection.md)
+- **Client-side conditional GET for polling**: browser clients polling read-heavy APIs should cache `Last-Modified` and `ETag` response headers in a `Map<url, string>` and send `If-Modified-Since` / `If-None-Match` on repeat requests. Return a nullable wrapper type (`HttpResponse<T>` with `data: T | null`) so callers distinguish "new data" from "not modified" without throwing. The polling layer treats `null` as a no-op, avoiding unnecessary re-renders. Applies to thread watchers, feed readers, dashboard polling, and any auto-refresh store backed by a server endpoint. See also [isr-caching-proxy-patterns](./isr-caching-proxy-patterns.md)
 
 ### Content Security Policy
 

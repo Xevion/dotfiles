@@ -1,7 +1,7 @@
 ---
 name: rust
 category: languages
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/banner
     path: src/banner/errors.rs
@@ -24,6 +24,12 @@ exemplars:
   - repo: Xevion/rustdoc-mcp
     path: src/error.rs
     note: "Five-level thiserror hierarchy with help() guidance method, shared futures singleflight"
+  - repo: local/game-hacking
+    path: crates/game-core/src/mem.rs + crates/ac/common/src/
+    note: "Pod-boundary glam conversion: [f32;3] bytemuck structs at memory boundary, Vec3/Mat4 downstream"
+  - repo: local/toriix
+    path: src/fs.rs + src/lib.rs
+    note: "cfg-gated struct fields for WASM/native bifurcation, rstest+proptest+assert2 nested tests, WASM Application lifetime via transmute+leak"
 ---
 
 # Rust
@@ -60,6 +66,8 @@ pub enum ClientError {
 - **Extension traits for non-sqlx error conversion**: the extension trait pattern generalizes beyond database errors — use it for any third-party crate with `Display`-but-not-`std::Error` error types. E.g., `OrtResultExt` with `.ort()` converts opaque ONNX Runtime errors to `anyhow::Error`
 - **Dual-channel error separation for thread pools**: separate result and error into distinct `crossbeam-channel` channels rather than `Result<T, E>`-wrapping results. The error channel carries fatal worker state; the coordinator uses `select!` to race both with a timeout arm
 - **Typed errors at Tauri IPC boundary**: implement `serde::Serialize` on command error enums so Tauri commands return `Result<T, CommandError>` instead of `Result<T, String>`. Eliminates stringly-typed failure paths across the IPC boundary
+- **Pod-boundary math type conversion**: in projects bridging raw memory layouts (FFI, mmap, cross-process reads, binary protocols) and math operations, keep two struct tiers. A Pod/`bytemuck::Pod` `#[repr(C)]` struct uses primitive arrays (`[f32; 3]`, `[u8; 16]`) that exactly match the external memory layout — padding, alignment, and all. A high-level struct uses `glam::{Vec2, Vec3, Vec4, Mat4, Quat}` for every field that participates in math operations. Convert immediately in the read helper (`VmMem::read_vec3()` returns `glam::Vec3`, not `[f32; 3]`); downstream code never touches raw arrays. Prevents scattered `Vec3::from(raw.pos)` calls and catches layout bugs at the boundary rather than downstream
+- **`#[cfg]` on individual struct fields**: when a struct compiles on all targets but some fields only exist on certain platforms (e.g., a `loading_task: Option<Task<()>>` present on native but not WASM), gate individual fields with `#[cfg(not(target_family = "wasm"))]`. Combine with matching `#[cfg]` on impl methods that access those fields. This is the struct-field equivalent of the enum-variant `cfg` pattern — preferred over maintaining two separate struct definitions
 
 ## Project Defaults
 

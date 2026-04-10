@@ -1,7 +1,7 @@
 ---
 name: ci-cd-deployment
 category: dx
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/banner
     path: .github/workflows/
@@ -18,6 +18,12 @@ exemplars:
   - repo: Xevion/xevion.dev
     path: .github/workflows/ci.yml
     note: "5-job parallel CI with binding-verification, security job (cargo-audit + zizmor + Trivy SARIF)"
+  - repo: local/Applyhelm
+    path: .github/workflows/ci.yml
+    note: "7-job parallel split (quality-backend/frontend/extension + bindings-check + typos + security + zizmor), SHA-pinned, docker gated on quality jobs"
+  - repo: local/toriix
+    path: .github/workflows/ci.yml
+    note: "Vendor patch-apply-in-every-job pattern for submodule-with-in-tree-patches dependency"
 ---
 
 # CI/CD & Deployment
@@ -47,6 +53,8 @@ RUN cargo build --release
 - **Multi-language parallel job split**: one job per subsystem (Go, Svelte, Python) running in parallel, with a gated docker job depending on all quality jobs passing
 - **Generated artifact verification in CI**: regenerate and diff (`sqlc diff`, `tygo generate && git diff --exit-code`). Catches stale generated code in PRs before merge
 - **Go Docker builds with `go mod download` as cached layer**: analogous to cargo-chef. Use UPX for binary compression. Match runtime base image to the actual entrypoint runtime (e.g. Bun, not Alpine) when the final binary is not standalone
+- **`zizmor` workflow security scanning**: run `zizmorcore/zizmor-action` in a dedicated job with `security-events: write` permission for SARIF upload. Catches misuse of untrusted input (`pull_request_target` without sanitization), excessive permissions (`permissions: write-all`), missing SHA pins in workflow files themselves, and shell injection via `${{ }}` interpolation into `run:` blocks. The check is cheap (~30s on typical workflows) and catches a class of supply-chain errors that cargo-deny and npm-audit don't see. Pair with Dependabot's `github-actions` ecosystem to keep the action versions themselves pinned
+- **Vendor patch-apply in every job** (for dependencies maintained as submodules with in-tree patches): when a project carries patches against a git submodule dependency (e.g., `vendor/gpui-component/` with `patches/*.patch`), every CI job that compiles must apply the patches *before* the compile step. Patches do not survive `actions/checkout` — each job needs its own `cd vendor/submodule && git apply ../../patches/*.patch` step. Extract to a composite action (`.github/actions/apply-vendor-patches/action.yml`) to avoid copy-paste drift when the dependency setup evolves
 
 ## Anti-Patterns
 

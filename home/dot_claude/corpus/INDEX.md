@@ -39,8 +39,10 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [deterministic-simulation](./architecture/deterministic-simulation.md) — Seeded RNG, context-keyed streams, deterministic client-side execution
 - [scoring-ranking-algorithms](./architecture/scoring-ranking-algorithms.md) — Weighted multi-factor scoring, log-scale proximity, adaptive priority, epsilon escalation, feedback-driven cost
 - [platform-abstraction-layer](./architecture/platform-abstraction-layer.md) — Transport interface, build-time platform selection, separate entry points
-- [scheduling](./architecture/scheduling.md) — Priority-queue dispatch, optimistic stamping, activity-adaptive polling
+- [scheduling](./architecture/scheduling.md) — Priority-queue dispatch, optimistic stamping, activity-adaptive polling, browser polling engine with visibility pause
 - [search-index-tfidf](./architecture/search-index-tfidf.md) — Custom inverted TF-IDF index vs managed FTS extensions, build-vs-buy
+- [userscript-extension-dual-target](./architecture/userscript-extension-dual-target.md) — Vite-plugin-monkey + WXT from one src/, runtime platform detection, unified StorageBackend, cross-tab sync transports
+- [linux-process-memory-injection](./architecture/linux-process-memory-injection.md) — process_vm_readv/writev, ptrace+dlopen injection, Pod-boundary glam, SIGUSR1 hot-reload, internal payload constraints
 
 ## Patterns
 
@@ -55,7 +57,9 @@ Reference of preferred patterns, conventions, and approaches. Read specific topi
 - [session-cookie-auth](./patterns/session-cookie-auth.md) — Server-side sessions, opaque cookies, role-based middleware, pgtestdb auth tests
 - [cursor-pagination](./patterns/cursor-pagination.md) — Opaque base64 cursors, keyset WHERE clauses, N+1 page detection
 - [integration-test-db-isolation](./patterns/integration-test-db-isolation.md) — pgtestdb template cloning, in-memory factories, two-layer fixture composition
-- [binary-reverse-engineering](./patterns/binary-reverse-engineering.md) — Documentation-driven RE, implementation-as-validation, static analysis workflow
+- [binary-reverse-engineering](./patterns/binary-reverse-engineering.md) — Documentation-driven RE, implementation-as-validation, static analysis workflow, three-artifact confidence KB
+- [shadow-dom-hostile-page-injection](./patterns/shadow-dom-hostile-page-injection.md) — Shadow DOM mount for Svelte/React into third-party pages, adoptedStyleSheets, MutationObserver lifecycle, module-scoped state over context
+- [ai-assisted-reverse-engineering-loop](./patterns/ai-assisted-reverse-engineering-loop.md) — Six-phase RE loop, four-tier confidence KB, anti-hallucination rules, multi-agent role decomposition
 
 ## Project Structure
 

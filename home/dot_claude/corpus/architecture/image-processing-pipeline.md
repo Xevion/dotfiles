@@ -1,7 +1,7 @@
 ---
 name: image-processing-pipeline
 category: architecture
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: local/inkwell
     path: internal/server/generate_stream.go + web/src/lib/stores/generation.svelte.ts
@@ -12,6 +12,9 @@ exemplars:
   - repo: Xevion/WebSAM
     path: src/lib/inference/
     note: "Encode-once decode-many SAM pipeline with iterative mask feedback, cached logits for interactive re-threshold"
+  - repo: local/stashapp-rapid-tag
+    path: src/lib/server/frames.ts + src/lib/server/vtt.ts
+    note: "WebVTT sprite ingestion, sharp extract, composite quality score (blur+exposure+entropy), dHash Hamming dedup, WebP upload to MinIO"
 ---
 
 # Image Processing Pipeline
@@ -26,6 +29,17 @@ Capture once, transform on demand. Store originals, derive variants via CDN/prox
 - **Detached context for persistence**: when persisting the final result (S3 upload + DB insert), detach from the request context so the operation survives browser disconnect
 - **Upload-time variant generation**: produce multiple WebP size variants (thumb/medium/full) plus the preserved original, with a blurhash for progressive loading. Extract blurhash from a downscaled thumbnail (32x32) for efficiency
 - **SSR-rendered OG images**: a typed spec enum defines all page variants; the backend calls an internal SSR endpoint (not a public route) to render the image, then stores the bytes in object storage under a deterministic key derived from the spec. Avoids headless browser dependencies by reusing the SSR runtime
+
+## Sprite-Sheet Ingestion with Quality-Score Filtering
+
+When the source of frames is a video sprite sheet (thumbnail grid + WebVTT timing manifest — Stash, Plex, Jellyfin, chapter thumbnails), the pipeline is ingestion-oriented rather than per-upload.
+
+- **Parallel VTT + sprite fetch**: fetch the WebVTT manifest and the sprite JPEG in parallel; the VTT gives `timestamp → #xywh` crop descriptors, the sprite provides the pixels. Parse the VTT with a forgiving hand-rolled parser — browser `vtt-parser` libraries assume the cue format but sprite sheets use `#xywh=x,y,w,h` annotations that are technically invalid
+- **Sharp `extract()` per entry**: for each VTT cue, call `sharp(sprite).extract({ left, top, width, height })` and pipe to a composite quality scorer. Sharp's extract is zero-copy for JPEG sources
+- **Composite quality score (blur + exposure + entropy)**: `qualityScore = 0.4 * blurNorm + 0.3 * exposureScore + 0.3 * entropyNorm`, where `blurNorm` is Laplacian variance normalized to `[0, 1]`, `exposureScore` penalizes extreme means (< 30 or > 220), and `entropyNorm` is Shannon entropy over the grayscale histogram. All three are computed from a single downscaled grayscale pass for efficiency. Threshold at `0.3` as a lower-bound filter; use the exact score as the evidence weight in downstream Bayesian classification
+- **Perceptual-hash deduplication via dHash**: compute a 64-bit difference hash (9×8 grayscale resize → horizontal gradient → binary string). Compare against existing hashes via Hamming distance; threshold ≤ 10 bits indicates a near-duplicate. Dedup within a single video removes bursts of static frames; dedup across videos can identify recurring scenes
+- **WebP upload with quality=80**: after filtering, `sharp().webp({ quality: 80 })` and `putFrame()` to S3/MinIO. WebP at 80 gives ~5-10× size reduction vs the original JPEG with perceptually negligible loss
+- **Pair with Bayesian classification**: quality score flows through as the evidence weight in [scoring-ranking-algorithms](./scoring-ranking-algorithms.md) Bayesian pipeline — high-quality frames update the posterior more confidently than low-quality ones
 
 ## Language-Specific
 

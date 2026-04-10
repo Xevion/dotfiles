@@ -1,7 +1,7 @@
 ---
 name: dependency-management
 category: dx
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: local/inkwell
     path: renovate.json
@@ -12,6 +12,12 @@ exemplars:
   - repo: Xevion/rustdoc-mcp
     path: deny.toml
     note: "cargo-deny with 4 target triples, license allowlist, yanked=deny, unknown-registry=deny"
+  - repo: local/Applyhelm
+    path: renovate.json
+    note: "Full baseline config + patch-update automerge, 8 ecosystem groups (SvelteKit, WXT, UnoCSS, Bits UI, Biome, ESLint, LogTape, Rust, Docker, Actions)"
+  - repo: local/toriix
+    path: renovate.json + deny.toml
+    note: "Git-HEAD dependency handling: Renovate opt-out with rationale for gpui/gpui_platform, deny.toml unknown-git=allow with explicit allowlist, transitive advisory ignore with upstream-fix-pending comments"
 ---
 
 # Dependency Management
@@ -35,6 +41,18 @@ For projects where Renovate's advanced features (allowedVersions with rationale,
 ### Baseline Renovate config for multi-language repos
 
 For multi-language monorepos (Go + TypeScript, Rust + TypeScript), four baseline conventions: (1) ecosystem grouping by manager and tightly-coupled namespaces, (2) `minimumReleaseAge` of 3 days, (3) `:semanticCommits` for conventional commit consistency, (4) `helpers:pinGitHubActionDigests` for supply-chain safety. A bare `{ "dependencyDashboard": true }` config is insufficient.
+
+### Patch-Update Automerge
+
+Enable `automerge: true` with `automergeType: "pr"` on patch-level updates to reduce PR review burden. Patch releases are semver-promised to be non-breaking; after CI passes, there's little value in a human rubber-stamp. Exclude security-sensitive packages (auth, crypto, native binaries) from the automerge rule via a separate `packageRules` entry. Pair with `minimumReleaseAge` so a yanked patch doesn't auto-merge before the yank is detected.
+
+### Git-HEAD Dependency Handling
+
+When a project depends on an upstream crate at a git rev rather than a released version (e.g., tracking `zed-industries/zed` HEAD for an actively-developed dependency), Renovate cannot manage updates. Two complementary guards:
+
+1. **Explicit Renovate opt-out with rationale**: add a `packageRules` entry matching the affected package names, set `enabled: false`, and put the reason in a `description` field. Prevents Renovate from generating spurious "no update found" noise and documents the exception
+2. **`cargo-deny` with `unknown-git = "allow"` + explicit allowlist**: in `deny.toml`, set `sources.unknown-git = "allow"` (the default is `deny`), then list permitted git sources in `allow-git`. This keeps the default-deny posture for everything else while letting the specific git dependency through
+3. **Advisory ignore list with upstream-fix-pending comments**: when transitive advisories from the git-pinned dep can't be resolved without upstream fixes, add them to `advisories.ignore` with a comment citing the upstream issue. Revisit on each audit — the goal is to keep the list short and stale entries marked
 
 ### Runtime & Package Manager Pinning
 

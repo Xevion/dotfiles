@@ -1,7 +1,7 @@
 ---
 name: testing-quality
 category: patterns
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/banner
     path: tests/
@@ -45,6 +45,12 @@ exemplars:
   - repo: Xevion/recall
     path: tests/
     note: "createTestDb() in-memory DuckDB factory, behavioral triage tests with shared fixture defaults"
+  - repo: local/toriix
+    path: src/fs.rs tests
+    note: "rstest parameterized cases + proptest sortedness invariants + assert2 in nested #[cfg(test)] mod tests sub-modules for domain-logic sort/merge"
+  - repo: local/stashapp-rapid-tag
+    path: src/lib/server/confidence.test.ts
+    note: "Vitest invariant tests for Bayesian scoring — stochastic Thompson Sampling with N-trial bounds, ordering and symmetry over exact floats"
 ---
 
 # Testing & Quality
@@ -69,7 +75,8 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 - Builder pattern in `tests/helpers/` for test data construction
 - `assert2` crate: `assert!()` over `assert_eq!()`, `let_assert!()` for pattern matching, `check!()` for non-fatal assertions. Prefer `assert2` over `speculoos` — `speculoos` is verbose without providing the structural pattern-matching that `assert2::let_assert!` enables. For nested tree output (parse → scene → node), chain `let_assert!` steps into a readable traversal that fails fast on the first mismatch, with `check!()` for non-fatal leaf assertions
 - **proptest roundtrip + panic safety for protocol codecs**: pair `parse(serialize(x)) == x` roundtrip tests with a separate never-panics invariant over arbitrary byte slices. These two properties together ensure both correctness and robustness for any binary parser
-- **Nested test sub-modules**: `mod proptest_tests` inside `#[cfg(test)] mod tests` allows type-level organization without requiring separate files. Useful when a single module has both unit and property-based tests
+- **Nested test sub-modules**: `mod proptest_tests` inside `#[cfg(test)] mod tests` allows type-level organization without requiring separate files. Useful when a single module has both unit and property-based tests. The pattern extends beyond protocol codecs — any function with a sortedness, monotonicity, or other invariant can use rstest (parameterized unit cases) + proptest (property tests over arbitrary inputs) + assert2 all within a single nested sub-module structure
+- **Invariant-based tests for scoring/math functions over exact-value assertions**: for `posteriorMean`, `entropy`, scoring combinators, and other mathematical functions, prefer invariant tests (monotonicity: `posteriorMean(1,4) < posteriorMean(2,4)`; symmetry: `entropy(0.2) ≈ entropy(0.8)`; boundary behavior: `score(0) === FLOOR`, `score(1) === CEILING`) over pinning exact float outputs (`toBeCloseTo(0.2)`). Invariant tests survive algorithm tuning; exact-value tests break on every parameter change. Exact values are acceptable only for mathematical identities that won't change (e.g., `entropy(0.5) === 1`). For stochastic functions (Thompson sampling, Monte Carlo), assert statistical bounds on N trials (`expect(uncertainSelected).toBeGreaterThan(40)` in 100 trials) rather than deterministic equality
 - **Runtime hardware-feature gate for SIMD tests**: use `is_x86_feature_detected!` guard and early-return in the test body (not `#[cfg]`) for hardware-dependent tests. Keeps tests compiled and visible on all machines, avoiding both false failures and CI configuration complexity
 - **Temp-file recording sink for structured output tests**: write events to a named tempfile (using `process::id()` for collision avoidance), drop the sink to flush, then parse NDJSON lines as `serde_json::Value` for field-level assertions
 - **ECS World fixture builders**: for Bevy ECS tests, use `create_*_world()` to initialize required resources, named `spawn_*_entity()` helpers to abstract component bundles, and a `run_*_system()` driver to encapsulate system invocation. Each test body reads as Arrange → Act → Assert against a single variable

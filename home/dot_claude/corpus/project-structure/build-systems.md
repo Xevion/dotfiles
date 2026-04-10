@@ -1,7 +1,7 @@
 ---
 name: build-systems
 category: project-structure
-last_audited: 2026-04-03
+last_audited: 2026-04-10
 exemplars:
   - repo: Xevion/banner
     path: Justfile
@@ -21,6 +21,12 @@ exemplars:
   - repo: Xevion/rustdoc-mcp
     path: Justfile + tempo.config.ts
     note: "tempo preset-override-extend with dep-check (cargo-machete) and deny (cargo-deny), fix-first autofix"
+  - repo: local/Applyhelm
+    path: tempo.config.ts + Justfile
+    note: "Reference tempo config: 4 subsystems, multi-artifact preflight (ts-rs + SQLx), custom commands (db, migrate, bindings, seed), dev process specs, autoFix pairing"
+  - repo: local/ts-chan
+    path: tempo.config.ts + Justfile
+    note: "Minimal single-subsystem tempo config for extension+userscript dual-target build, Biome integration"
 ---
 
 # Build Systems
@@ -58,6 +64,7 @@ test *args:
 - **tempo preset-override-extend pattern**: in `tempo.config.ts`, spread a typed preset (`presets.rust()`), selectively override commands that need workspace flags, and extend with additional checks (cargo-deny, cargo-machete, doc-check with `RUSTDOCFLAGS=-D warnings`). The `requires` field on each check communicates optional tool dependencies and skips gracefully when absent
 - **tempo preflights**: pre-check hooks that run before commands — node_modules existence, PandaCSS codegen staleness, ts-rs bindings generation, SQLx query preparation. Preflights ensure derived artifacts are fresh before checks run
 - **tempo custom commands**: extend beyond check/test/dev with project-specific commands (`deploy`, `db`, `migrate`, `bindings`, `docker-build`) with typed flag definitions. Commands can have hooks (`before:dev`, `before:check`) for conditional setup
+- **Multi-artifact mtime-gated preflights**: when a project depends on two or more generated artifacts from different sources (ts-rs bindings + SQLx `.sqlx/` metadata, protobuf + GraphQL schema), register each as its own preflight in `tempo.config.ts`. Each preflight compares source mtime to artifact mtime, regenerates into a tmpdir, and diffs before replacing the committed output. The tmpdir isolation prevents partial regeneration from corrupting the workspace on failure; idempotent barrel generation prevents spurious git diffs; CI verifies the same preflights produce no diff (`TS_RS_EXPORT_DIR=$RUNNER_TEMP/bindings cargo test export_bindings && diff -r`). Applyhelm's tempo config is the reference implementation
 - **`set dotenv-load` in Justfile**: standard header for projects that need environment-specific paths (GPU library locations, custom SDK roots). Auto-loads `.env` variables into recipe execution
 
 ### Justfile Micro-Patterns
