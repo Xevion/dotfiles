@@ -1,29 +1,27 @@
 // PreToolUse hook: discipline checks + compound command auto-approval.
 //
 // Phase 1 (Discipline): Parses Bash via shfmt AST, checks each command
-// against data-driven rules. Blocks misuse of cat/grep/head/tail/find
-// and bad redirect patterns.
+// against rules. Rules can WARN (surface guidance, command runs) or
+// BLOCK (exit 2, command refused).
 //
-// Phase 2 (Approval): If discipline passes, checks compound commands
-// against Claude Code permission settings. Auto-approves when all
-// sub-commands match the allow list, denies when any match the deny list.
+// Phase 2 (Approval): Checks compound commands against Claude Code
+// permission settings. Auto-approves when all sub-commands match the
+// allow list, denies when any match the deny list.
 //
 // Single shfmt parse shared between both phases.
-// Exit codes: 0 = allow/fall-through, 2 = block
 
-import { readFileSync } from "fs";
+import { readFileSync, appendFileSync, mkdirSync, readdirSync, statSync } from "fs";
 import { dirname } from "path";
 
-const TRUNCATION_LIMIT = 100;
-
-// Prefixes that are transparent — the real command is the next arg
+// Prefixes that are transparent — the real command is the next arg.
+// NOTE: `sudo` is intentionally excluded so it surfaces as its own command
+// and the sudo-block rule can catch it.
 const TRANSPARENT = new Set([
   "command",
   "builtin",
   "env",
   "nice",
   "nohup",
-  "sudo",
   "time",
   "doas",
   "exec",
@@ -40,118 +38,122 @@ const OP_OR = 14;
 const REDIR_OUT = 63; // >
 const REDIR_DUP_OUT = 68; // >&
 
+// Session state for truncation-bump detection
+const STATE_DIR = "/tmp/bash-guard";
+const BUMP_WINDOW_MS = 5 * 60 * 1000;
+
 interface CommandCtx {
-  name: string; // effective command name (basename, prefix-stripped)
-  args: string[]; // all literal arg values
+  name: string;
+  args: string[];
   inPipeline: boolean;
   isRightOfPipe: boolean;
   redirects: Redirect[];
-  hasOrFallback: boolean; // part of || chain
+  hasOrFallback: boolean;
 }
 
 interface Redirect {
-  fd: string; // "2", "1", etc.
+  fd: string;
   op: number;
-  target: string; // "/dev/null", "1", "error.log", etc.
+  target: string;
 }
 
-type Rule = (ctx: CommandCtx) => string | null;
+type Verdict = "warn" | "block";
+interface Issue {
+  verdict: Verdict;
+  message: string;
+}
+
+interface RuleCtx {
+  ctx: CommandCtx;
+  command: string;
+  sessionId: string;
+}
+
+type Rule = (rctx: RuleCtx) => Issue | null;
 
 const rules: Rule[] = [
-  (ctx) => {
-    if (ctx.name === "grep" && !ctx.isRightOfPipe)
-      return (
-        "Use the Grep tool instead of the grep command. " +
-        "It handles permissions correctly and doesn't require approval."
-      );
+  // BLOCK: sudo never works in this harness
+  ({ ctx }) => {
+    if (ctx.name === "sudo")
+      return {
+        verdict: "block",
+        message:
+          "sudo will not work in this environment. If elevation is genuinely required, tell the user and stop.",
+      };
     return null;
   },
 
-  (ctx) => {
-    if (ctx.name === "cat" && !ctx.isRightOfPipe) {
-      if (ctx.args.some((a) => a.startsWith("<<"))) return null;
-      return (
-        "Use the Read tool instead of cat. " +
-        "It provides line numbers and supports offset/limit."
-      );
-    }
-    return null;
-  },
-
-  (ctx) => {
-    if (
-      (ctx.name === "head" || ctx.name === "tail") &&
-      !ctx.isRightOfPipe
-    )
-      return "Use the Read tool with offset/limit instead of head/tail on files.";
-    return null;
-  },
-
-  (ctx) => {
-    if (ctx.name === "find" && !ctx.isRightOfPipe) {
-      if (ctx.args.some((a) => ["-name", "-iname", "-type"].includes(a)))
-        return "Use the Glob tool instead of find. It's faster and doesn't need approval.";
-    }
-    return null;
-  },
-
-  (ctx) => {
+  // BLOCK: pipe-to-shell (curl ... | bash)
+  ({ ctx }) => {
     if (!ctx.isRightOfPipe) return null;
-    if (ctx.name !== "head" && ctx.name !== "tail") return null;
-    const n = parseTruncationN(ctx.args);
-    if (n !== null && n <= TRUNCATION_LIMIT) {
-      return (
-        `Avoid '| ${ctx.name} -${n}' — small truncation values encourage ` +
-        "wasteful re-runs. Let the Bash tool handle output naturally, " +
-        `or use the Read tool on saved output (limit > ${TRUNCATION_LIMIT}).`
-      );
-    }
+    if (!["bash", "sh", "zsh", "fish"].includes(ctx.name)) return null;
+    // Allow `| bash -c '...'` (explicit script), block bare `| bash`
+    if (ctx.args.includes("-c")) return null;
+    return {
+      verdict: "block",
+      message:
+        "Do not pipe remote output into a shell. Download, inspect, then execute.",
+    };
+  },
+
+  // BLOCK: grep command (use Grep tool)
+  ({ ctx }) => {
+    if (ctx.name === "grep" && !ctx.isRightOfPipe)
+      return {
+        verdict: "block",
+        message:
+          "Use the Grep tool instead of the grep command. " +
+          "It handles permissions correctly and doesn't require approval.",
+      };
     return null;
   },
 
-  (ctx) => {
+  // WARN: bare `cat <single-file>` — Read tool is better
+  ({ ctx }) => {
+    if (ctx.name !== "cat" || ctx.isRightOfPipe) return null;
+    if (ctx.redirects.length > 0) return null;
+    // args: ["cat", "file"] — exactly one non-flag arg, no heredoc
+    if (ctx.args.length !== 2) return null;
+    const arg = ctx.args[1];
+    if (arg.startsWith("-") || arg.startsWith("<<")) return null;
+    return {
+      verdict: "warn",
+      message:
+        "Prefer the Read tool over `cat <file>` — it gives line numbers and supports offset/limit.",
+    };
+  },
+
+  // WARN: find with name/type filters — Glob is usually nicer
+  ({ ctx }) => {
+    if (ctx.name !== "find" || ctx.isRightOfPipe) return null;
+    if (ctx.args.some((a) => ["-name", "-iname", "-type"].includes(a)))
+      return {
+        verdict: "warn",
+        message:
+          "Consider the Glob tool instead of `find -name/-type` — faster and no approval needed.",
+      };
+    return null;
+  },
+
+  // WARN: 2>/dev/null suppression (except common feature-detection patterns)
+  ({ ctx }) => {
     const bad = ctx.redirects.find(
       (r) => r.fd === "2" && r.op === REDIR_OUT && r.target === "/dev/null",
     );
-    if (bad)
-      return (
-        "Do not suppress stderr with 2>/dev/null. " +
-        "Error output often contains the diagnosis, and suppression " +
-        "makes commands unrecognizable to the permission system."
-      );
-    return null;
-  },
-
-  (ctx) => {
-    const bad = ctx.redirects.find(
-      (r) => r.fd === "2" && r.op === REDIR_DUP_OUT && r.target === "1",
-    );
-    if (bad)
-      return (
-        "Remove '2>&1' — the Bash tool captures both stdout and stderr " +
-        "automatically. Adding it is unnecessary and can interfere with " +
-        "permission pattern matching."
-      );
-    return null;
-  },
-
-  (ctx) => {
-    if (!ctx.hasOrFallback) return null;
-    if (ctx.name !== "echo") return null;
-    const suppression = /^(not found|NOT FOUND|error|no |none)/;
-    if (ctx.args.slice(1).some((a) => suppression.test(a)))
-      return (
-        "Do not suppress errors with '|| echo ...'. " +
-        "Let commands fail naturally so errors are visible."
-      );
-    return null;
+    if (!bad) return null;
+    // Allow feature-detection: `command -v X 2>/dev/null`, `which X 2>/dev/null`
+    if (["command", "which", "type", "hash"].includes(ctx.name)) return null;
+    return {
+      verdict: "warn",
+      message:
+        "`2>/dev/null` hides the diagnosis when things break. Prefer letting errors surface.",
+    };
   },
 ];
 
 function parseTruncationN(args: string[]): number | null {
   for (let i = 1; i < args.length; i++) {
     const a = args[i];
-    // -n +N is offset syntax — not truncation, allow it
     if (a === "-n" && args[i + 1]?.startsWith("+")) return null;
     if (a.startsWith("-n+") || a.startsWith("+")) return null;
     if (a === "-n" && i + 1 < args.length) {
@@ -167,6 +169,91 @@ function parseTruncationN(args: string[]): number | null {
   return null;
 }
 
+// Session-aware truncation-bump detection.
+// Fires only when the same base command is re-run with an INCREASED N
+// within the bump window. Same-N re-runs (check→fix→check loop) pass silently.
+function checkTruncationBump(
+  command: string,
+  contexts: CommandCtx[],
+  sessionId: string,
+): Issue | null {
+  // Find the rightmost head/tail context that is right-of-pipe
+  let truncCtx: CommandCtx | null = null;
+  for (const ctx of contexts) {
+    if (!ctx.isRightOfPipe) continue;
+    if (ctx.name !== "head" && ctx.name !== "tail") continue;
+    truncCtx = ctx;
+  }
+  if (!truncCtx) return null;
+  const n = parseTruncationN(truncCtx.args);
+  if (n === null) return null;
+
+  // Base = everything left of the final `|`
+  const lastPipe = command.lastIndexOf("|");
+  if (lastPipe < 0) return null;
+  const base = command.substring(0, lastPipe).trim();
+  if (!base) return null;
+
+  const prior = readSessionHistory(sessionId);
+  const now = Date.now();
+  const recent = prior.filter(
+    (e) => e.base === base && now - e.t < BUMP_WINDOW_MS,
+  );
+
+  recordCommand(sessionId, { t: now, base, n, cmd: truncCtx.name });
+
+  const prevMax = recent.reduce((m, e) => Math.max(m, e.n), 0);
+  if (recent.length > 0 && n > prevMax) {
+    return {
+      verdict: "warn",
+      message:
+        `Re-running the same command with a larger '| ${truncCtx.name} -${n}' ` +
+        `(previous: -${prevMax}). If you need more output, use the Bash tool's ` +
+        `natural output, or save to a file and use Read with offset/limit.`,
+    };
+  }
+  return null;
+}
+
+interface HistoryEntry {
+  t: number;
+  base: string;
+  n: number;
+  cmd: string;
+}
+
+function sessionStatePath(sessionId: string): string {
+  return `${STATE_DIR}/${sessionId}.jsonl`;
+}
+
+function readSessionHistory(sessionId: string): HistoryEntry[] {
+  try {
+    const raw = readFileSync(sessionStatePath(sessionId), "utf-8");
+    return raw
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => {
+        try {
+          return JSON.parse(l) as HistoryEntry;
+        } catch {
+          return null;
+        }
+      })
+      .filter((e): e is HistoryEntry => e !== null);
+  } catch {
+    return [];
+  }
+}
+
+function recordCommand(sessionId: string, entry: HistoryEntry): void {
+  try {
+    mkdirSync(STATE_DIR, { recursive: true });
+    appendFileSync(sessionStatePath(sessionId), JSON.stringify(entry) + "\n");
+  } catch {
+    // Best-effort; state loss just means a missed bump detection
+  }
+}
+
 interface AstNode {
   Type?: string;
   Stmts?: AstNode[];
@@ -176,17 +263,17 @@ interface AstNode {
   Parts?: AstNode[];
   Value?: string;
   Op?: number;
-  X?: AstNode; // BinaryCmd left
-  Y?: AstNode; // BinaryCmd right
-  N?: { Value?: string }; // redirect fd
-  Word?: AstNode; // redirect target
+  X?: AstNode;
+  Y?: AstNode;
+  N?: { Value?: string };
+  Word?: AstNode;
   Cond?: AstNode[];
   Then?: AstNode[];
   Else?: AstNode;
   Do?: AstNode[];
   Loop?: AstNode;
   Items?: AstNode[];
-  Stmt?: AstNode; // TimeClause inner statement
+  Stmt?: AstNode;
   Assigns?: AstNode[];
   Array?: { Elems?: AstNode[] };
 }
@@ -293,7 +380,6 @@ function* walkNode(
     return;
   }
 
-  // Container types — recurse into their statement lists
   const stmtLists: (AstNode[] | undefined)[] = [
     node.Stmts,
     node.Cond,
@@ -327,14 +413,12 @@ function parseAst(command: string): AstNode {
   return JSON.parse(proc.stdout.toString());
 }
 
-// Approval: find the git root for project-level settings
 function findGitRoot(): string | null {
   const toplevel = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], {
     stderr: "pipe",
   });
   if (toplevel.exitCode !== 0) return null;
 
-  // Handle worktrees: common-dir differs from git-dir
   const gitDir = Bun.spawnSync(["git", "rev-parse", "--git-dir"], {
     stderr: "pipe",
   });
@@ -350,7 +434,6 @@ function findGitRoot(): string | null {
   return toplevel.stdout.toString().trim();
 }
 
-// Extract the command prefix from a Bash(...) permission pattern
 function extractBashPrefix(pattern: string): string | null {
   if (!pattern.startsWith("Bash(")) return null;
   let s = pattern.slice(5);
@@ -404,7 +487,15 @@ function loadPrefixes(): PermissionPrefixes {
   return { allowed: [...allowedSet], denied: [...deniedSet] };
 }
 
-// Approval: prefix matching against permission lists
+// Strip trailing redirects from a command string before prefix matching.
+// `bq query foo 2>&1` should still match `Bash(bq query:*)`.
+function stripTrailingRedirects(cmd: string): string {
+  return cmd
+    .replace(/\s+(?:\d*>>?&?\d*|\d*<)\s*\S+\s*$/g, "")
+    .replace(/\s+(?:\d*>>?&?\d*|\d*<)\s*\S+\s*$/g, "")
+    .trim();
+}
+
 function matchesPrefix(cmd: string, prefix: string): boolean {
   return (
     cmd === prefix ||
@@ -417,20 +508,19 @@ function matchesPrefixList(cmd: string, prefixes: string[]): boolean {
   return prefixes.some((p) => matchesPrefix(cmd, p));
 }
 
-// Generate candidate command strings for prefix matching.
-// Includes the full arg string and a version with transparent prefixes stripped.
 function commandCandidates(ctx: CommandCtx): string[] {
   const full = ctx.args.join(" ");
-  const candidates = [full];
+  const candidates = [full, stripTrailingRedirects(full)];
 
   let i = 0;
   while (i < ctx.args.length && TRANSPARENT.has(pathBasename(ctx.args[i])))
     i++;
   if (i > 0 && i < ctx.args.length) {
-    candidates.push(ctx.args.slice(i).join(" "));
+    const stripped = ctx.args.slice(i).join(" ");
+    candidates.push(stripped, stripTrailingRedirects(stripped));
   }
 
-  return candidates;
+  return [...new Set(candidates)];
 }
 
 function checkPermission(
@@ -447,8 +537,6 @@ function checkPermission(
   return "unknown";
 }
 
-// Quick check for shell metacharacters that indicate compound structure.
-// Simple commands don't need approval — Claude Code handles them natively.
 function hasCompoundStructure(cmd: string): boolean {
   return (
     /[|&;`]/.test(cmd) ||
@@ -458,7 +546,6 @@ function hasCompoundStructure(cmd: string): boolean {
   );
 }
 
-// Recursively expand sh -c / bash -c into inner commands for approval checking
 function expandShellC(contexts: CommandCtx[]): CommandCtx[] {
   const expanded: CommandCtx[] = [];
   for (const ctx of contexts) {
@@ -479,16 +566,10 @@ function expandShellC(contexts: CommandCtx[]): CommandCtx[] {
   return expanded;
 }
 
-const ALLOW_JSON = JSON.stringify({
-  hookSpecificOutput: {
-    hookEventName: "PreToolUse",
-    permissionDecision: "allow",
-  },
-});
-
 interface HookInput {
   tool_name: string;
   tool_input: { command?: string };
+  session_id?: string;
 }
 
 const input: HookInput = await Bun.stdin.json();
@@ -497,11 +578,12 @@ if (input.tool_name !== "Bash") process.exit(0);
 const command = input.tool_input?.command;
 if (!command) process.exit(0);
 
+const sessionId = input.session_id ?? "unknown";
+
 let ast: AstNode;
 try {
   ast = parseAst(command);
 } catch {
-  // shfmt unavailable or parse failure — allow through
   process.exit(0);
 }
 
@@ -510,37 +592,76 @@ for (const stmt of ast.Stmts ?? []) {
   for (const ctx of walkStmt(stmt)) contexts.push(ctx);
 }
 
-// Phase 1: Discipline — block bad tool usage patterns
+// Phase 1: Discipline
 const seen = new Set<string>();
-const issues: string[] = [];
+const issues: Issue[] = [];
+
+function pushIssue(i: Issue | null) {
+  if (!i) return;
+  if (seen.has(i.message)) return;
+  seen.add(i.message);
+  issues.push(i);
+}
+
 for (const ctx of contexts) {
   for (const rule of rules) {
-    const msg = rule(ctx);
-    if (msg && !seen.has(msg)) {
-      seen.add(msg);
-      issues.push(msg);
-    }
+    pushIssue(rule({ ctx, command, sessionId }));
   }
 }
 
-if (issues.length > 0) {
-  console.error(issues.map((i) => `\u2022 ${i}`).join("\n"));
+pushIssue(checkTruncationBump(command, contexts, sessionId));
+
+const blocks = issues.filter((i) => i.verdict === "block");
+const warns = issues.filter((i) => i.verdict === "warn");
+
+if (blocks.length > 0) {
+  const all = [
+    ...blocks.map((i) => `\u2022 ${i.message}`),
+    ...warns.map((i) => `\u2022 (warn) ${i.message}`),
+  ];
+  console.error(all.join("\n"));
   process.exit(2);
 }
 
-// Phase 2: Approval — auto-approve compound commands when all segments are allowed
-if (!hasCompoundStructure(command)) process.exit(0);
+// Phase 2: Approval
+function emit(opts: {
+  permissionDecision?: "allow";
+  additionalContext?: string;
+}): void {
+  const out: any = {
+    hookSpecificOutput: { hookEventName: "PreToolUse" },
+  };
+  if (opts.permissionDecision)
+    out.hookSpecificOutput.permissionDecision = opts.permissionDecision;
+  if (opts.additionalContext)
+    out.hookSpecificOutput.additionalContext = opts.additionalContext;
+  console.log(JSON.stringify(out));
+}
+
+const warnText =
+  warns.length > 0 ? warns.map((i) => `\u2022 ${i.message}`).join("\n") : undefined;
+
+if (!hasCompoundStructure(command)) {
+  if (warnText) emit({ additionalContext: warnText });
+  process.exit(0);
+}
 
 const prefixes = loadPrefixes();
-if (prefixes.allowed.length === 0) process.exit(0);
+if (prefixes.allowed.length === 0) {
+  if (warnText) emit({ additionalContext: warnText });
+  process.exit(0);
+}
 
 const allContexts = expandShellC(contexts);
-if (allContexts.length === 0) process.exit(0);
+if (allContexts.length === 0) {
+  if (warnText) emit({ additionalContext: warnText });
+  process.exit(0);
+}
 
 const statuses = allContexts.map((ctx) => checkPermission(ctx, prefixes));
 
 if (statuses.every((s) => s === "allowed")) {
-  console.log(ALLOW_JSON);
+  emit({ permissionDecision: "allow", additionalContext: warnText });
   process.exit(0);
 }
 
@@ -549,4 +670,5 @@ if (statuses.some((s) => s === "denied")) {
   process.exit(2);
 }
 
+if (warnText) emit({ additionalContext: warnText });
 process.exit(0);

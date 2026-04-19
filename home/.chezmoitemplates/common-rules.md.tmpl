@@ -84,6 +84,7 @@ When I make obvious mistakes, point them out with gentle humor or playful teasin
 
 - **NEVER invoke `cargo clean`** - rarely necessary and wastes time
 - **Avoid running full builds unless necessary** - prefer type checking and linting
+- **Use `cargo run` directly** — it builds automatically. Never do `cargo build` then `cargo run` separately; that just builds twice for no reason.
 - Run cargo build or any build commands with lots of output in 'quiet' mode, unless you require access to stacktrace/warnings/etc
 - Alternatively, avoid running the command and stop the prompt there if you simply want the user to test and report back
 
