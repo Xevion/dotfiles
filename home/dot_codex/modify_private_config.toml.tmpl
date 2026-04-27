@@ -1,0 +1,25 @@
+#!/bin/bash
+# Merges managed [mcp_servers.*] blocks into ~/.codex/config.toml.
+# Preserves user-set keys: model, personality, [projects.*] trust grants,
+# [plugins.*], [tui], etc. Only the [mcp_servers.*] section is authoritative.
+
+SCRIPT=$(mktemp)
+trap "rm -f $SCRIPT" EXIT
+
+cat > "$SCRIPT" <<'TYPESCRIPT'
+const MCP_BLOCK = {{ output "bun" (joinPath .chezmoi.sourceDir "../meta/mcp-servers.ts") "codex" dopplerProjectJson.CONTEXT7_API_KEY dopplerProjectJson.EXA_API_KEY | quote }};
+
+const input = await Bun.stdin.text();
+
+// Strip existing [mcp_servers.*] sections. A TOML section runs until the next
+// top-level [header] or EOF. This regex is anchored to line starts.
+const stripped = input.replace(
+  /(^|\n)\[mcp_servers\.[^\]]+\][\s\S]*?(?=\n\[[^\]]+\]|$)/g,
+  "$1",
+).replace(/\n{3,}/g, "\n\n").trimEnd();
+
+const separator = stripped.length > 0 ? "\n\n" : "";
+process.stdout.write(stripped + separator + MCP_BLOCK);
+TYPESCRIPT
+
+exec bun "$SCRIPT"

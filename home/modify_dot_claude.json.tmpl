@@ -26,23 +26,10 @@ interface ClaudeConfig {
   [key: string]: unknown;
 }
 
-const REQUIRED_SERVERS: Record<string, McpServer> = {
-  context7: {
-    type: "http",
-    url: "https://mcp.context7.com/mcp",
-    headers: {
-      CONTEXT7_API_KEY: "{{ dopplerProjectJson.CONTEXT7_API_KEY }}",
-    },
-  },
-  gh_grep: {
-    type: "http",
-    url: "https://mcp.grep.app",
-  },
-  linear: {
-    type: "http",
-    url: "https://mcp.linear.app/mcp",
-  },
-};
+const { required: REQUIRED_SERVERS, managed: MANAGED_NAMES }: {
+  required: Record<string, McpServer>;
+  managed: string[];
+} = {{ output "bun" (joinPath .chezmoi.sourceDir "../meta/mcp-servers.ts") "claude" dopplerProjectJson.CONTEXT7_API_KEY dopplerProjectJson.EXA_API_KEY }};
 
 // Deep sort object keys for deterministic hashing
 function sortDeep(obj: unknown): unknown {
@@ -68,6 +55,11 @@ const modifiedConfig: ClaudeConfig = JSON.parse(JSON.stringify(originalConfig));
 
 if (!modifiedConfig.mcpServers || typeof modifiedConfig.mcpServers !== 'object') {
   modifiedConfig.mcpServers = {};
+}
+
+// Prune managed names that aren't required (e.g. tool dropped from shared list)
+for (const name of MANAGED_NAMES) {
+  if (!(name in REQUIRED_SERVERS)) delete modifiedConfig.mcpServers[name];
 }
 
 // Add/update required servers
