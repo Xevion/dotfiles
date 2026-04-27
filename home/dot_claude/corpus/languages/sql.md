@@ -9,6 +9,9 @@ exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: internal/database/migrations/
     note: goose migrations with sequential numeric prefixes, sqlc-generated Go types
+  - repo: local/stashapp-rapid-tag
+    path: src/lib/server/db.ts + migrations/
+    note: "better-sqlite3 startup migration runner, WAL + foreign_keys + busy_timeout pragmas, sequential 001_/002_/003_ files"
 ---
 
 # SQL
@@ -32,6 +35,15 @@ CREATE INDEX idx_courses_meeting_times ON courses USING GIN (meeting_times);
 - **Materialized views for precomputed aggregations**: when aggregations are expensive and read-heavy but write-infrequent. Add a UNIQUE index on the grouping key to enable `REFRESH CONCURRENTLY`
 - **UNLOGGED TABLE for ephemeral state**: scheduler timestamps, cache entries, bot command fingerprints — data where crash-loss is acceptable. No WAL overhead. Document the tradeoff in a migration comment
 - **Safe CHECK constraint migrations**: include a data-repair step (UPDATE to fix invalid rows) and a validation block (`DO $$ ... RAISE EXCEPTION ... $$`) before adding the constraint. Even when data is believed clean, include the validation block — a comment asserting data cleanliness is acceptable documentation, but the validation block catches silent drift.
+
+## TypeScript + SQLite
+
+For SvelteKit/Bun server code that needs a local SQL database, `better-sqlite3` (synchronous) is the correct choice over `bun:sqlite` when the surface area is non-trivial — the synchronous API gives proper type inference, idiomatic transaction handling, and mature ecosystem tooling.
+
+- **Startup migration runner with `_migrations` tracking table**: on first `getDb()` call, open the database, create `_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMP)` if it doesn't exist, read `migrations/*.sql` sorted lexicographically, compute the set of unapplied files, and execute them via `db.exec()` inside individual transactions. Idempotent by construction — re-running the app on an up-to-date database is a no-op
+- **Sequential numeric prefix naming for SQLite migrations**: `001_initial.sql`, `002_add_users.sql`, etc. Pad to at least 3 digits. Timestamp prefixes are unnecessary for single-writer SQLite projects
+- **Open-time pragmas for all SQLite databases**: `PRAGMA journal_mode = WAL` (concurrent readers with single writer), `PRAGMA foreign_keys = ON` (off by default — a footgun), `PRAGMA busy_timeout = 5000` (wait 5s on lock contention before throwing). Apply in `getDb()` before returning the connection
+- **Query result typing via local interface casts**: since better-sqlite3 results are `unknown`, cast per-query with narrow inline interfaces (`.get(id) as { count: number }`). Acceptable for internal queries where the schema is controlled — flag at user-input boundaries where Zod validation is required
 
 ## Anti-Patterns
 

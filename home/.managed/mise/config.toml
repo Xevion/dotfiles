@@ -36,6 +36,7 @@ ollama = "latest"
 btop = "latest"
 tmux = "latest"
 ruby = "latest"
+bitwarden = "latest"
 
 [settings]
 
