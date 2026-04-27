@@ -12,6 +12,7 @@
 
 import { readFileSync, appendFileSync, mkdirSync, readdirSync, statSync } from "fs";
 import { dirname } from "path";
+import { createHash } from "crypto";
 
 // Prefixes that are transparent — the real command is the next arg.
 // NOTE: `sudo` is intentionally excluded so it surfaces as its own command
@@ -41,6 +42,58 @@ const REDIR_DUP_OUT = 68; // >&
 // Session state for truncation-bump detection
 const STATE_DIR = "/tmp/bash-guard";
 const BUMP_WINDOW_MS = 5 * 60 * 1000;
+
+// Filter-pipeline rewrite: redirect expensive commands' output to a file
+// when they're piped into truncating filters, so Claude reads the file
+// instead of re-running with different filter args.
+const REWRITE_DIR = "/tmp/claude-bash";
+
+// Commands whose output is expensive to regenerate. Only these get rewritten.
+const EXPENSIVE_COMMANDS = new Set([
+  "cargo",
+  "rustc",
+  "npm",
+  "pnpm",
+  "yarn",
+  "bun",
+  "just",
+  "make",
+  "gradle",
+  "mvn",
+  "go",
+  "pytest",
+  "python",
+  "python3",
+  "uv",
+  "node",
+  "tsc",
+  "eslint",
+  "biome",
+  "ruff",
+  "rspec",
+  "jest",
+  "vitest",
+  "playwright",
+  "deno",
+  "tox",
+  "ctest",
+  "cmake",
+  "ninja",
+]);
+
+// Pipeline filters whose presence indicates Claude is truncating output.
+const FILTER_COMMANDS = new Set([
+  "head",
+  "tail",
+  "rg",
+  "grep",
+  "sed",
+  "awk",
+  "cut",
+  "wc",
+  "sort",
+  "uniq",
+]);
 
 interface CommandCtx {
   name: string;
@@ -566,6 +619,183 @@ function expandShellC(contexts: CommandCtx[]): CommandCtx[] {
   return expanded;
 }
 
+// Find the first top-level `|` in the command string, respecting quotes,
+// escapes, and nesting in (), {}, []. Returns -1 if none found.
+// Skips `||` (logical-or).
+function findFirstTopLevelPipe(s: string): number {
+  let parenDepth = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let inSingle = false;
+  let inDouble = false;
+  let inBacktick = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (c === "\\" && !inSingle) {
+      escape = true;
+      continue;
+    }
+    if (inSingle) {
+      if (c === "'") inSingle = false;
+      continue;
+    }
+    if (inDouble) {
+      if (c === '"') inDouble = false;
+      continue;
+    }
+    if (inBacktick) {
+      if (c === "`") inBacktick = false;
+      continue;
+    }
+    if (c === "'") {
+      inSingle = true;
+      continue;
+    }
+    if (c === '"') {
+      inDouble = true;
+      continue;
+    }
+    if (c === "`") {
+      inBacktick = true;
+      continue;
+    }
+    if (c === "(") {
+      parenDepth++;
+      continue;
+    }
+    if (c === ")") {
+      if (parenDepth > 0) parenDepth--;
+      continue;
+    }
+    if (c === "{") {
+      braceDepth++;
+      continue;
+    }
+    if (c === "}") {
+      if (braceDepth > 0) braceDepth--;
+      continue;
+    }
+    if (c === "[") {
+      bracketDepth++;
+      continue;
+    }
+    if (c === "]") {
+      if (bracketDepth > 0) bracketDepth--;
+      continue;
+    }
+    if (
+      c === "|" &&
+      parenDepth === 0 &&
+      braceDepth === 0 &&
+      bracketDepth === 0
+    ) {
+      if (s[i + 1] === "|") {
+        i++;
+        continue;
+      }
+      return i;
+    }
+  }
+  return -1;
+}
+
+interface RewriteDecision {
+  base: string;
+  rewritten: string;
+  path: string;
+}
+
+// Detect: top-level pipeline where leftmost is an expensive command and
+// at least one downstream segment is a truncating filter. If matched,
+// produce a rewrite that runs the base command with output redirected to
+// a hash-keyed file under REWRITE_DIR.
+function detectFilterRewrite(
+  command: string,
+  ast: AstNode,
+): RewriteDecision | null {
+  const stmts = ast.Stmts ?? [];
+  if (stmts.length !== 1) return null;
+  const stmt = stmts[0];
+
+  // Reject if the top-level statement carries its own redirects — the user
+  // is already routing output, don't second-guess.
+  if ((stmt.Redirs ?? []).length > 0) return null;
+
+  const cmd = stmt.Cmd ?? stmt;
+  if (cmd.Type !== "BinaryCmd" || cmd.Op !== OP_PIPE) return null;
+
+  // Walk left-to-right collecting CallExpr leaves of the pipeline.
+  const segments: { name: string; node: AstNode; redirs: AstNode[] }[] = [];
+  function collect(node: AstNode | undefined): boolean {
+    if (!node) return false;
+    const innerStmt = node;
+    const inner = innerStmt.Cmd ?? innerStmt;
+    if (inner.Type === "BinaryCmd" && inner.Op === OP_PIPE) {
+      return collect(inner.X) && collect(inner.Y);
+    }
+    if (inner.Type === "CallExpr") {
+      const args = extractArgs(inner);
+      if (args.length === 0) return false;
+      segments.push({
+        name: effectiveName(args),
+        node: inner,
+        redirs: innerStmt.Redirs ?? [],
+      });
+      return true;
+    }
+    return false;
+  }
+  if (!collect(cmd)) return null;
+  if (segments.length < 2) return null;
+
+  const base = segments[0];
+  if (!EXPENSIVE_COMMANDS.has(base.name)) return null;
+
+  // If the base segment redirects stdout to a file, the wrap would
+  // double-redirect and lose output. Bail.
+  for (const r of base.redirs) {
+    if (r.Op === REDIR_OUT) {
+      const target = wordValue(r.Word);
+      // Allow stderr-only: `2> file` (fd === "2"). Reject any 1> or default-fd `>`.
+      const fd = r.N?.Value ?? "1";
+      if (fd === "1") return null;
+    }
+  }
+
+  // At least one downstream segment must be a truncating filter.
+  const hasFilter = segments
+    .slice(1)
+    .some((s) => FILTER_COMMANDS.has(s.name));
+  if (!hasFilter) return null;
+
+  // Slice base from the original command at the first top-level pipe.
+  const pipeIdx = findFirstTopLevelPipe(command);
+  if (pipeIdx < 0) return null;
+  const baseStr = command.substring(0, pipeIdx).trim();
+  if (!baseStr) return null;
+
+  const hash = createHash("sha256").update(baseStr).digest("hex").slice(0, 12);
+  const path = `${REWRITE_DIR}/${hash}.log`;
+
+  // Rewritten command — uses only allowed primitives (mkdir, stat, echo, exit).
+  // Brace group ensures `> path 2>&1` applies to the whole base regardless
+  // of any inner `2>&1` it carried.
+  const rewritten =
+    `mkdir -p ${REWRITE_DIR}; ` +
+    `{ ${baseStr}; } > ${path} 2>&1; ` +
+    `ec=$?; ` +
+    `sz=$(stat -c%s ${path}); ` +
+    `echo "[bash-guard] saved: ${path} ($sz bytes, exit $ec). Use the Read tool with offset/limit, or Grep, to inspect — do not re-run with different filter args."; ` +
+    `exit $ec`;
+
+  return { base: baseStr, rewritten, path };
+}
+
 interface HookInput {
   tool_name: string;
   tool_input: { command?: string };
@@ -623,10 +853,46 @@ if (blocks.length > 0) {
   process.exit(2);
 }
 
+// Phase 1.5: Filter-pipeline rewrite. If matched, substitute the command
+// in-memory. Approval (Phase 2) checks the BASE command's contexts \u2014 the
+// wrapper primitives (mkdir, brace group, assignments, stat, echo, exit)
+// are injected by us and trusted by construction; they don't need to be
+// in the user's allow list.
+const rewrite = detectFilterRewrite(command, ast);
+let effectiveCommand = command;
+let effectiveContexts = contexts;
+let rewriteContext: string | undefined;
+let updatedInput: { command: string } | undefined;
+
+if (rewrite) {
+  effectiveCommand = rewrite.rewritten;
+  updatedInput = { command: rewrite.rewritten };
+  rewriteContext =
+    `[bash-guard] Rewrote pipeline: '${rewrite.base}' was piped into truncating filters. ` +
+    `Output redirected to ${rewrite.path}. ` +
+    `Use the Read tool with offset/limit, or Grep, to inspect \u2014 do NOT re-run with different filter args. ` +
+    `If the same base command runs again, output goes to the same path.`;
+  try {
+    const baseAst = parseAst(rewrite.base);
+    effectiveContexts = [];
+    for (const stmt of baseAst.Stmts ?? []) {
+      for (const ctx of walkStmt(stmt)) effectiveContexts.push(ctx);
+    }
+  } catch {
+    // If the base somehow fails to parse, drop the rewrite and fall
+    // through with the original command.
+    effectiveCommand = command;
+    effectiveContexts = contexts;
+    updatedInput = undefined;
+    rewriteContext = undefined;
+  }
+}
+
 // Phase 2: Approval
 function emit(opts: {
   permissionDecision?: "allow";
   additionalContext?: string;
+  updatedInput?: { command: string };
 }): void {
   const out: any = {
     hookSpecificOutput: { hookEventName: "PreToolUse" },
@@ -635,33 +901,48 @@ function emit(opts: {
     out.hookSpecificOutput.permissionDecision = opts.permissionDecision;
   if (opts.additionalContext)
     out.hookSpecificOutput.additionalContext = opts.additionalContext;
+  if (opts.updatedInput)
+    out.hookSpecificOutput.updatedInput = opts.updatedInput;
   console.log(JSON.stringify(out));
 }
 
-const warnText =
-  warns.length > 0 ? warns.map((i) => `\u2022 ${i.message}`).join("\n") : undefined;
+const warnLines = warns.map((i) => `\u2022 ${i.message}`);
+const contextParts: string[] = [];
+if (rewriteContext) contextParts.push(rewriteContext);
+if (warnLines.length > 0) contextParts.push(warnLines.join("\n"));
+const additionalContext =
+  contextParts.length > 0 ? contextParts.join("\n\n") : undefined;
 
-if (!hasCompoundStructure(command)) {
-  if (warnText) emit({ additionalContext: warnText });
+function emitFinal(opts: { permissionDecision?: "allow" } = {}): void {
+  if (!additionalContext && !updatedInput && !opts.permissionDecision) return;
+  emit({
+    permissionDecision: opts.permissionDecision,
+    additionalContext,
+    updatedInput,
+  });
+}
+
+if (!hasCompoundStructure(effectiveCommand)) {
+  emitFinal();
   process.exit(0);
 }
 
 const prefixes = loadPrefixes();
 if (prefixes.allowed.length === 0) {
-  if (warnText) emit({ additionalContext: warnText });
+  emitFinal();
   process.exit(0);
 }
 
-const allContexts = expandShellC(contexts);
+const allContexts = expandShellC(effectiveContexts);
 if (allContexts.length === 0) {
-  if (warnText) emit({ additionalContext: warnText });
+  emitFinal();
   process.exit(0);
 }
 
 const statuses = allContexts.map((ctx) => checkPermission(ctx, prefixes));
 
 if (statuses.every((s) => s === "allowed")) {
-  emit({ permissionDecision: "allow", additionalContext: warnText });
+  emitFinal({ permissionDecision: "allow" });
   process.exit(0);
 }
 
@@ -670,5 +951,5 @@ if (statuses.some((s) => s === "denied")) {
   process.exit(2);
 }
 
-if (warnText) emit({ additionalContext: warnText });
+emitFinal();
 process.exit(0);

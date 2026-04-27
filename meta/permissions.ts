@@ -291,6 +291,7 @@ allow(
   "zip",
   "stat",
   "file",
+  "exit",
   "env",
   "printenv",
   "pwd",
