@@ -19,10 +19,12 @@
     "provider": "copilot",
   },
   "project_panel": {
+    "dock": "left",
     "hide_hidden": true,
     "hide_gitignore": false,
   },
   "agent": {
+    "dock": "right",
     "default_model": {
       "provider": "copilot_chat",
       "model": "claude-sonnet-4.5",
