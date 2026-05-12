@@ -18,7 +18,7 @@
 		"typescript": "^5"
 	},
 	"dependencies": {
-		"@anthropic-ai/claude-agent-sdk": "^0.2.81",
+		"@anthropic-ai/claude-agent-sdk": "^0.2.139",
 		"@clack/core": "^0.4.2",
 		"@clack/prompts": "^0.10.0",
 		"ajv": "^8.18.0",

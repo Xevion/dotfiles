@@ -1,5 +1,6 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import Ajv from "ajv/dist/2020";
+import { logEvent } from "./debug.ts";
 import {
 	type CommitOption,
 	type CommitOptionsOutput,
@@ -153,43 +154,99 @@ export async function generateOptions(
 	let output: CommitOptionsOutput | null = null;
 	let rawResultText: string | null = null;
 
+	const queryOptions = {
+		model: modelId,
+		systemPrompt,
+		thinking:
+			thinking === "none"
+				? ({ type: "disabled" } as const)
+				: ({ type: "adaptive" } as const),
+		persistSession: false,
+		settingSources: [] as never[],
+		maxTurns: 4,
+		effort,
+		permissionMode: "dontAsk" as const,
+		outputFormat: {
+			type: "json_schema" as const,
+			schema: stripSchemaDirective(
+				commitOptionsSchema as Record<string, unknown>,
+			),
+		},
+	};
+
+	logEvent("query-start", {
+		model: modelId,
+		thinking,
+		effort,
+		count,
+		systemPromptChars: systemPrompt.length,
+		userPromptChars: userPrompt.length,
+	});
+
+	let resultFailure: {
+		subtype?: string;
+		apiErrorStatus?: unknown;
+		terminalReason?: unknown;
+		isError?: unknown;
+	} | null = null;
+
 	for await (const message of query({
 		prompt: userPrompt,
-		options: {
-			model: modelId,
-			systemPrompt,
-			thinking:
-				thinking === "none"
-					? { type: "disabled" }
-					: { type: "enabled", budgetTokens: thinkingBudget(thinking) },
-			persistSession: false,
-			settingSources: [],
-			maxTurns: 4,
-			effort,
-			permissionMode: "dontAsk",
-			outputFormat: {
-				type: "json_schema",
-				schema: stripSchemaDirective(
-					commitOptionsSchema as Record<string, unknown>,
-				),
-			},
-		},
+		options: queryOptions,
 	})) {
+		logEvent("sdk-message", message);
+
 		if (message.type === "result") {
+			const m = message as unknown as Record<string, unknown>;
 			if (message.subtype === "success") {
 				rawResultText = message.result;
 				if (message.structured_output) {
 					const candidate = message.structured_output as CommitOptionsOutput;
 					if (validateCommitOptions(candidate)) {
 						output = candidate;
+					} else {
+						logEvent("structured-output-invalid", {
+							errors: validateCommitOptions.errors,
+							candidate,
+						});
 					}
+				} else {
+					logEvent("no-structured-output", { rawLen: rawResultText?.length });
 				}
+			} else {
+				resultFailure = {
+					subtype: message.subtype,
+					apiErrorStatus: m.api_error_status,
+					terminalReason: m.terminal_reason,
+					isError: m.is_error,
+				};
+				logEvent("result-non-success", { ...resultFailure, message });
 			}
 		}
 	}
 
+	if (!output && resultFailure) {
+		const parts = [`SDK result subtype=${resultFailure.subtype}`];
+		if (resultFailure.apiErrorStatus !== undefined)
+			parts.push(
+				`api_error_status=${JSON.stringify(resultFailure.apiErrorStatus)}`,
+			);
+		if (resultFailure.terminalReason !== undefined)
+			parts.push(
+				`terminal_reason=${JSON.stringify(resultFailure.terminalReason)}`,
+			);
+		throw new Error(parts.join(" "));
+	}
+
 	if (!output && rawResultText) {
 		output = tryExtractCommitOptions(rawResultText);
+		if (output) {
+			logEvent("fallback-text-parse-succeeded", null);
+		} else {
+			logEvent("fallback-text-parse-failed", {
+				rawHead: rawResultText.slice(0, 500),
+			});
+		}
 	}
 
 	if (output) {
@@ -205,19 +262,4 @@ export async function generateOptions(
 	}
 
 	return { options: [], rawFallback: rawResultText ?? undefined };
-}
-
-function thinkingBudget(level: ThinkingLevel): number {
-	switch (level) {
-		case "low":
-			return 1024;
-		case "medium":
-			return 4096;
-		case "high":
-			return 16384;
-		case "max":
-			return 65536;
-		default:
-			return 1024;
-	}
 }

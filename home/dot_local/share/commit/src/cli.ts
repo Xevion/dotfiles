@@ -13,6 +13,7 @@ import {
 	THINKING_DEFAULTS,
 	type ThinkingLevel,
 } from "./ai.ts";
+import { debugLogPath, formatErrorForDisplay, logError } from "./debug.ts";
 import type { CommitOption } from "./schema.ts";
 
 const MAX_AI_RETRIES = 3;
@@ -680,9 +681,9 @@ const main = defineCommand({
 				} catch (err) {
 					clearInterval(timer);
 					spinner.stop("Generation failed.");
-					p.log.error(
-						err instanceof Error ? err.message : "Unknown error from AI.",
-					);
+					logError("generate-threw", err);
+					p.log.error(formatErrorForDisplay(err));
+					p.log.info(`Debug log: ${pc.cyan(debugLogPath)}`);
 					if (attempt < MAX_AI_RETRIES - 1) {
 						p.log.info(`Retrying... (${attempt + 2}/${MAX_AI_RETRIES})`);
 					}
@@ -691,6 +692,7 @@ const main = defineCommand({
 
 			if (generatedOptions.length === 0) {
 				p.log.error("Failed to generate commit options after all retries.");
+				p.log.info(`Debug log: ${pc.cyan(debugLogPath)}`);
 				if (lastRawOutput) {
 					p.log.warn("Last raw AI output:");
 					console.log(pc.dim("─".repeat(60)));
