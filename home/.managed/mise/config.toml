@@ -37,6 +37,7 @@ btop = "latest"
 tmux = "latest"
 ruby = "latest"
 bitwarden = "latest"
+duckdb = "latest"
 
 [settings]
 
