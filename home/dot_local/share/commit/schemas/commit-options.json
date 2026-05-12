@@ -13,8 +13,8 @@
 				"properties": {
 					"subject": {
 						"type": "string",
-						"maxLength": 72,
-						"description": "Commit message subject line, under 72 characters, imperative mood, no trailing period"
+						"maxLength": 100,
+						"description": "Commit message subject line, target under 72 characters, imperative mood, no trailing period"
 					},
 					"body": {
 						"type": "string",

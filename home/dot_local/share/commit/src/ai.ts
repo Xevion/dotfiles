@@ -163,7 +163,7 @@ export async function generateOptions(
 				: ({ type: "adaptive" } as const),
 		persistSession: false,
 		settingSources: [] as never[],
-		maxTurns: 4,
+		maxTurns: 8,
 		effort,
 		permissionMode: "dontAsk" as const,
 		outputFormat: {
