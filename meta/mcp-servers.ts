@@ -25,6 +25,7 @@ type Server = {
   headers?: Record<string, string>;
   oauth?: boolean;
   only?: Format[];
+  tools?: Record<string, Record<string, string>>;
 };
 
 const allServers: Record<string, Server> = {
@@ -43,6 +44,11 @@ const allServers: Record<string, Server> = {
   linear: {
     url: "https://mcp.linear.app/mcp",
     oauth: true,
+    tools: {
+      save_issue: { approval_mode: "approve" },
+      save_project: { approval_mode: "approve" },
+      save_comment: { approval_mode: "approve" },
+    },
   },
 };
 
@@ -88,6 +94,15 @@ function formatCodex(): string {
         .map(([k, v]) => `${k} = ${JSON.stringify(v)}`)
         .join(", ");
       lines.push(`headers = { ${pairs} }`);
+    }
+    if (s.tools) {
+      for (const [toolName, toolConfig] of Object.entries(s.tools)) {
+        lines.push("");
+        lines.push(`[mcp_servers.${name}.tools.${toolName}]`);
+        for (const [k, v] of Object.entries(toolConfig)) {
+          lines.push(`${k} = ${JSON.stringify(v)}`);
+        }
+      }
     }
     lines.push("");
   }
