@@ -1,7 +1,7 @@
 ---
 name: rust-build-error-resolver
 description: "Build and compiler error resolution specialist for Rust projects. Use PROACTIVELY when cargo build fails or compiler errors occur. Fixes build/type errors only with minimal diffs, no architectural edits."
-model: opus
+model: sonnet
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 

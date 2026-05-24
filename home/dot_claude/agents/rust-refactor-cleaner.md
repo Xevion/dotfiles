@@ -1,7 +1,7 @@
 ---
 name: rust-refactor-cleaner
 description: "Dead code cleanup and consolidation specialist for Rust projects. Use PROACTIVELY for removing unused code, duplicates, and refactoring. Runs analysis tools (cargo clippy, cargo udeps, cargo-machete) to identify dead code and safely removes it."
-model: opus
+model: sonnet
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 

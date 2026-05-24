@@ -1,7 +1,7 @@
 ---
 name: jvm-doc-updater
 description: "Documentation and codemap specialist for Kotlin/Java projects. Use PROACTIVELY for updating codemaps and documentation. Generates docs/CODEMAPS/*, updates READMEs and API docs using Dokka/KDoc."
-model: opus
+model: sonnet
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 

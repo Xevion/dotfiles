@@ -1,7 +1,7 @@
 ---
 name: jvm-refactor-cleaner
 description: "Dead code cleanup and consolidation specialist for Kotlin/Java projects. Use PROACTIVELY for removing unused code, duplicates, and refactoring. Runs analysis tools (Detekt, SpotBugs, dependency analysis) to identify dead code and safely removes it."
-model: opus
+model: sonnet
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 

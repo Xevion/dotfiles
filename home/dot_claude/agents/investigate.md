@@ -1,7 +1,7 @@
 ---
 name: investigate
 description: "Deep codebase reasoning. Use when you need to answer specific questions about how code works, trace execution paths, or prove/disprove hypotheses. Read-only — never modifies files."
-model: opus
+model: sonnet
 tools: Read, Glob, Grep
 ---
 

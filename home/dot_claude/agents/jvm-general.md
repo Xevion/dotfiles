@@ -1,7 +1,7 @@
 ---
 name: jvm-general
 description: "General-purpose Kotlin/Java implementation specialist. Use for writing idiomatic JVM code, applying patterns, and solving implementation challenges. Favors Kotlin-first with clean Java interop."
-model: opus
+model: sonnet
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 

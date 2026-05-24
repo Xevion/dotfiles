@@ -1,7 +1,7 @@
 ---
 name: jvm-build-error-resolver
 description: "Build and compilation error resolution specialist for Kotlin/Java/JVM projects. Use PROACTIVELY when Gradle/Maven builds fail or compiler errors occur. Fixes build/type errors only with minimal diffs, no architectural edits."
-model: opus
+model: sonnet
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 

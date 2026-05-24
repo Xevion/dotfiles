@@ -1,7 +1,7 @@
 ---
 name: rust-doc-updater
 description: "Documentation and codemap specialist for Rust projects. Use PROACTIVELY for updating codemaps and documentation. Generates docs/CODEMAPS/*, updates READMEs and API docs using rustdoc."
-model: opus
+model: sonnet
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 

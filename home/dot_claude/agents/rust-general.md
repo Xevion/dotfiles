@@ -1,7 +1,7 @@
 ---
 name: rust-general
 description: "General-purpose Rust implementation specialist. Use for writing idiomatic Rust, applying patterns, and solving implementation challenges. Favors zero-cost abstractions with safe, expressive code."
-model: opus
+model: sonnet
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 

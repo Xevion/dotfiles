@@ -1,7 +1,7 @@
 ---
 name: rust-tdd-guide
 description: "Test-Driven Development specialist for Rust projects enforcing write-tests-first methodology. Use PROACTIVELY when writing new features, fixing bugs, or refactoring code. Ensures comprehensive test coverage with built-in test framework, proptest, and mockall."
-model: opus
+model: sonnet
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
