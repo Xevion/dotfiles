@@ -149,16 +149,16 @@ const rules: Rule[] = [
     };
   },
 
-  // BLOCK: grep command (use Grep tool)
+  // BLOCK: git stash — hard ban, no exceptions
   ({ ctx }) => {
-    if (ctx.name === "grep" && !ctx.isRightOfPipe)
-      return {
-        verdict: "block",
-        message:
-          "Use the Grep tool instead of the grep command. " +
-          "It handles permissions correctly and doesn't require approval.",
-      };
-    return null;
+    if (ctx.name !== "git") return null;
+    const firstNonFlag = ctx.args.slice(1).find((a) => !a.startsWith("-"));
+    if (firstNonFlag !== "stash") return null;
+    return {
+      verdict: "block",
+      message:
+        "STOP. `git stash` is BANNED in this environment. Do NOT use it. Do NOT try to work around this with `git stash push`, `git stash save`, plumbing equivalents, or any other variation. This is not a transient error, not a permission glitch, not something to retry — it is a HARD RULE the user set deliberately. Do NOT touch the user's git state to work around it: no commits, no branches, no resets, no checkouts, no `git add`, nothing. Leave the working tree exactly as it is and pick a different approach that doesn't involve modifying git state at all. If you genuinely cannot proceed without touching git, STOP and ask the user.",
+    };
   },
 
   // WARN: bare `cat <single-file>` — Read tool is better
@@ -176,14 +176,14 @@ const rules: Rule[] = [
     };
   },
 
-  // WARN: find with name/type filters — Glob is usually nicer
+  // WARN: find with name/type filters — fd/rg are usually nicer
   ({ ctx }) => {
     if (ctx.name !== "find" || ctx.isRightOfPipe) return null;
     if (ctx.args.some((a) => ["-name", "-iname", "-type"].includes(a)))
       return {
         verdict: "warn",
         message:
-          "Consider the Glob tool instead of `find -name/-type` — faster and no approval needed.",
+          "Consider `fd` or `rg --files` instead of `find -name/-type` — faster and respects .gitignore.",
       };
     return null;
   },
@@ -790,7 +790,7 @@ function detectFilterRewrite(
     `{ ${baseStr}; } > ${path} 2>&1; ` +
     `ec=$?; ` +
     `sz=$(stat -c%s ${path}); ` +
-    `echo "[bash-guard] saved: ${path} ($sz bytes, exit $ec). Use the Read tool with offset/limit, or Grep, to inspect — do not re-run with different filter args."; ` +
+    `echo "[bash-guard] saved: ${path} ($sz bytes, exit $ec). Use the Read tool with offset/limit, or rg, to inspect — do not re-run with different filter args."; ` +
     `exit $ec`;
 
   return { base: baseStr, rewritten, path };
@@ -870,7 +870,7 @@ if (rewrite) {
   rewriteContext =
     `[bash-guard] Rewrote pipeline: '${rewrite.base}' was piped into truncating filters. ` +
     `Output redirected to ${rewrite.path}. ` +
-    `Use the Read tool with offset/limit, or Grep, to inspect \u2014 do NOT re-run with different filter args. ` +
+    `Use the Read tool with offset/limit, or rg, to inspect \u2014 do NOT re-run with different filter args. ` +
     `If the same base command runs again, output goes to the same path.`;
   try {
     const baseAst = parseAst(rewrite.base);
