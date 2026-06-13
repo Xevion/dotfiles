@@ -163,6 +163,8 @@ The Bash tool automatically truncates output that exceeds its limits. Do not man
 - Environment prefix: `ENV_VAR=value command`
 - Two commands where the second genuinely depends on the first succeeding
 
+**`ripgrep` is not `grep` — don't port `grep -rn`.** ripgrep searches recursively by default, and `-r` is `--replace`, not "recursive". So `rg -rn "PAT"` parses as `--replace=n` and prints matches with the matched text swapped for `n` (`"UPDATE ALL FROM"` → `"n ALL FROM"`) instead of line numbers. Use `rg -n "PAT"` (or just `rg "PAT"`); only use `-r`/`--replace=TEXT` when you actually want substitution.
+
 ## Testing
 
 ### Test-Driven Development

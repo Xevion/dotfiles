@@ -188,6 +188,27 @@ const rules: Rule[] = [
     return null;
   },
 
+  // WARN: `rg -rn`-style flag bundles — grep muscle memory that silently mangles output.
+  // ripgrep is recursive by default and `-r` is `--replace`, so `-rn` is parsed as
+  // "replace each match with the text 'n'", not "recursive + line numbers".
+  ({ ctx }) => {
+    if (ctx.name !== "rg") return null;
+    for (const a of ctx.args) {
+      if (a === "--") break;
+      if (!/^-r[a-zA-Z]+$/.test(a)) continue;
+      const repl = a.slice(2);
+      return {
+        verdict: "warn",
+        message:
+          `\`rg ${a}\` is grep muscle memory: ripgrep searches recursively by default, and \`-r\` is \`--replace\`. ` +
+          `\`${a}\` makes ripgrep print each match with the matched text replaced by "${repl}" instead of showing line numbers ` +
+          `(e.g. "UPDATE ALL FROM" becomes "${repl} ALL FROM"). ` +
+          "For line numbers use `rg -n` (recursion is automatic); to actually replace, use `rg --replace=TEXT`.",
+      };
+    }
+    return null;
+  },
+
   // WARN: 2>/dev/null suppression (except common feature-detection patterns)
   ({ ctx }) => {
     const bad = ctx.redirects.find(
