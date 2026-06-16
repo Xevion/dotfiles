@@ -38,6 +38,7 @@ tmux = "latest"
 ruby = "latest"
 bitwarden = "latest"
 duckdb = "latest"
+dotnet = "latest"
 
 [settings]
 
