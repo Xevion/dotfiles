@@ -519,6 +519,7 @@ function extractBashPrefix(pattern: string): string | null {
 interface PermissionPrefixes {
   allowed: string[];
   denied: string[];
+  asked: string[];
 }
 
 function loadPrefixes(): PermissionPrefixes {
@@ -540,6 +541,7 @@ function loadPrefixes(): PermissionPrefixes {
 
   const allowedSet = new Set<string>();
   const deniedSet = new Set<string>();
+  const askedSet = new Set<string>();
 
   for (const file of files) {
     let data: any;
@@ -556,9 +558,17 @@ function loadPrefixes(): PermissionPrefixes {
       const prefix = extractBashPrefix(p);
       if (prefix !== null) deniedSet.add(prefix);
     }
+    for (const p of data?.permissions?.ask ?? []) {
+      const prefix = extractBashPrefix(p);
+      if (prefix !== null) askedSet.add(prefix);
+    }
   }
 
-  return { allowed: [...allowedSet], denied: [...deniedSet] };
+  return {
+    allowed: [...allowedSet],
+    denied: [...deniedSet],
+    asked: [...askedSet],
+  };
 }
 
 // Strip trailing redirects from a command string before prefix matching.
@@ -609,6 +619,48 @@ function checkPermission(
     if (matchesPrefixList(c, prefixes.allowed)) return "allowed";
   }
   return "unknown";
+}
+
+// Verbs of `xevion projects content` that only edit the long-form body of a
+// portfolio entry. Their PM-JSON payloads begin with `{"`, which trips Claude
+// Code's built-in brace-quote ("expansion obfuscation") heuristic and forces a
+// manual prompt on every insert/replace even though `Bash(xevion:*)` already
+// allows them. `set` is intentionally excluded — it replaces the entire
+// document and is deliberately gated behind an `ask` rule.
+const XEVION_SAFE_CONTENT_VERBS = new Set([
+  "list",
+  "get",
+  "insert",
+  "replace",
+  "rm",
+  "move",
+]);
+
+// True for a single `xevion projects content <safe-verb>` call the user has
+// neither denied nor gated behind `ask`. Such calls get an explicit hook allow
+// to suppress the brace-quote prompt. We re-check the settings deny/ask lists
+// here so this carve-out can never override an explicit restriction, regardless
+// of how Claude Code orders hook decisions against permission rules.
+function isSafeXevionContent(contexts: CommandCtx[]): boolean {
+  if (contexts.length !== 1) return false;
+  const ctx = contexts[0];
+
+  let i = 0;
+  while (i < ctx.args.length && TRANSPARENT.has(pathBasename(ctx.args[i]))) i++;
+  const argv = ctx.args.slice(i);
+
+  if (pathBasename(argv[0] ?? "") !== "xevion") return false;
+  if (argv[1] !== "projects" || argv[2] !== "content") return false;
+  if (!XEVION_SAFE_CONTENT_VERBS.has(argv[3] ?? "")) return false;
+
+  const prefixes = loadPrefixes();
+  const candidates = commandCandidates(ctx);
+  if (candidates.some((c) => matchesPrefixList(c, prefixes.denied)))
+    return false;
+  if (candidates.some((c) => matchesPrefixList(c, prefixes.asked)))
+    return false;
+
+  return true;
 }
 
 function hasCompoundStructure(cmd: string): boolean {
@@ -941,6 +993,15 @@ function emitFinal(opts: { permissionDecision?: "allow" } = {}): void {
     additionalContext,
     updatedInput,
   });
+}
+
+// Auto-approve safe `xevion projects content` body edits. These are single,
+// non-compound commands, so without this they fall straight through to Claude
+// Code's permission flow and hit the built-in brace-quote prompt on every
+// PM-JSON payload. Runs before the generic compound handling below.
+if (isSafeXevionContent(effectiveContexts)) {
+  emitFinal({ permissionDecision: "allow" });
+  process.exit(0);
 }
 
 if (!hasCompoundStructure(effectiveCommand)) {

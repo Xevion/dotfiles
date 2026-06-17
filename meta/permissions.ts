@@ -164,7 +164,6 @@ tool("git", {
     "commit",
     "rm",
     "mv",
-    "restore",
     "ls-tree",
     "ls-files",
     "blame",
@@ -189,6 +188,7 @@ tool("git", {
     "stash",
     "switch",
     "clone",
+    "restore",
   ],
   deny: [
     "push --force",
@@ -313,6 +313,25 @@ allow(
 // -- DB / query tools --
 allow("psql", "sqlite3");
 
+// -- xevion (xevion.dev content CLI) --
+// Authoring is iterative and runs against production by design (edits are atomic
+// and cheap to revise), so the read + content-mutation surface is allowed wholesale.
+// Only the irreversibly-destructive verbs are gated. Node deletion (`content rm`)
+// is ordinary authoring and stays allowed.
+allow("xevion");
+tool("xevion", {
+  // Reversible-but-clobbering: prompt rather than run blind.
+  ask: [
+    "projects content set", // replaces the entire detail document
+    "targets rm", // removes a configured API target
+    "logout", // revokes the server-side session + clears the token
+  ],
+  // Purely destructive, no undo: never auto-run.
+  deny: [
+    "projects delete", // deletes an entire project
+  ],
+});
+
 // -- Chezmoi --
 tool("chezmoi", {
   allow: [
@@ -395,6 +414,10 @@ deny("wrangler delete", "wrangler secret delete");
 // -- Windows destructive --
 deny("rmdir /s", "rd /s", "Remove-Item -Recurse -Force", "del /s");
 
+// -- ripgrep footgun: `-r`/`--replace` is substitution, not "recursive" --
+// (ported `grep -rn` silently rewrites matches instead of printing line numbers)
+deny("rg -r", "rg --replace");
+
 // =============================================================================
 // OUTPUT FORMATTING
 // =============================================================================
@@ -435,6 +458,8 @@ const claudeExtras = {
     "mcp__context7__query-docs",
     // gh_grep
     "mcp__gh_grep__searchGitHub",
+    // ida (reverse-engineering MCP)
+    "mcp__ida__*",
     // Linear: read-only (must be exact names — wildcards not supported in MCP permissions)
     "mcp__linear__get_attachment",
     "mcp__linear__get_document",
@@ -457,23 +482,23 @@ const claudeExtras = {
     "mcp__linear__list_users",
     "mcp__linear__search_documentation",
     "mcp__linear__extract_images",
-    // Linear: light mutations (batch-friendly)
+    // Linear: light mutations (batch-friendly) — unblocked, run without prompting
     "mcp__linear__save_issue",
     "mcp__linear__create_issue_label",
+    "mcp__linear__save_comment",
+    "mcp__linear__create_attachment",
+    "mcp__linear__create_document",
+    "mcp__linear__update_document",
   ],
   deny: [
     "Task(Explore)",
   ],
   ask: [
-    // Linear: one-off mutations that deserve confirmation
+    // Linear: destructive / heavier mutations that deserve confirmation
     "mcp__linear__save_project",
     "mcp__linear__save_milestone",
-    "mcp__linear__save_comment",
     "mcp__linear__delete_comment",
-    "mcp__linear__create_attachment",
     "mcp__linear__delete_attachment",
-    "mcp__linear__create_document",
-    "mcp__linear__update_document",
   ] as string[],
 };
 
