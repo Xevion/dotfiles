@@ -138,6 +138,16 @@ are restricted to `http://`, `https://`, `mailto:` (see `src/pm.rs`).
 {"type":"text","marks":[{"type":"bold"},{"type":"link","attrs":{"href":"https://example.com"}}],"text":"bold link"}
 ```
 
+The `code` mark takes an optional highlight attr (in `--md`, the `{:lang}` /
+`{:.kind}` suffix; here, the attr directly). `lang` is any Shiki id (unknown →
+plain); `token` ∈ `keyword`, `fn`, `type`, `string`, `number`, `const`, `var`,
+`flag`, `comment` (validated). Set one, not both.
+
+```json
+{"type":"text","marks":[{"type":"code","attrs":{"lang":"rust"}}],"text":"while running { poll_events() }"}
+{"type":"text","marks":[{"type":"code","attrs":{"token":"fn"}}],"text":"useState"}
+```
+
 ## Not a node: `kbd` keycaps
 
 `[[Key]]` in ordinary prose becomes `<kbd>Key</kbd>` via a render post-pass (it

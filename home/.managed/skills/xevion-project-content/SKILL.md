@@ -230,7 +230,30 @@ Shiki; the language label shows in a header bar. Author via `--md`.
 ### Inline code & the standard marks
 `bold`, `italic`, `strike`, inline `code`, `underline`, and `link` (http/https/
 mailto only). Express through `--md` where Markdown allows, or as `marks` in a
-`--node` payload.
+`--node` payload. `code` now coexists with `link` (a linked code span) and
+emphasis.
+
+**Inline-code highlighting.** A `code` span can carry an optional highlight hint,
+written in Shiki's tailing-curly-colon convention in `--md`:
+
+- `` `let x = (a: int) => a * 2{:ts}` `` — `{:lang}` highlights the span as that
+  grammar, an *inline code block*. Use a real, balanced expression; a bare
+  fragment tokenizes poorly. `lang` is any Shiki id the code-block picker offers;
+  an unknown id degrades to plain text.
+- `` `Arc{:.type}` `` — `{:.kind}` paints one author-declared token color, for a
+  bare identifier a grammar can't disambiguate. `kind` ∈ `keyword` · `fn` ·
+  `type` · `string` · `number` · `const` · `var` · `flag` · `comment` (validated
+  — an unknown kind is rejected on the write path).
+
+The two are mutually exclusive: a span is grammar-highlighted *or* token-painted.
+A trailing `{:…}` that isn't a well-formed hint stays literal; to keep a literal
+`{:…}`, author the span via `--node` with no `lang`/`token`. In a `--node` payload
+the hint is an attr on the `code` mark:
+
+```json
+{"type":"text","marks":[{"type":"code","attrs":{"lang":"rust"}}],"text":"while running { poll_events() }"}
+{"type":"text","marks":[{"type":"code","attrs":{"token":"fn"}}],"text":"useState"}
+```
 
 ### `figure` — image/video block
 Atom node. Attrs: `src` (required, real URL), `alt`, `caption`, `kind`
