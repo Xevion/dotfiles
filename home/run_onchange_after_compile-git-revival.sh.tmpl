@@ -1,0 +1,29 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# Compiles the `git revival` CLI (private source at ~/projects/timeline-revival)
+# into ~/.local/bin/git-revival. The hash below is the source digest at render
+# time, so this re-runs whenever the CLI changes; when the private repo is not
+# cloned on this machine the digest is the empty-input hash (stable) and the
+# body skips the build instead of failing apply.
+# hash: {{ output "sh" "-c" (print "cat " .chezmoi.homeDir "/projects/timeline-revival/cli/src/*.ts " .chezmoi.homeDir "/projects/timeline-revival/cli/package.json 2>/dev/null | sha256sum || true") }}
+set -euo pipefail
+
+SRC="{{ .chezmoi.homeDir }}/projects/timeline-revival/cli/src/index.ts"
+OUT="{{ .chezmoi.homeDir }}/.local/bin/git-revival"
+
+if ! command -v bun &>/dev/null; then
+  echo "[build-git-revival] bun not found, skipping"
+  exit 0
+fi
+
+if [[ ! -f "$SRC" ]]; then
+  echo "[build-git-revival] source not found at $SRC"
+  echo "[build-git-revival] clone Xevion/timeline-revival to ~/projects to enable; skipping"
+  exit 0
+fi
+
+echo "[build-git-revival] Compiling git revival → $OUT"
+bun build --compile "$SRC" --outfile "$OUT"
+chmod +x "$OUT"
+echo "[build-git-revival] Done"
+{{ end -}}
