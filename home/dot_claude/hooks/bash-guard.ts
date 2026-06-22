@@ -1,16 +1,21 @@
-// PreToolUse hook: discipline checks + compound command auto-approval.
+// PreToolUse hook: discipline checks + truncation rewrite + auto-approval.
 //
 // Phase 1 (Discipline): Parses Bash via shfmt AST, checks each command
 // against rules. Rules can WARN (surface guidance, command runs) or
 // BLOCK (exit 2, command refused).
 //
+// Phase 1.5 (Truncation rewrite): When a command's output is piped into
+// head/tail, rewrite that pipeline so the FULL output streams to a file
+// (via tee) while only a bounded preview shows inline. Claude can no longer
+// hide output behind a small `-n`; the complete output is always on disk.
+//
 // Phase 2 (Approval): Checks compound commands against Claude Code
 // permission settings. Auto-approves when all sub-commands match the
 // allow list, denies when any match the deny list.
 //
-// Single shfmt parse shared between both phases.
+// Single shfmt parse shared between all phases.
 
-import { readFileSync, appendFileSync, mkdirSync, readdirSync, statSync } from "fs";
+import { readFileSync, mkdirSync, renameSync } from "fs";
 import { dirname } from "path";
 import { createHash } from "crypto";
 
@@ -37,63 +42,22 @@ const OP_OR = 14;
 
 // shfmt redirect op codes
 const REDIR_OUT = 63; // >
-const REDIR_DUP_OUT = 68; // >&
 
-// Session state for truncation-bump detection
-const STATE_DIR = "/tmp/bash-guard";
-const BUMP_WINDOW_MS = 5 * 60 * 1000;
+// Truncation rewrite: when a command's output is piped into head/tail, the
+// pipeline is rewritten to stream the FULL output to a file (via tee) while
+// showing a bounded live preview. Claude's requested N is ignored — we always
+// capture everything so output can never be hidden behind a small `-n`.
+const BUFFER_DIR = "/tmp/claude-bash";
 
-// Filter-pipeline rewrite: redirect expensive commands' output to a file
-// when they're piped into truncating filters, so Claude reads the file
-// instead of re-running with different filter args.
-const REWRITE_DIR = "/tmp/claude-bash";
+// Inline preview sizes. Show the first N lines live as they stream; when the
+// output exceeds that, also surface the last few lines plus the total line
+// count and a pointer to the saved file.
+const PREVIEW_HEAD = 50;
+const PREVIEW_TAIL = 5;
 
-// Commands whose output is expensive to regenerate. Only these get rewritten.
-const EXPENSIVE_COMMANDS = new Set([
-  "cargo",
-  "rustc",
-  "npm",
-  "pnpm",
-  "yarn",
-  "bun",
-  "just",
-  "make",
-  "gradle",
-  "mvn",
-  "go",
-  "pytest",
-  "python",
-  "python3",
-  "uv",
-  "node",
-  "tsc",
-  "eslint",
-  "biome",
-  "ruff",
-  "rspec",
-  "jest",
-  "vitest",
-  "playwright",
-  "deno",
-  "tox",
-  "ctest",
-  "cmake",
-  "ninja",
-]);
-
-// Pipeline filters whose presence indicates Claude is truncating output.
-const FILTER_COMMANDS = new Set([
-  "head",
-  "tail",
-  "rg",
-  "grep",
-  "sed",
-  "awk",
-  "cut",
-  "wc",
-  "sort",
-  "uniq",
-]);
+// The compiled hook binary, which doubles as the `--preview` stdin filter the
+// truncation rewrite pipes into. Matches the path wired in settings.json.
+const SELF_BIN = `${process.env.HOME ?? "~"}/.claude/hooks/bash-guard`;
 
 interface CommandCtx {
   name: string;
@@ -119,7 +83,6 @@ interface Issue {
 interface RuleCtx {
   ctx: CommandCtx;
   command: string;
-  sessionId: string;
 }
 
 type Rule = (rctx: RuleCtx) => Issue | null;
@@ -225,111 +188,10 @@ const rules: Rule[] = [
   },
 ];
 
-function parseTruncationN(args: string[]): number | null {
-  for (let i = 1; i < args.length; i++) {
-    const a = args[i];
-    if (a === "-n" && args[i + 1]?.startsWith("+")) return null;
-    if (a.startsWith("-n+") || a.startsWith("+")) return null;
-    if (a === "-n" && i + 1 < args.length) {
-      const n = parseInt(args[i + 1], 10);
-      return isNaN(n) ? null : n;
-    }
-    if (a.startsWith("-n") && a.length > 2) {
-      const n = parseInt(a.slice(2), 10);
-      return isNaN(n) ? null : n;
-    }
-    if (/^-\d+$/.test(a)) return parseInt(a.slice(1), 10);
-  }
-  return null;
-}
-
-// Session-aware truncation-bump detection.
-// Fires only when the same base command is re-run with an INCREASED N
-// within the bump window. Same-N re-runs (check→fix→check loop) pass silently.
-function checkTruncationBump(
-  command: string,
-  contexts: CommandCtx[],
-  sessionId: string,
-): Issue | null {
-  // Find the rightmost head/tail context that is right-of-pipe
-  let truncCtx: CommandCtx | null = null;
-  for (const ctx of contexts) {
-    if (!ctx.isRightOfPipe) continue;
-    if (ctx.name !== "head" && ctx.name !== "tail") continue;
-    truncCtx = ctx;
-  }
-  if (!truncCtx) return null;
-  const n = parseTruncationN(truncCtx.args);
-  if (n === null) return null;
-
-  // Base = everything left of the final `|`
-  const lastPipe = command.lastIndexOf("|");
-  if (lastPipe < 0) return null;
-  const base = command.substring(0, lastPipe).trim();
-  if (!base) return null;
-
-  const prior = readSessionHistory(sessionId);
-  const now = Date.now();
-  const recent = prior.filter(
-    (e) => e.base === base && now - e.t < BUMP_WINDOW_MS,
-  );
-
-  recordCommand(sessionId, { t: now, base, n, cmd: truncCtx.name });
-
-  const prevMax = recent.reduce((m, e) => Math.max(m, e.n), 0);
-  if (recent.length > 0 && n > prevMax) {
-    return {
-      verdict: "warn",
-      message:
-        `Re-running the same command with a larger '| ${truncCtx.name} -${n}' ` +
-        `(previous: -${prevMax}). If you need more output, use the Bash tool's ` +
-        `natural output, or save to a file and use Read with offset/limit.`,
-    };
-  }
-  return null;
-}
-
-interface HistoryEntry {
-  t: number;
-  base: string;
-  n: number;
-  cmd: string;
-}
-
-function sessionStatePath(sessionId: string): string {
-  return `${STATE_DIR}/${sessionId}.jsonl`;
-}
-
-function readSessionHistory(sessionId: string): HistoryEntry[] {
-  try {
-    const raw = readFileSync(sessionStatePath(sessionId), "utf-8");
-    return raw
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => {
-        try {
-          return JSON.parse(l) as HistoryEntry;
-        } catch {
-          return null;
-        }
-      })
-      .filter((e): e is HistoryEntry => e !== null);
-  } catch {
-    return [];
-  }
-}
-
-function recordCommand(sessionId: string, entry: HistoryEntry): void {
-  try {
-    mkdirSync(STATE_DIR, { recursive: true });
-    appendFileSync(sessionStatePath(sessionId), JSON.stringify(entry) + "\n");
-  } catch {
-    // Best-effort; state loss just means a missed bump detection
-  }
-}
-
 interface AstNode {
   Type?: string;
+  Pos?: { Offset?: number };
+  End?: { Offset?: number };
   Stmts?: AstNode[];
   Cmd?: AstNode;
   Redirs?: AstNode[];
@@ -692,181 +554,184 @@ function expandShellC(contexts: CommandCtx[]): CommandCtx[] {
   return expanded;
 }
 
-// Find the first top-level `|` in the command string, respecting quotes,
-// escapes, and nesting in (), {}, []. Returns -1 if none found.
-// Skips `||` (logical-or).
-function findFirstTopLevelPipe(s: string): number {
-  let parenDepth = 0;
-  let braceDepth = 0;
-  let bracketDepth = 0;
-  let inSingle = false;
-  let inDouble = false;
-  let inBacktick = false;
-  let escape = false;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (escape) {
-      escape = false;
+// True when a pipeline's final segment is a `head`/`tail` that truncates piped
+// stdin. Returns the command name, or null when it should be left alone:
+// following mode (`-f`), or reading an explicit file argument (not stdin).
+function truncKind(cmd: AstNode): "head" | "tail" | null {
+  const args = extractArgs(cmd);
+  const name = effectiveName(args);
+  if (name !== "head" && name !== "tail") return null;
+
+  let expectValue = false;
+  for (let i = 1; i < args.length; i++) {
+    const a = args[i];
+    if (expectValue) {
+      expectValue = false;
       continue;
     }
-    if (c === "\\" && !inSingle) {
-      escape = true;
+    if (a === "-f" || a === "--follow" || a.startsWith("--follow")) return null;
+    if (a === "-n" || a === "-c" || a === "--lines" || a === "--bytes") {
+      expectValue = true;
       continue;
     }
-    if (inSingle) {
-      if (c === "'") inSingle = false;
-      continue;
-    }
-    if (inDouble) {
-      if (c === '"') inDouble = false;
-      continue;
-    }
-    if (inBacktick) {
-      if (c === "`") inBacktick = false;
-      continue;
-    }
-    if (c === "'") {
-      inSingle = true;
-      continue;
-    }
-    if (c === '"') {
-      inDouble = true;
-      continue;
-    }
-    if (c === "`") {
-      inBacktick = true;
-      continue;
-    }
-    if (c === "(") {
-      parenDepth++;
-      continue;
-    }
-    if (c === ")") {
-      if (parenDepth > 0) parenDepth--;
-      continue;
-    }
-    if (c === "{") {
-      braceDepth++;
-      continue;
-    }
-    if (c === "}") {
-      if (braceDepth > 0) braceDepth--;
-      continue;
-    }
-    if (c === "[") {
-      bracketDepth++;
-      continue;
-    }
-    if (c === "]") {
-      if (bracketDepth > 0) bracketDepth--;
-      continue;
-    }
-    if (
-      c === "|" &&
-      parenDepth === 0 &&
-      braceDepth === 0 &&
-      bracketDepth === 0
-    ) {
-      if (s[i + 1] === "|") {
-        i++;
-        continue;
+    if (a.startsWith("-")) continue; // `-5`, `-n50`, `--lines=5`, `--`
+    return null; // a bare argument is a file operand → reads from disk, not stdin
+  }
+  return name;
+}
+
+interface RewriteTarget {
+  start: number; // byte offset of the head/tail segment to replace
+  end: number;
+}
+
+// Find every pipeline whose final segment truncates with head/tail, anywhere it
+// sits in command position — a bare statement, or an operand of `;`/`&&`/`||`,
+// or inside a compound body. Pipelines feeding a downstream consumer
+// (`cmd | head | grep`) are skipped: rewriting them would corrupt that stdin.
+function collectRewriteTargets(ast: AstNode): RewriteTarget[] {
+  const targets: RewriteTarget[] = [];
+
+  function visitStmt(stmt: AstNode | undefined): void {
+    if (!stmt) return;
+    visitCmd(stmt.Cmd ?? stmt, stmt);
+  }
+
+  function visitCmd(cmd: AstNode | undefined, stmt: AstNode): void {
+    if (!cmd) return;
+
+    if (cmd.Type === "BinaryCmd") {
+      if (cmd.Op === OP_PIPE) {
+        // Final segment of `X | Y` is Y (pipes are left-associative, so the
+        // outermost pipe node's Y is the last command in the chain).
+        const yCmd = cmd.Y?.Cmd ?? cmd.Y;
+        const kind =
+          yCmd?.Type === "CallExpr" ? truncKind(yCmd) : null;
+        // Replace ONLY the final `head/tail` segment [Y.Pos, Y.End); LEFT and
+        // the `|` are left verbatim.
+        const ys = cmd.Y?.Pos?.Offset;
+        const ye = cmd.Y?.End?.Offset;
+        if (kind && ys !== undefined && ye !== undefined) {
+          targets.push({ start: ys, end: ye });
+        }
+        // Do not descend into X (it is the captured base) or Y (terminal).
+        return;
       }
-      return i;
+      // Logical `&&` / `||`: both operands run in command position.
+      visitStmt(cmd.X);
+      visitStmt(cmd.Y);
+      return;
     }
+
+    // Compound bodies (subshells, blocks, if/for/while, case) hold statement
+    // lists whose members are themselves in command position.
+    for (const list of [cmd.Stmts, cmd.Cond, cmd.Then, cmd.Do]) {
+      if (list) for (const s of list) visitStmt(s);
+    }
+    if (cmd.Else?.Stmts) for (const s of cmd.Else.Stmts) visitStmt(s);
+    else if (cmd.Else) visitStmt(cmd.Else);
+    if (cmd.Items)
+      for (const it of cmd.Items)
+        if (it.Stmts) for (const s of it.Stmts) visitStmt(s);
+    if (cmd.Cmd) visitCmd(cmd.Cmd, stmt);
   }
-  return -1;
+
+  for (const stmt of ast.Stmts ?? []) visitStmt(stmt);
+  return targets;
 }
 
-interface RewriteDecision {
-  base: string;
-  rewritten: string;
-  path: string;
+interface RewriteResult {
+  command: string;
+  count: number;
 }
 
-// Detect: top-level pipeline where leftmost is an expensive command and
-// at least one downstream segment is a truncating filter. If matched,
-// produce a rewrite that runs the base command with output redirected to
-// a hash-keyed file under REWRITE_DIR.
-function detectFilterRewrite(
+// Swap every head/tail segment for the bare `--preview` filter — the whole
+// point is that the rewritten command reads as `LEFT | …bash-guard --preview`.
+// Replacements run right-to-left so earlier byte offsets stay valid. The filter
+// picks (and creates) its own output path, so nothing else is injected.
+function applyRewrites(
   command: string,
-  ast: AstNode,
-): RewriteDecision | null {
-  const stmts = ast.Stmts ?? [];
-  if (stmts.length !== 1) return null;
-  const stmt = stmts[0];
-
-  // Reject if the top-level statement carries its own redirects — the user
-  // is already routing output, don't second-guess.
-  if ((stmt.Redirs ?? []).length > 0) return null;
-
-  const cmd = stmt.Cmd ?? stmt;
-  if (cmd.Type !== "BinaryCmd" || cmd.Op !== OP_PIPE) return null;
-
-  // Walk left-to-right collecting CallExpr leaves of the pipeline.
-  const segments: { name: string; node: AstNode; redirs: AstNode[] }[] = [];
-  function collect(node: AstNode | undefined): boolean {
-    if (!node) return false;
-    const innerStmt = node;
-    const inner = innerStmt.Cmd ?? innerStmt;
-    if (inner.Type === "BinaryCmd" && inner.Op === OP_PIPE) {
-      return collect(inner.X) && collect(inner.Y);
-    }
-    if (inner.Type === "CallExpr") {
-      const args = extractArgs(inner);
-      if (args.length === 0) return false;
-      segments.push({
-        name: effectiveName(args),
-        node: inner,
-        redirs: innerStmt.Redirs ?? [],
-      });
-      return true;
-    }
-    return false;
+  targets: RewriteTarget[],
+): RewriteResult {
+  const ordered = [...targets].sort((a, b) => b.start - a.start);
+  let out = command;
+  for (const t of ordered) {
+    out = out.slice(0, t.start) + `${SELF_BIN} --preview` + out.slice(t.end);
   }
-  if (!collect(cmd)) return null;
-  if (segments.length < 2) return null;
+  return { command: out, count: targets.length };
+}
 
-  const base = segments[0];
-  if (!EXPENSIVE_COMMANDS.has(base.name)) return null;
+// `--preview [logPath]` mode: the stdin filter the truncation rewrite pipes
+// into. Streams the first PREVIEW_HEAD lines live, tees the complete stream to a
+// file, keeps a ring buffer of the last PREVIEW_TAIL, then prints a footer
+// (total lines, saved path, last lines). Exits 0, mirroring how a real
+// head/tail terminates the pipeline.
+//
+// logPath is optional: when omitted (the production rewrite passes no path), the
+// stream is content-hashed and saved as `<hash>.log` so identical output reuses
+// one file instead of piling up. An explicit path (for testing) is used as-is.
+async function previewMode(logPath?: string): Promise<never> {
+  const writePath = logPath ?? `${BUFFER_DIR}/.pending-${process.pid}.log`;
+  try {
+    mkdirSync(dirname(writePath), { recursive: true });
+  } catch {
+    // Best-effort; the writer below surfaces any real failure.
+  }
+  const sink = Bun.file(writePath).writer();
+  const hash = logPath ? null : createHash("sha256");
+  const decoder = new TextDecoder();
 
-  // If the base segment redirects stdout to a file, the wrap would
-  // double-redirect and lose output. Bail.
-  for (const r of base.redirs) {
-    if (r.Op === REDIR_OUT) {
-      const target = wordValue(r.Word);
-      // Allow stderr-only: `2> file` (fd === "2"). Reject any 1> or default-fd `>`.
-      const fd = r.N?.Value ?? "1";
-      if (fd === "1") return null;
+  let total = 0;
+  let headPrinted = 0;
+  const ring: string[] = new Array(PREVIEW_TAIL);
+  let pending = "";
+
+  const onLine = (line: string) => {
+    total++;
+    if (headPrinted < PREVIEW_HEAD) {
+      process.stdout.write(line + "\n");
+      headPrinted++;
+    }
+    ring[(total - 1) % PREVIEW_TAIL] = line;
+  };
+
+  for await (const chunk of Bun.stdin.stream()) {
+    sink.write(chunk); // exact tee of the raw bytes
+    hash?.update(chunk);
+    pending += decoder.decode(chunk, { stream: true });
+    let nl: number;
+    while ((nl = pending.indexOf("\n")) >= 0) {
+      onLine(pending.slice(0, nl));
+      pending = pending.slice(nl + 1);
     }
   }
+  pending += decoder.decode();
+  if (pending.length > 0) onLine(pending); // trailing line without a newline
+  await sink.end();
 
-  // At least one downstream segment must be a truncating filter.
-  const hasFilter = segments
-    .slice(1)
-    .some((s) => FILTER_COMMANDS.has(s.name));
-  if (!hasFilter) return null;
-
-  // Slice base from the original command at the first top-level pipe.
-  const pipeIdx = findFirstTopLevelPipe(command);
-  if (pipeIdx < 0) return null;
-  const baseStr = command.substring(0, pipeIdx).trim();
-  if (!baseStr) return null;
-
-  const hash = createHash("sha256").update(baseStr).digest("hex").slice(0, 12);
-  const path = `${REWRITE_DIR}/${hash}.log`;
-
-  // Rewritten command — uses only allowed primitives (mkdir, stat, echo, exit).
-  // Brace group ensures `> path 2>&1` applies to the whole base regardless
-  // of any inner `2>&1` it carried.
-  const rewritten =
-    `mkdir -p ${REWRITE_DIR}; ` +
-    `{ ${baseStr}; } > ${path} 2>&1; ` +
-    `ec=$?; ` +
-    `sz=$(stat -c%s ${path}); ` +
-    `echo "[bash-guard] saved: ${path} ($sz bytes, exit $ec). Use the Read tool with offset/limit, or rg, to inspect — do not re-run with different filter args."; ` +
-    `exit $ec`;
-
-  return { base: baseStr, rewritten, path };
+  let finalPath = writePath;
+  if (hash) {
+    finalPath = `${BUFFER_DIR}/${hash.digest("hex").slice(0, 12)}.log`;
+    try {
+      renameSync(writePath, finalPath);
+    } catch {
+      finalPath = writePath;
+    }
+  }
+  if (total > PREVIEW_HEAD) {
+    process.stdout.write(
+      `[bash-guard] ${total} total lines; showed first ${PREVIEW_HEAD}. ` +
+        `full output: ${finalPath}. last ${PREVIEW_TAIL} lines:\n`,
+    );
+    for (let i = total - PREVIEW_TAIL; i < total; i++) {
+      process.stdout.write((ring[i % PREVIEW_TAIL] ?? "") + "\n");
+    }
+  } else {
+    process.stdout.write(
+      `[bash-guard] ${total} line(s); full output: ${finalPath}\n`,
+    );
+  }
+  process.exit(0);
 }
 
 interface HookInput {
@@ -875,13 +740,17 @@ interface HookInput {
   session_id?: string;
 }
 
+// Filter mode: `bash-guard --preview [logPath]` reads piped output rather than
+// a hook payload. Dispatch before touching stdin as JSON.
+if (process.argv[2] === "--preview") {
+  await previewMode(process.argv[3]);
+}
+
 const input: HookInput = await Bun.stdin.json();
 if (input.tool_name !== "Bash") process.exit(0);
 
 const command = input.tool_input?.command;
 if (!command) process.exit(0);
-
-const sessionId = input.session_id ?? "unknown";
 
 let ast: AstNode;
 try {
@@ -908,11 +777,9 @@ function pushIssue(i: Issue | null) {
 
 for (const ctx of contexts) {
   for (const rule of rules) {
-    pushIssue(rule({ ctx, command, sessionId }));
+    pushIssue(rule({ ctx, command }));
   }
 }
-
-pushIssue(checkTruncationBump(command, contexts, sessionId));
 
 const blocks = issues.filter((i) => i.verdict === "block");
 const warns = issues.filter((i) => i.verdict === "warn");
@@ -926,39 +793,28 @@ if (blocks.length > 0) {
   process.exit(2);
 }
 
-// Phase 1.5: Filter-pipeline rewrite. If matched, substitute the command
-// in-memory. Approval (Phase 2) checks the BASE command's contexts \u2014 the
-// wrapper primitives (mkdir, brace group, assignments, stat, echo, exit)
-// are injected by us and trusted by construction; they don't need to be
-// in the user's allow list.
-const rewrite = detectFilterRewrite(command, ast);
+// Phase 1.5: Truncation rewrite. When the command pipes into head/tail, swap
+// that final segment for our `--preview` filter, which streams the full output
+// to a file. Approval (Phase 2) runs against the ORIGINAL command's
+// sub-commands, so when the original was approvable the rewrite is auto-approved
+// too; the user is never re-prompted just because output is being preserved.
+const targets = collectRewriteTargets(ast);
 let effectiveCommand = command;
-let effectiveContexts = contexts;
 let rewriteContext: string | undefined;
 let updatedInput: { command: string } | undefined;
 
-if (rewrite) {
-  effectiveCommand = rewrite.rewritten;
-  updatedInput = { command: rewrite.rewritten };
+if (targets.length > 0) {
+  const rewrite = applyRewrites(command, targets);
+  effectiveCommand = rewrite.command;
+  updatedInput = { command: rewrite.command };
+  const plural = rewrite.count === 1 ? "pipeline" : "pipelines";
   rewriteContext =
-    `[bash-guard] Rewrote pipeline: '${rewrite.base}' was piped into truncating filters. ` +
-    `Output redirected to ${rewrite.path}. ` +
-    `Use the Read tool with offset/limit, or rg, to inspect \u2014 do NOT re-run with different filter args. ` +
-    `If the same base command runs again, output goes to the same path.`;
-  try {
-    const baseAst = parseAst(rewrite.base);
-    effectiveContexts = [];
-    for (const stmt of baseAst.Stmts ?? []) {
-      for (const ctx of walkStmt(stmt)) effectiveContexts.push(ctx);
-    }
-  } catch {
-    // If the base somehow fails to parse, drop the rewrite and fall
-    // through with the original command.
-    effectiveCommand = command;
-    effectiveContexts = contexts;
-    updatedInput = undefined;
-    rewriteContext = undefined;
-  }
+    `[bash-guard] Swapped head/tail for the preview filter in ${rewrite.count} ` +
+    `${plural}: the full output now streams to a file while only the first ` +
+    `${PREVIEW_HEAD} lines (plus a footer with the total line count and last ` +
+    `${PREVIEW_TAIL} lines) show inline. The exact saved-file path is printed in ` +
+    `the [bash-guard] footer \u2014 read it with the Read tool (offset/limit) or rg; ` +
+    `do NOT re-run with a different -n/-N to see more.`;
 }
 
 // Phase 2: Approval
@@ -999,7 +855,7 @@ function emitFinal(opts: { permissionDecision?: "allow" } = {}): void {
 // non-compound commands, so without this they fall straight through to Claude
 // Code's permission flow and hit the built-in brace-quote prompt on every
 // PM-JSON payload. Runs before the generic compound handling below.
-if (isSafeXevionContent(effectiveContexts)) {
+if (isSafeXevionContent(contexts)) {
   emitFinal({ permissionDecision: "allow" });
   process.exit(0);
 }
@@ -1015,7 +871,7 @@ if (prefixes.allowed.length === 0) {
   process.exit(0);
 }
 
-const allContexts = expandShellC(effectiveContexts);
+const allContexts = expandShellC(contexts);
 if (allContexts.length === 0) {
   emitFinal();
   process.exit(0);

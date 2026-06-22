@@ -453,6 +453,12 @@ const claudeExtras = {
     "WebSearch",
     "WebFetch",
     "Skill(superpowers:*)",
+    // /tmp is scratch space — the bash-guard truncation rewrite saves full
+    // command output under /tmp/claude-bash, and /tmp is generally throwaway.
+    // Allow the file tools to operate there without prompting.
+    "Read(/tmp/**)",
+    "Write(/tmp/**)",
+    "Edit(/tmp/**)",
     // MCP servers — context7 (wildcards work for context7 tool names)
     "mcp__context7__resolve-library-id",
     "mcp__context7__query-docs",
