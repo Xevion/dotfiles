@@ -243,6 +243,14 @@ function effectiveName(args: string[]): string {
   return args.length > 0 ? pathBasename(args[args.length - 1]) : "";
 }
 
+// argv with leading transparent prefixes (env, time, xargs, …) removed, so the
+// genuine command sits at index 0. Empty when every token is transparent.
+function effectiveArgv(args: string[]): string[] {
+  let i = 0;
+  while (i < args.length && TRANSPARENT.has(pathBasename(args[i]))) i++;
+  return args.slice(i);
+}
+
 function extractRedirects(stmt: AstNode): Redirect[] {
   return (stmt.Redirs ?? []).map((r) => ({
     fd: r.N?.Value ?? "1",
@@ -349,7 +357,17 @@ function parseAst(command: string): AstNode {
   return JSON.parse(proc.stdout.toString());
 }
 
+let gitRootCache: string | null | undefined;
+
+// Memoized: a single hook invocation resolves the git root at most once, even
+// though several callers (loadPrefixes via multiple phases) ask for it.
 function findGitRoot(): string | null {
+  if (gitRootCache !== undefined) return gitRootCache;
+  gitRootCache = computeGitRoot();
+  return gitRootCache;
+}
+
+function computeGitRoot(): string | null {
   const toplevel = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], {
     stderr: "pipe",
   });
@@ -384,7 +402,17 @@ interface PermissionPrefixes {
   asked: string[];
 }
 
+let prefixCache: PermissionPrefixes | undefined;
+
+// Memoized: settings files don't change mid-invocation, so the allow/deny/ask
+// lists are read once and shared across the xevion carve-out and Phase 2.
 function loadPrefixes(): PermissionPrefixes {
+  if (prefixCache) return prefixCache;
+  prefixCache = computePrefixes();
+  return prefixCache;
+}
+
+function computePrefixes(): PermissionPrefixes {
   const home = process.env.HOME ?? "";
   const gitRoot = findGitRoot();
 
@@ -436,10 +464,10 @@ function loadPrefixes(): PermissionPrefixes {
 // Strip trailing redirects from a command string before prefix matching.
 // `bq query foo 2>&1` should still match `Bash(bq query:*)`.
 function stripTrailingRedirects(cmd: string): string {
-  return cmd
-    .replace(/\s+(?:\d*>>?&?\d*|\d*<)\s*\S+\s*$/g, "")
-    .replace(/\s+(?:\d*>>?&?\d*|\d*<)\s*\S+\s*$/g, "")
-    .trim();
+  const redir = /\s+(?:\d*>>?&?\d*|\d*<)\s*\S+\s*$/;
+  let out = cmd;
+  while (redir.test(out)) out = out.replace(redir, "");
+  return out.trim();
 }
 
 function matchesPrefix(cmd: string, prefix: string): boolean {
@@ -458,11 +486,9 @@ function commandCandidates(ctx: CommandCtx): string[] {
   const full = ctx.args.join(" ");
   const candidates = [full, stripTrailingRedirects(full)];
 
-  let i = 0;
-  while (i < ctx.args.length && TRANSPARENT.has(pathBasename(ctx.args[i])))
-    i++;
-  if (i > 0 && i < ctx.args.length) {
-    const stripped = ctx.args.slice(i).join(" ");
+  const argv = effectiveArgv(ctx.args);
+  if (argv.length > 0 && argv.length < ctx.args.length) {
+    const stripped = argv.join(" ");
     candidates.push(stripped, stripTrailingRedirects(stripped));
   }
 
@@ -481,6 +507,16 @@ function checkPermission(
     if (matchesPrefixList(c, prefixes.allowed)) return "allowed";
   }
   return "unknown";
+}
+
+// The truncation rewrite pipes into our own compiled binary (`… --preview`).
+// It is trusted by construction, so it must never gate approval of a rewritten
+// command — only the user's genuine sub-commands should.
+function isSelfFilter(ctx: CommandCtx): boolean {
+  return (
+    pathBasename(ctx.args[0] ?? "") === "bash-guard" &&
+    ctx.args.includes("--preview")
+  );
 }
 
 // Verbs of `xevion projects content` that only edit the long-form body of a
@@ -507,9 +543,7 @@ function isSafeXevionContent(contexts: CommandCtx[]): boolean {
   if (contexts.length !== 1) return false;
   const ctx = contexts[0];
 
-  let i = 0;
-  while (i < ctx.args.length && TRANSPARENT.has(pathBasename(ctx.args[i]))) i++;
-  const argv = ctx.args.slice(i);
+  const argv = effectiveArgv(ctx.args);
 
   if (pathBasename(argv[0] ?? "") !== "xevion") return false;
   if (argv[1] !== "projects" || argv[2] !== "content") return false;
@@ -795,9 +829,10 @@ if (blocks.length > 0) {
 
 // Phase 1.5: Truncation rewrite. When the command pipes into head/tail, swap
 // that final segment for our `--preview` filter, which streams the full output
-// to a file. Approval (Phase 2) runs against the ORIGINAL command's
-// sub-commands, so when the original was approvable the rewrite is auto-approved
-// too; the user is never re-prompted just because output is being preserved.
+// to a file. Approval (Phase 2) runs against the EFFECTIVE command that will
+// actually execute, with the injected filter trusted — so a rewrite never adds
+// or removes approval surface: the stripped head/tail no longer gates, and the
+// filter doesn't either. Only the user's genuine sub-commands decide approval.
 const targets = collectRewriteTargets(ast);
 let effectiveCommand = command;
 let rewriteContext: string | undefined;
@@ -871,13 +906,33 @@ if (prefixes.allowed.length === 0) {
   process.exit(0);
 }
 
-const allContexts = expandShellC(contexts);
+// Evaluate the command that will ACTUALLY run. When a truncation rewrite fired,
+// re-walk the effective command so the stripped head/tail is gone and the
+// trusted filter takes its place; otherwise the original parse already matches.
+const approvalContexts =
+  effectiveCommand === command
+    ? contexts
+    : (() => {
+        try {
+          const eAst = parseAst(effectiveCommand);
+          const out: CommandCtx[] = [];
+          for (const stmt of eAst.Stmts ?? [])
+            for (const c of walkStmt(stmt)) out.push(c);
+          return out;
+        } catch {
+          return contexts;
+        }
+      })();
+
+const allContexts = expandShellC(approvalContexts);
 if (allContexts.length === 0) {
   emitFinal();
   process.exit(0);
 }
 
-const statuses = allContexts.map((ctx) => checkPermission(ctx, prefixes));
+const statuses = allContexts.map((ctx) =>
+  isSelfFilter(ctx) ? "allowed" : checkPermission(ctx, prefixes),
+);
 
 if (statuses.every((s) => s === "allowed")) {
   emitFinal({ permissionDecision: "allow" });
