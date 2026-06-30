@@ -9,16 +9,24 @@ customized; the action (clipboard / default-open / launch) defers to kitty.
 
 Wired up from kitty.conf via ``--customize-processing hints-trim.py``. Honors
 ``--type url`` (require a URL scheme) vs anything else (require a path signal).
+
+For open-style actions (any ``--program`` that isn't pure copy/paste) a path
+candidate is dropped only when it is *provably* absent on disk: an absolute or
+``~``/``$VAR`` path that doesn't exist. Relative paths can't be resolved here (no
+window cwd), so they are kept; copy actions are never filtered.
 """
+import os
 import re
 
 _TOKEN = re.compile(r'\S+')
 _URL_SCHEME = re.compile(r'(?:https?|ftp|ftps|file|ssh|git)://', re.IGNORECASE)
 _PATH_SIGNAL = re.compile(r'/|\w\.\w')          # a slash, or a dotted filename
+_LINENUM = re.compile(r':\d+(?::\d+)?$')        # trailing :line or :line:col
 _CLOSERS = {')': '(', ']': '[', '}': '{', '>': '<'}
 _OPENERS = '([{<'
 _QUOTES = "'\"`"
 _SENTENCE = '.,;:!?'
+_COPY_LIKE = {'@', '*', '-'}                    # --program values that copy/paste text
 
 
 def _strip(s):
@@ -42,8 +50,28 @@ def _strip(s):
     return left, s
 
 
+def _opens_files(args):
+    """True for open/launch actions (not pure copy/paste), where filtering to
+    paths that exist on disk is useful."""
+    progs = getattr(args, 'program', None) or ['default']
+    return any(p not in _COPY_LIKE and not p.startswith('@') for p in progs)
+
+
+def _provably_absent(core):
+    """True only when we can resolve the path to an absolute location and it is
+    confirmed missing. Relative/unresolvable paths return False (kept)."""
+    p = os.path.expanduser(os.path.expandvars(_LINENUM.sub('', core)))
+    if not os.path.isabs(p):
+        return False
+    try:
+        return not os.path.lexists(p)
+    except OSError:
+        return False
+
+
 def mark(text, args, Mark, extra_cli_args, *a):
     is_url = getattr(args, 'type', '') == 'url'
+    filter_missing = not is_url and _opens_files(args)
     idx = 0
     for tm in _TOKEN.finditer(text):
         left, core = _strip(tm.group().replace('\0', ''))
@@ -53,6 +81,8 @@ def mark(text, args, Mark, extra_cli_args, *a):
             if not _URL_SCHEME.match(core):
                 continue
         elif not _PATH_SIGNAL.search(core):
+            continue
+        elif filter_missing and _provably_absent(core):
             continue
         start = tm.start() + left
         yield Mark(idx, start, start + len(core), core, {})
