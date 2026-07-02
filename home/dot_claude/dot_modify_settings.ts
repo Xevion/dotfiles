@@ -34,7 +34,7 @@ const desired: Record<string, unknown> = {
         hooks: [
           {
             type: "command",
-            command: "~/.claude/hooks/bash-guard",
+            command: "~/.claude/hooks/guard hook",
             timeout: 3000,
           },
         ],

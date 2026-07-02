@@ -7,6 +7,7 @@
 //!
 //! See `DESIGN.md` for the full rationale.
 
+pub mod approval;
 pub mod hook;
 pub mod parse;
 pub mod rules;

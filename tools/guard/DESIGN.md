@@ -6,8 +6,10 @@ rules, approval, command rewriting). `guard run` is the machine (executes one
 pipeline itself: spawns stages, wires pipes, taps the unfiltered source stream,
 reports exit/duration/counts in a footer).
 
-> **Status**: design. Sections marked *PROVISIONAL* await research results
-> (parser crate selection, hooks-API confirmation, pipeline-executor traps).
+> **Status**: implemented. The crate builds and passes its test suite; two
+> decisions changed during implementation (see [§13](#13-implementation-divergences)):
+> the rg/find/grep harness-wrapper replication was dropped for safety, and
+> approval treats pipeline filters as trusted.
 
 ---
 
@@ -85,7 +87,7 @@ Consequences baked into this design:
 |---|---|
 | zsh executes, agent assumes bash | `guard hook` parses with a bash grammar (what the agent *meant*); any parse failure ⇒ fail open, no rewrite |
 | snapshot defines aliases/functions | capture predicate (§4.3) requires every stage's argv0 to resolve to a real PATH executable; otherwise skip rewrite |
-| `rg`/`find`/`grep` are harness wrappers to embedded binaries | `guard run` replicates the wrapper for these three names: spawn `$CLAUDE_CODE_EXECPATH` with `arg0` set to the tool name (§5.1); running the system binaries instead would *diverge* from unwrapped behavior (`grep`→ugrep and `find`→bfs differ materially) |
+| `rg`/`find`/`grep` are harness wrappers to embedded binaries | `guard run` execs the system binary from PATH; replication was dropped (§13.1) since the `ARGV0`/`CLAUDE_CODE_EXECPATH` mechanism is unsafe to reproduce and stdin filtering is equivalent |
 | cwd persisted by the outer shell | `cd`, `export`, assignments must never move inside guard — the rewrite touches only pipelines (§4.2) |
 | `eval '<command>'` in zsh | rewritten text must be zsh-eval-safe; the spliced pipeline is a single-quoted word with `'\''` escaping (§4.4) |
 | shell may differ per machine (bash on others) | `guard run` never shells out for simple stages; the compound-stage fallback uses `$SHELL` (§5.4) |
@@ -271,13 +273,11 @@ For `S | F1 | F2` (source + filters):
    (via `std::process::Command` + fd wiring, no shell):
    - argv exec'd directly (`execvp` semantics — PATH from inherited env,
      identical resolution to the harness shell for real executables).
-   - **Harness-wrapper replication**: when argv0 is `rg`, `find`, or `grep`
-     and `$CLAUDE_CODE_EXECPATH` names an executable, spawn that binary with
-     `CommandExt::arg0(<name>)` instead — byte-identical to the snapshot
-     function the harness shell would have invoked. Falls back to the PATH
-     binary when the env var is absent. Version-sensitive (the wrapper set
-     is Claude Code's, not ours): the per-upgrade test suite (§4.6) compares
-     `rg --version` through the harness vs through guard.
+   - **Harness-wrapper replication — dropped** (see §13). guard runs the
+     system `rg`/`find`/`grep` from PATH, not the embedded binaries. The real
+     dispatch is `ARGV0=<name> "$CLAUDE_CODE_EXECPATH"` (an env var, not
+     argv0), and getting it wrong launches the Claude agent itself; in a
+     pipeline/stdin context the system tools filter identically anyway.
    - Leading `VAR=val` words become child env entries.
    - Redirects implemented by fd wiring at spawn: `2>&1` ⇒ child stderr dup'd
      to the same write-end its stdout uses; `>f`/`>>f`/`<f`/`2>f` ⇒
@@ -464,9 +464,6 @@ build step, and the `/tmp/claude-bash` convention (`.chezmoiremove` not needed
 
 ## 8. Implementation choices
 
-*PROVISIONAL — pending research agents; recommendations below are the working
-assumption and the doc will be amended.*
-
 - **Language**: Rust. Startup latency is the binding constraint (hook runs on
   every Bash call); Bun's cold start is the single biggest cost of the current
   system.
@@ -572,9 +569,41 @@ The tap adds one user-space copy on the S→F1 adjacency only. For
    canary).
 5. Variable-expansion pipelines (scenario 6 option (a)) — v2 candidate.
 6. `--exit-source` opt-in surface: per-command config? never?
-7. Harness-wrapper drift: the `rg`/`find`/`grep` → embedded-binary
-   replication (§5.1) mirrors an undocumented Claude Code mechanism; the
-   wrapper list or `CLAUDE_CODE_EXECPATH` contract may change between
-   releases. Covered by the per-upgrade test; if it churns, consider parsing
-   the active snapshot file for `function <name>` markers instead of
-   hardcoding the set.
+7. ~~Harness-wrapper drift.~~ **Resolved — replication dropped** (§13.1).
+   guard runs system rg/find/grep; no dependence on the `ARGV0`/
+   `CLAUDE_CODE_EXECPATH` mechanism.
+
+## 13. Implementation divergences
+
+Two design decisions changed once the code met reality.
+
+### 13.1 No harness-wrapper replication
+
+The design had `guard run` replicate Claude Code's snapshot wrappers for
+`rg`/`find`/`grep`, spawning the embedded binaries so a captured filter ran the
+same tool as the unwrapped command. Two findings killed it:
+
+- The dispatch is `ARGV0=<name> "$CLAUDE_CODE_EXECPATH" "$@"` — an **environment
+  variable**, not process argv0. The original plan set argv0 via `arg0()`, which
+  is the wrong channel: running `$CLAUDE_CODE_EXECPATH` without `ARGV0` set
+  **launches the Claude agent**, verified when a test `echo hi | grep hi` spent
+  6s emitting a chat reply instead of grepping.
+- `grep` and `find` also inject default flags (`ugrep -G --ignore-files
+  --hidden --exclude-dir=.git …`, `bfs -S dfs -regextype findutils-default`)
+  that are irrelevant to stdin filtering and pin guard to a snapshot format.
+
+For a pipeline filter reading stdin, system `grep`/`rg`/`find` behave
+identically to the embedded tools (`rg` *is* ripgrep). The predicate already
+requires the binary to resolve on PATH, so guard just execs it. The residual
+divergence (ugrep vs GNU grep edge regexes; bfs vs find traversal order) is
+minor and strictly safer than the catastrophic failure mode of the wrapper.
+
+### 13.2 Filters are trusted in approval
+
+`Approval::decide` treats a stage whose argv0 is a known filter
+(head/tail/grep/rg/…) as pre-approved, so a wrapped `cargo test 2>&1 | tail`
+auto-allows on `cargo test` alone without the user allow-listing `tail`. This
+follows the same logic the old TS hook used for its injected preview filter,
+and keeps capture-with-auto-allow working for the common build/test pipelines.
+Approval still evaluates the original command (deny/ask rules always win, per
+the documented permission precedence).

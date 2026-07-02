@@ -2,6 +2,7 @@
 //! discipline rules, rewrites capturable pipelines to `guard run '...'`, checks
 //! approval, and emits one JSON response.
 
+use crate::approval::{Approval, Decision};
 use crate::parse::PipelineInfo;
 use crate::rules::{self, Verdict};
 use serde::Deserialize;
@@ -40,7 +41,7 @@ impl Rewrite {
                 (s, e, format!("{self_exe} run {}", single_quote(&p.text)))
             })
             .collect();
-        spans.sort_by(|a, b| b.0.cmp(&a.0));
+        spans.sort_by_key(|s| std::cmp::Reverse(s.0));
 
         let mut out = command.to_string();
         for (s, e, repl) in &spans {
@@ -143,13 +144,21 @@ pub fn main() -> i32 {
         out.updated_command = Some(rewrite.command);
     }
 
-    match out.to_json() {
-        Some(json) => {
-            println!("{json}");
-            0
+    // Approval evaluates the original command; the guard-run wrapper adds no
+    // approval surface, so approving the original is equivalent.
+    match Approval::load().decide(&command) {
+        Decision::Deny => {
+            eprintln!("Command contains a denied sub-command.");
+            return 2;
         }
-        None => 0,
+        Decision::Allow => out.permission_allow = true,
+        Decision::Passthrough => {}
     }
+
+    if let Some(json) = out.to_json() {
+        println!("{json}");
+    }
+    0
 }
 
 fn rewrite_note(count: usize) -> String {

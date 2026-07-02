@@ -1,0 +1,26 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# Builds the `guard` PreToolUse hook (Rust crate at <repo>/tools/guard, outside
+# the chezmoi root) into ~/.claude/hooks/guard. The hash below is the release
+# source digest at render time, so this re-runs whenever the crate changes; with
+# no Rust toolchain the body skips the build and the existing hook stays.
+# hash: {{ output "sh" "-c" (print "cat " .chezmoi.sourceDir "/../tools/guard/src/*.rs " .chezmoi.sourceDir "/../tools/guard/Cargo.toml 2>/dev/null | sha256sum || true") }}
+set -euo pipefail
+
+CRATE="{{ .chezmoi.sourceDir }}/../tools/guard"
+OUT="{{ .chezmoi.homeDir }}/.claude/hooks/guard"
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "[build-guard] cargo not found, skipping (existing hook kept)"
+  exit 0
+fi
+if [[ ! -d "$CRATE" ]]; then
+  echo "[build-guard] crate not found at $CRATE; skipping"
+  exit 0
+fi
+
+echo "[build-guard] Building guard (release)"
+cargo build --release --manifest-path "$CRATE/Cargo.toml" --quiet
+install -Dm755 "$CRATE/target/release/guard" "$OUT"
+echo "[build-guard] Installed -> $OUT"
+{{ end -}}
