@@ -18,10 +18,6 @@ pub const FILTERS: &[&str] = &[
     "head", "tail", "grep", "rg", "sed", "awk", "jq", "wc", "sort", "uniq", "cut", "tr",
 ];
 
-/// Names Claude Code rewires to embedded binaries (ripgrep / bfs / ugrep). The
-/// runner replicates the wrapper so a captured filter runs the same tool.
-pub const HARNESS_WRAPPED: &[&str] = &["rg", "find", "grep"];
-
 /// A redirection on a stage, restricted to the reproducible set. Anything else
 /// makes the stage `Unsupported`.
 #[derive(Clone, Debug, PartialEq, Eq)]
