@@ -18,6 +18,9 @@
 # writing-plans skill disabled/deleted
 .claude/skills/writing-plans/SKILL.md
 
+# Kitty compiled-bytecode cache (was tracked by mistake; regenerated at runtime)
+.config/kitty/__pycache__
+
 # Old hook files replaced by compiled bash-guard and banner-comment-lint binaries
 .claude/hooks/bash-discipline.py
 .claude/hooks/bash-discipline.ts

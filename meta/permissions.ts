@@ -375,6 +375,9 @@ allow(
   "mise use",
   "mise run",
   "claude mcp add",
+  // Custom local tooling on external storage
+  "/mnt/storage/unity/bin/unity",
+  "/mnt/storage/unity/bin/pcommit",
 );
 
 // -- Package managers (ask — lifecycle scripts, lockfile changes) --

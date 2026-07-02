@@ -82,7 +82,6 @@ const desired: Record<string, unknown> = {
     "code-simplifier@claude-plugins-official": true,
     "ralph-loop@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
-    "autofix-bot@claude-plugins-official": false,
   },
   alwaysThinkingEnabled: true,
   voiceEnabled: true,

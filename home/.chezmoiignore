@@ -68,6 +68,9 @@ claude-settings.json
 # Kitty auto-generated theme files (managed: kitty.conf, diff.conf, dracula.conf, etc.)
 .config/kitty/*.auto.conf
 
+# Kitty compiled-bytecode cache for hints-trim.py (regenerated at runtime)
+.config/kitty/__pycache__
+
 # Micro runtime state (managed: bindings.json, settings.json)
 .config/micro/buffers
 
