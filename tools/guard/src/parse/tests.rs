@@ -1,4 +1,6 @@
 use super::*;
+use assert2::{assert, check};
+use rstest::*;
 
 fn pls(cmd: &str) -> Vec<PipelineInfo> {
     PipelineInfo::extract(cmd).expect("parse")
@@ -7,7 +9,7 @@ fn pls(cmd: &str) -> Vec<PipelineInfo> {
 /// The single capturable pipeline in `cmd`, or panic.
 fn only_capturable(cmd: &str) -> PipelineInfo {
     let mut caps: Vec<PipelineInfo> = pls(cmd).into_iter().filter(|p| p.capturable()).collect();
-    assert_eq!(caps.len(), 1, "expected exactly one capturable pipeline in {cmd:?}");
+    assert!(caps.len() == 1, "expected exactly one capturable pipeline in {cmd:?}");
     caps.pop().unwrap()
 }
 
@@ -18,71 +20,52 @@ fn none_capturable(cmd: &str) {
     );
 }
 
+/// argv of a simple stage, or panic.
+fn argv_of(stage: &Stage) -> &[String] {
+    assert!(let Stage::Simple { argv, .. } = stage);
+    argv
+}
+
 #[test]
 fn simple_filter_is_capturable() {
     let pl = only_capturable("ls -la | head -5");
-    assert_eq!(pl.stages.len(), 2);
-    assert_eq!(pl.stages[0].argv0(), Some("ls"));
-    assert_eq!(pl.stages[1].argv0(), Some("head"));
+    check!(pl.stages.len() == 2);
+    check!(pl.stages[0].argv0() == Some("ls"));
+    check!(pl.stages[1].argv0() == Some("head"));
 }
 
 #[test]
 fn two_filters_capturable() {
     let pl = only_capturable("ls | grep foo | head");
-    assert_eq!(pl.stages.len(), 3);
+    assert!(pl.stages.len() == 3);
 }
 
-#[test]
-fn single_stage_not_capturable() {
-    none_capturable("ls -la");
-}
-
-#[test]
-fn no_filter_stage_not_capturable() {
-    // `cat` is not a recognized filter; nothing to narrow.
-    none_capturable("ls | cat");
-}
-
-#[test]
-fn unresolvable_argv0_not_capturable() {
-    // Alias/function shield (predicate rule 4).
-    none_capturable("definitely_not_a_real_binary_xyz | head");
-}
-
-#[test]
-fn follow_not_capturable() {
-    none_capturable("cat file | tail -f");
-    none_capturable("tail -f log | grep err");
-}
-
-#[test]
-fn background_not_capturable() {
-    none_capturable("ls | head &");
-}
-
-#[test]
-fn negation_and_time_not_capturable() {
-    none_capturable("! ls | grep x");
-    none_capturable("time ls | grep x");
-}
-
-#[test]
-fn dollar_expansion_excluded() {
-    none_capturable("ls $HOME | head");
-    none_capturable("echo \"$PWD\" | grep x | head");
-    none_capturable("cmd `date` | head");
+#[rstest]
+#[case::single_stage("ls -la")]
+#[case::no_filter_stage("ls | cat")] // `cat` is not a recognized filter; nothing to narrow.
+#[case::unresolvable_argv0("definitely_not_a_real_binary_xyz | head")] // Alias/function shield (predicate rule 4).
+#[case::follow_source("cat file | tail -f")]
+#[case::follow_sink("tail -f log | grep err")]
+#[case::background("ls | head &")]
+#[case::negation("! ls | grep x")]
+#[case::time_prefix("time ls | grep x")]
+#[case::dollar_var("ls $HOME | head")] // `$` expansion excluded
+#[case::dollar_quoted_var("echo \"$PWD\" | grep x | head")] // `$` expansion excluded
+#[case::dollar_backtick("cmd `date` | head")] // `$` expansion excluded
+#[case::compound_later_stage("ls | { grep foo; }")]
+#[case::process_substitution("diff <(ls a) b | head")]
+#[case::unquoted_glob_star("ls *.rs | head")] // runner can't glob-expand; fail open so it runs unwrapped
+#[case::unquoted_glob_question("ls | grep foo?bar")] // runner can't glob-expand; fail open so it runs unwrapped
+#[case::tilde("cat ~/file | head")] // tilde expansion needs the shell; fail open
+fn not_capturable(#[case] cmd: &str) {
+    none_capturable(cmd);
 }
 
 #[test]
 fn compound_first_stage_capturable() {
     let pl = only_capturable("{ echo hdr; ls; } | grep foo");
-    assert!(matches!(pl.stages[0], Stage::Compound { .. }));
-    assert_eq!(pl.stages[1].argv0(), Some("grep"));
-}
-
-#[test]
-fn compound_later_stage_not_capturable() {
-    none_capturable("ls | { grep foo; }");
+    assert!(let Stage::Compound { .. } = &pl.stages[0]);
+    assert!(pl.stages[1].argv0() == Some("grep"));
 }
 
 #[test]
@@ -92,8 +75,8 @@ fn cd_stays_outside_wrapped_span() {
         .into_iter()
         .filter(|p| p.capturable())
         .collect();
-    assert_eq!(caps.len(), 1);
-    assert_eq!(caps[0].text, "ls -la | head -5");
+    assert!(caps.len() == 1);
+    assert!(caps[0].text == "ls -la | head -5");
 }
 
 #[test]
@@ -103,9 +86,9 @@ fn multi_statement_yields_two_captures() {
         .into_iter()
         .filter(|p| p.capturable())
         .collect();
-    assert_eq!(caps.len(), 2);
-    assert_eq!(caps[0].text, "ls src | head");
-    assert_eq!(caps[1].text, "ls -la | tail");
+    check!(caps.len() == 2);
+    check!(caps[0].text == "ls src | head");
+    check!(caps[1].text == "ls -la | tail");
 }
 
 #[test]
@@ -113,106 +96,55 @@ fn byte_span_slices_original_exactly() {
     let cmd = "cd x && ls -la | grep foo | head -3";
     let pl = only_capturable(cmd);
     let (s, e) = pl.byte_span;
-    assert_eq!(&cmd[s..e], "ls -la | grep foo | head -3");
-    assert_eq!(pl.text, &cmd[s..e]);
+    check!(&cmd[s..e] == "ls -la | grep foo | head -3");
+    check!(pl.text == &cmd[s..e]);
 }
 
 #[test]
 fn redirect_dup_extracted() {
     // `2>&1` on the source is modeled as a Dup on the first stage.
     let pl = only_capturable("ls foo 2>&1 | grep bar | tail");
-    match &pl.stages[0] {
-        Stage::Simple { redirs, .. } => {
-            assert!(redirs.contains(&Redir::Dup { from: 2, to: 1 }), "got {redirs:?}");
-        }
-        s => panic!("expected simple stage, got {s:?}"),
-    }
+    assert!(let Stage::Simple { redirs, .. } = &pl.stages[0]);
+    assert!(redirs.contains(&Redir::Dup { from: 2, to: 1 }), "got {redirs:?}");
 }
 
 #[test]
 fn env_assignment_becomes_stage_env() {
     let pl = only_capturable("FOO=bar ls | head");
-    match &pl.stages[0] {
-        Stage::Simple { assignments, argv, .. } => {
-            assert_eq!(assignments, &[("FOO".to_string(), "bar".to_string())]);
-            assert_eq!(argv[0], "ls");
-        }
-        s => panic!("expected simple stage, got {s:?}"),
-    }
+    assert!(let Stage::Simple { assignments, argv, .. } = &pl.stages[0]);
+    check!(assignments == &[("FOO".to_string(), "bar".to_string())]);
+    check!(argv[0] == "ls");
 }
 
-/// argv of a simple stage, or panic.
-fn argv_of(stage: &Stage) -> &[String] {
-    match stage {
-        Stage::Simple { argv, .. } => argv,
-        s => panic!("expected simple stage, got {s:?}"),
-    }
-}
-
-#[test]
-fn single_quoted_arg_is_unquoted() {
-    // The regression: `-E 'binary(roundtrip)'` must reach the child without its
-    // quotes, since the runner spawns the stage with no shell to strip them.
-    let pl = only_capturable("cargo nextest run -E 'binary(roundtrip)' | tail -25");
-    assert_eq!(
-        argv_of(&pl.stages[0]),
-        &["cargo", "nextest", "run", "-E", "binary(roundtrip)"]
-    );
-}
-
-#[test]
-fn double_quoted_arg_is_unquoted() {
-    let pl = only_capturable("cargo nextest run -E \"binary(roundtrip)\" | tail");
-    assert_eq!(argv_of(&pl.stages[0]).last().unwrap(), "binary(roundtrip)");
-}
-
-#[test]
-fn quoted_arg_with_space_is_one_word() {
-    let pl = only_capturable("ls | grep 'foo bar'");
-    assert_eq!(argv_of(&pl.stages[1]), &["grep", "foo bar"]);
-}
-
-#[test]
-fn adjacent_quote_concatenation() {
-    // `pre'mid'post` is one word after quote removal.
-    let pl = only_capturable("ls | grep pre'mid'post");
-    assert_eq!(argv_of(&pl.stages[1]), &["grep", "premidpost"]);
+#[rstest]
+// The regression: `-E 'binary(roundtrip)'` must reach the child without its
+// quotes, since the runner spawns the stage with no shell to strip them.
+// Both quote styles below must unquote to the identical argv.
+#[case::single_quoted(
+    "cargo nextest run -E 'binary(roundtrip)' | tail -25",
+    0,
+    &["cargo", "nextest", "run", "-E", "binary(roundtrip)"]
+)]
+#[case::double_quoted(
+    "cargo nextest run -E \"binary(roundtrip)\" | tail",
+    0,
+    &["cargo", "nextest", "run", "-E", "binary(roundtrip)"]
+)]
+#[case::space_in_quotes("ls | grep 'foo bar'", 1, &["grep", "foo bar"])]
+// `pre'mid'post` is one word after quote removal.
+#[case::adjacent_quote_concatenation("ls | grep pre'mid'post", 1, &["grep", "premidpost"])]
+// Inside quotes the glob is literal, so the stage is reproducible.
+#[case::quoted_glob_is_literal("ls | grep '*.rs'", 1, &["grep", "*.rs"])]
+fn argv_after_unquoting(#[case] cmd: &str, #[case] stage_idx: usize, #[case] expected: &[&str]) {
+    let pl = only_capturable(cmd);
+    assert!(argv_of(&pl.stages[stage_idx]) == expected);
 }
 
 #[test]
 fn quoted_assignment_value_is_unquoted() {
     let pl = only_capturable("DB='a b' ls | head");
-    match &pl.stages[0] {
-        Stage::Simple { assignments, .. } => {
-            assert_eq!(assignments, &[("DB".to_string(), "a b".to_string())]);
-        }
-        s => panic!("expected simple stage, got {s:?}"),
-    }
-}
-
-#[test]
-fn unquoted_glob_not_capturable() {
-    // The runner can't glob-expand; fail open so it runs unwrapped.
-    none_capturable("ls *.rs | head");
-    none_capturable("ls | grep foo?bar");
-}
-
-#[test]
-fn tilde_not_capturable() {
-    // Tilde expansion needs the shell; fail open.
-    none_capturable("cat ~/file | head");
-}
-
-#[test]
-fn quoted_glob_is_literal_and_capturable() {
-    // Inside quotes the glob is literal, so the stage is reproducible.
-    let pl = only_capturable("ls | grep '*.rs'");
-    assert_eq!(argv_of(&pl.stages[1]), &["grep", "*.rs"]);
-}
-
-#[test]
-fn process_substitution_not_capturable() {
-    none_capturable("diff <(ls a) b | head");
+    assert!(let Stage::Simple { assignments, .. } = &pl.stages[0]);
+    assert!(assignments == &[("DB".to_string(), "a b".to_string())]);
 }
 
 #[test]
@@ -221,6 +153,6 @@ fn non_ascii_byte_span() {
     let cmd = "echo café | grep é";
     let pl = only_capturable(cmd);
     let (s, e) = pl.byte_span;
-    assert_eq!(&cmd[s..e], cmd); // whole thing is one pipeline
-    assert_eq!(pl.stages.len(), 2);
+    check!(&cmd[s..e] == cmd); // whole thing is one pipeline
+    check!(pl.stages.len() == 2);
 }
