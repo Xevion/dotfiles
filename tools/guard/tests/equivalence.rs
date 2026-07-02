@@ -78,6 +78,12 @@ fn norm(s: &str) -> String {
 #[case::source_outerr_to_devnull("sh -c 'echo O; echo E 1>&2' &>/dev/null | grep .")]
 #[case::herestring_fallback("grep o <<< 'foo' | head -1")]
 #[case::multiple_assignments("A=1 B=2 sh -c 'echo x' | grep x")]
+// Exit codes follow bash's default (no pipefail): the pipeline's status is the
+// final stage's, and a failing non-final stage does not change it.
+#[case::final_failure_propagates("printf 'a\\n' | grep zzz")]
+#[case::source_failure_ignored("cat /nonexistent/path/xyz | head -1")]
+#[case::source_output_then_failure("sh -c 'echo hi; exit 5' | head -1")]
+#[case::middle_failure_ignored("sh -c 'echo hi; exit 2' | grep hi | head -1")]
 // Redirect forms the runner reproduces via its fd-table simulation (fds 0/1/2).
 // `1>&2` on the source: stdout goes to stderr, the pipe stays empty, grep finds
 // nothing (exit 1).
@@ -112,4 +118,18 @@ fn ignores_login_shell(#[case] pipeline: &str) {
     let (out, rc) = guard_env(pipeline, &[("SHELL", "/nonexistent-shell-xyz")]);
     check!(out == "hi", "output for {pipeline:?}");
     check!(rc == Some(0), "exit code for {pipeline:?}");
+}
+
+/// guard's footer surfaces a source failure a no-pipefail shell would swallow:
+/// the pipeline exit stays the final stage's (0), but the footer reports the
+/// source's real exit (5). This is diagnostic extra, not a semantics change.
+#[test]
+fn footer_reports_nonzero_source_exit() {
+    let out = Command::new(env!("CARGO_BIN_EXE_guard"))
+        .args(["run", "sh -c 'echo hi; exit 5' | head -1"])
+        .output()
+        .expect("spawn guard");
+    let raw = String::from_utf8_lossy(&out.stdout);
+    check!(raw.contains("sh: exit 5"), "footer should report source exit: {raw:?}");
+    check!(out.status.code() == Some(0));
 }
