@@ -20,15 +20,23 @@ fn bash(pipeline: &str) -> (String, Option<i32>) {
     (norm(&String::from_utf8_lossy(&out.stdout)), out.status.code())
 }
 
-/// Run `pipeline` through `guard run`, SHELL pinned to bash so compound /
-/// fallback stages use the same interpreter as the oracle. The trailing
-/// `[guard] …` footer is stripped so stdout reflects only the pipeline output.
+/// Run `pipeline` through `guard run`. The ambient `$SHELL` is left untouched:
+/// guard reproduces fallback/compound stages with bash on its own, so the
+/// differential suite would catch any regression back to honoring `$SHELL`. The
+/// trailing `[guard] …` footer is stripped so stdout reflects only the pipeline
+/// output.
 fn guard(pipeline: &str) -> (String, Option<i32>) {
-    let out = Command::new(env!("CARGO_BIN_EXE_guard"))
-        .args(["run", pipeline])
-        .env("SHELL", "/bin/bash")
-        .output()
-        .expect("spawn guard");
+    guard_env(pipeline, &[])
+}
+
+/// As `guard`, but with extra environment variables set on the child.
+fn guard_env(pipeline: &str, envs: &[(&str, &str)]) -> (String, Option<i32>) {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_guard"));
+    cmd.args(["run", pipeline]);
+    for (k, v) in envs {
+        cmd.env(k, v);
+    }
+    let out = cmd.output().expect("spawn guard");
     let raw = String::from_utf8_lossy(&out.stdout);
     // The footer is the last thing printed and always begins with "[guard] ".
     let cut = match raw.rfind("[guard] ") {
@@ -89,4 +97,19 @@ fn guard_matches_bash(#[case] pipeline: &str) {
     let (got_out, got_rc) = guard(pipeline);
     check!(got_out == want_out, "stdout mismatch for {pipeline:?}");
     check!(got_rc == want_rc, "exit code mismatch for {pipeline:?}");
+}
+
+/// guard must reproduce fallback and compound stages with bash, never the
+/// user's login `$SHELL`. Pinning a bogus `$SHELL` proves it is ignored: were it
+/// honored, the stage would fail to spawn and produce no output. bash-syntax
+/// commands run under fish/zsh would otherwise diverge.
+#[rstest]
+// Not capturable (`cat` is not a filter) -> whole-pipeline exec_fallback.
+#[case::fallback("echo hi | cat")]
+// Compound first stage -> run via the reproduction shell inside run_captured.
+#[case::compound("{ echo hi; } | grep hi")]
+fn ignores_login_shell(#[case] pipeline: &str) {
+    let (out, rc) = guard_env(pipeline, &[("SHELL", "/nonexistent-shell-xyz")]);
+    check!(out == "hi", "output for {pipeline:?}");
+    check!(rc == Some(0), "exit code for {pipeline:?}");
 }

@@ -1,7 +1,8 @@
 //! `guard run '<pipeline>'`: execute one pipeline, tap the unfiltered source
 //! stream, and print a footer. Spawns each stage directly (no shell) with pipes
 //! wired by hand, so PATH resolution, redirects, and signal behavior match the
-//! unwrapped command. A compound first stage runs via `$SHELL -c`.
+//! unwrapped command. A compound first stage, and the whole-pipeline fallback,
+//! run via `bash -c` (see `repro_shell`) to match the Bash tool's interpreter.
 
 use crate::parse::{basename, FileKind, PipelineInfo, Redir, Stage};
 use crate::tap::{Capture, Sink};
@@ -24,15 +25,27 @@ pub fn main(pipeline: &str) -> i32 {
     }
 }
 
-/// Run the pipeline unchanged through the harness shell, no capture, no footer.
+/// Run the pipeline unchanged through the reproduction shell, no capture, no
+/// footer.
 fn exec_fallback(pipeline: &str) -> i32 {
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into());
-    Command::new(shell)
+    Command::new(repro_shell())
         .arg("-c")
         .arg(pipeline)
         .status()
         .map(status_code)
         .unwrap_or(127)
+}
+
+/// The interpreter used to reproduce fallback and compound stages. The Bash
+/// tool executes bash syntax, so guard reproduces it with bash — not the user's
+/// login `$SHELL`, which may be fish/zsh and parse the command differently —
+/// falling back to `sh` only when bash is unavailable.
+fn repro_shell() -> &'static str {
+    if crate::parse::resolves_on_path("bash") {
+        "bash"
+    } else {
+        "sh"
+    }
 }
 
 fn run_captured(pl: &PipelineInfo) -> io::Result<i32> {
@@ -170,8 +183,7 @@ fn dup_parent(n: i32) -> io::Result<OwnedFd> {
 fn spawn_stage(stage: &Stage, stdin: Stdin, stdout: PipeWriter) -> io::Result<Child> {
     match stage {
         Stage::Compound { text } => {
-            let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into());
-            let mut cmd = Command::new(shell);
+            let mut cmd = Command::new(repro_shell());
             cmd.arg("-c").arg(text);
             cmd.stdin(match stdin {
                 Stdin::Inherit => Stdio::inherit(),
