@@ -120,6 +120,23 @@ fn ignores_login_shell(#[case] pipeline: &str) {
     check!(rc == Some(0), "exit code for {pipeline:?}");
 }
 
+/// A capture file (footer `full:`) is kept only when the filters narrowed the
+/// stream — visible output smaller than the source. Expansion, same-size
+/// transforms, and pass-through keep no file.
+#[rstest]
+#[case::narrowed("printf 'a\\nb\\nc\\n' | head -1", true)]
+#[case::expansion("printf 'a\\n' | sed 's/a/aaaa/'", false)]
+#[case::same_size_transform("printf 'ab\\n' | tr ab ba", false)]
+#[case::pass_through_all("printf 'x\\ny\\n' | grep ''", false)]
+fn capture_file_only_when_narrowed(#[case] pipeline: &str, #[case] expect_file: bool) {
+    let out = Command::new(env!("CARGO_BIN_EXE_guard"))
+        .args(["run", pipeline])
+        .output()
+        .expect("spawn guard");
+    let raw = String::from_utf8_lossy(&out.stdout);
+    check!(raw.contains("full:") == expect_file, "footer for {pipeline:?}: {raw:?}");
+}
+
 /// guard's footer surfaces a source failure a no-pipefail shell would swallow:
 /// the pipeline exit stays the final stage's (0), but the footer reports the
 /// source's real exit (5). This is diagnostic extra, not a semantics change.

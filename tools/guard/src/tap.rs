@@ -1,7 +1,8 @@
 //! The source-stream sink: count lines/bytes, hold the stream in memory up to a
 //! cap, spill to a content-hashed file beyond it, and decide at the end whether
-//! a file is warranted at all. No file is written when the filters dropped
-//! nothing (source bytes equal the visible output bytes).
+//! a file is warranted at all. A file is kept only when the filters narrowed the
+//! stream — the visible output is fewer bytes than the source. Equal or larger
+//! output (pass-through, reordering, or expansion) hid nothing worth recovering.
 
 use std::fs::{self, File};
 use std::io::Write;
@@ -130,15 +131,17 @@ impl Sink {
             let _ = fs::remove_file(&self.pending_path);
             return self.capture(None, true);
         }
-        if self.spilled || self.truncated {
-            let path = self.commit_spill();
-            return self.capture(path, false);
+        // Keep a file only when the filters narrowed the stream (visible output
+        // smaller than the source). Equal or larger output hid nothing.
+        if final_bytes >= self.bytes {
+            let _ = fs::remove_file(&self.pending_path); // no-op unless spilled
+            return self.capture(None, false);
         }
-        // Entirely in memory.
-        if final_bytes == self.bytes {
-            return self.capture(None, false); // nothing dropped
-        }
-        let path = self.commit_mem();
+        let path = if self.spilled || self.truncated {
+            self.commit_spill()
+        } else {
+            self.commit_mem()
+        };
         self.capture(path, false)
     }
 

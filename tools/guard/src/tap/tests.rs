@@ -6,6 +6,9 @@ use rstest::*;
 #[case::nothing_dropped_writes_no_file(b"hello\nworld\n".as_slice(), 12, 12, 2, false)]
 #[case::dropped_data_writes_file(b"a\nb\nc\nd\n".as_slice(), 4, 8, 4, true)]
 #[case::trailing_unterminated_line_counts(b"one\ntwo".as_slice(), 0, 7, 2, true)]
+// Visible output larger than source (a filter expanded it): nothing was
+// narrowed, so no file is kept.
+#[case::expansion_keeps_no_file(b"hi\n".as_slice(), 100, 3, 1, false)]
 fn sink_accounting(
     #[case] input: &[u8],
     #[case] final_bytes: u64,
