@@ -6,10 +6,15 @@
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 const MEM_CAP: usize = 256 * 1024;
 const SPILL_CAP: u64 = 64 * 1024 * 1024;
 const DIR: &str = "/tmp/claude-guard";
+
+/// Distinguishes pending files of concurrent Sinks that share a pid — notably
+/// the parallel test runner, where every thread reports the same process id.
+static PENDING_SEQ: AtomicU64 = AtomicU64::new(0);
 
 /// Accumulates the source stream and tracks enough to build the footer.
 pub struct Sink {
@@ -44,7 +49,8 @@ impl Sink {
             hasher: blake3::Hasher::new(),
             mem: Vec::new(),
             spill: None,
-            pending_path: PathBuf::from(DIR).join(format!(".pending-{pid}")),
+            pending_path: PathBuf::from(DIR)
+                .join(format!(".pending-{pid}-{}", PENDING_SEQ.fetch_add(1, Ordering::Relaxed))),
             bytes: 0,
             lines: 0,
             last_byte: b'\n',
@@ -140,21 +146,28 @@ impl Sink {
         if let Some(f) = self.spill.take() {
             let _ = f.sync_all();
         }
-        let dest = PathBuf::from(DIR).join(format!("{}.log", self.hash_name()));
-        match fs::rename(&self.pending_path, &dest) {
-            Ok(()) => Some(dest),
-            Err(_) => Some(self.pending_path.clone()),
-        }
+        Some(self.commit_pending())
     }
 
     fn commit_mem(&mut self) -> Option<PathBuf> {
         if fs::create_dir_all(DIR).is_err() {
             return None;
         }
+        if fs::write(&self.pending_path, &self.mem).is_err() {
+            return None;
+        }
+        Some(self.commit_pending())
+    }
+
+    /// Atomically publish the per-run pending file under its content-hashed
+    /// name. Concurrent runs with identical output rename onto the same
+    /// destination, but each first writes its own unique pending file, so a
+    /// reader of the final path never observes a truncated or half-written file.
+    fn commit_pending(&self) -> PathBuf {
         let dest = PathBuf::from(DIR).join(format!("{}.log", self.hash_name()));
-        match File::create(&dest).and_then(|mut f| f.write_all(&self.mem)) {
-            Ok(()) => Some(dest),
-            Err(_) => None,
+        match fs::rename(&self.pending_path, &dest) {
+            Ok(()) => dest,
+            Err(_) => self.pending_path.clone(),
         }
     }
 

@@ -57,8 +57,29 @@ fn two_filters_capturable() {
 #[case::unquoted_glob_star("ls *.rs | head")] // runner can't glob-expand; fail open so it runs unwrapped
 #[case::unquoted_glob_question("ls | grep foo?bar")] // runner can't glob-expand; fail open so it runs unwrapped
 #[case::tilde("cat ~/file | head")] // tilde expansion needs the shell; fail open
+#[case::brace_expansion("echo {a,b} | grep a")] // brace expansion needs the shell; fail open
+#[case::assignment_only_source("FOO=bar | head")] // no argv0 in the source stage
 fn not_capturable(#[case] cmd: &str) {
     none_capturable(cmd);
+}
+
+// fd numbers above 2 can't be reproduced by the runner's three-slot fd table,
+// so conv_redir rejects them and the pipeline falls open to the shell.
+#[rstest]
+#[case::fd3_dup("ls 3>&1 | grep x")]
+#[case::swap_via_fd3("ls 3>&1 1>&2 2>&3 | grep x")]
+#[case::fd3_target("ls 2>&3 | grep x")]
+fn fd_above_two_not_captured(#[case] cmd: &str) {
+    none_capturable(cmd);
+}
+
+#[test]
+fn reverse_dup_extracted() {
+    // `1>&2` (stdout to stderr) is on fds 0/1/2, so it is reproducible and the
+    // pipeline stays capturable, unlike the fd>2 forms above.
+    let pl = only_capturable("ls 1>&2 | grep bar | tail");
+    assert!(let Stage::Simple { redirs, .. } = &pl.stages[0]);
+    assert!(redirs.contains(&Redir::Dup { from: 1, to: 2 }), "got {redirs:?}");
 }
 
 #[test]
@@ -135,9 +156,20 @@ fn env_assignment_becomes_stage_env() {
 #[case::adjacent_quote_concatenation("ls | grep pre'mid'post", 1, &["grep", "premidpost"])]
 // Inside quotes the glob is literal, so the stage is reproducible.
 #[case::quoted_glob_is_literal("ls | grep '*.rs'", 1, &["grep", "*.rs"])]
+#[case::empty_quoted_arg("ls | grep ''", 1, &["grep", ""])]
+#[case::escaped_quote_in_double("ls | grep \"a\\\"b\"", 1, &["grep", "a\"b"])]
+#[case::cross_type_concatenation("ls | grep \"foo\"'bar'", 1, &["grep", "foobar"])]
+#[case::escaped_space_unquoted("ls | grep a\\ b", 1, &["grep", "a b"])]
 fn argv_after_unquoting(#[case] cmd: &str, #[case] stage_idx: usize, #[case] expected: &[&str]) {
     let pl = only_capturable(cmd);
     assert!(argv_of(&pl.stages[stage_idx]) == expected);
+}
+
+#[test]
+fn multiple_assignments_extracted() {
+    let pl = only_capturable("A=1 B=2 ls | head");
+    assert!(let Stage::Simple { assignments, .. } = &pl.stages[0]);
+    assert!(assignments == &[("A".to_string(), "1".to_string()), ("B".to_string(), "2".to_string())]);
 }
 
 #[test]

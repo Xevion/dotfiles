@@ -26,12 +26,48 @@ fn sink_accounting(
 
 #[test]
 fn dropped_data_writes_file() {
+    // Content unique to this test: the spill path is content-hashed, so sharing
+    // bytes with another test would collide on one path and race under the
+    // parallel test runner.
+    let content = b"dropped-file-roundtrip\nsecond line\n";
     let mut s = Sink::new(std::process::id());
-    s.push(b"a\nb\nc\nd\n");
-    let cap = s.finish(4); // filter kept only half
+    s.push(content);
+    let cap = s.finish(0); // filter kept nothing visible
     assert!(let Some(path) = cap.path);
-    assert!(std::fs::read(&path).unwrap() == b"a\nb\nc\nd\n");
+    assert!(std::fs::read(&path).unwrap() == content);
     std::fs::remove_file(path).ok();
+}
+
+#[test]
+fn concurrent_identical_content_reads_are_never_truncated() {
+    // Identical output hashes to one destination path across Sinks. Committing
+    // must be atomic (unique pending file + rename), so a reader of the final
+    // path never observes a truncated or half-written file. Under the old
+    // direct File::create(dest), a parallel thread could read during another's
+    // truncate and see an empty file.
+    let content: &[u8] = b"concurrent-dedup\nsecond line\nthird line\n";
+    let handles: Vec<_> = (0..16)
+        .map(|_| {
+            std::thread::spawn(move || {
+                let mut s = Sink::new(std::process::id());
+                s.push(content);
+                let cap = s.finish(0);
+                let path = cap.path.expect("spill path");
+                let read = std::fs::read(&path).expect("read back");
+                (path, read)
+            })
+        })
+        .collect();
+
+    let mut published = None;
+    for h in handles {
+        let (path, read) = h.join().expect("thread");
+        check!(read == content);
+        published = Some(path);
+    }
+    if let Some(p) = published {
+        std::fs::remove_file(p).ok();
+    }
 }
 
 #[test]

@@ -7,6 +7,7 @@ use crate::parse::{basename, FileKind, PipelineInfo, Redir, Stage};
 use crate::tap::{Capture, Sink};
 use std::fs::{File, OpenOptions};
 use std::io::{self, PipeReader, PipeWriter, Read, Write};
+use std::os::fd::{AsFd, OwnedFd};
 use std::os::unix::process::ExitStatusExt;
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::thread;
@@ -131,34 +132,38 @@ enum Stdin {
     Pipe(PipeReader),
 }
 
-impl Stdin {
-    fn into_stdio(self) -> Stdio {
+/// One of a simple stage's three standard fds while redirects are resolved:
+/// either still inheriting the parent's fd `n`, or bound to an owned fd.
+enum Slot {
+    Inherit(i32),
+    Owned(OwnedFd),
+}
+
+impl Slot {
+    /// Duplicate this slot's current target, mirroring `dup2`'s "copy the
+    /// referent" semantics.
+    fn clone_fd(&self) -> io::Result<OwnedFd> {
         match self {
-            Stdin::Inherit => Stdio::inherit(),
-            Stdin::Pipe(r) => Stdio::from(r),
+            Slot::Inherit(n) => dup_parent(*n),
+            Slot::Owned(f) => f.as_fd().try_clone_to_owned(),
         }
-    }
-}
-
-/// stdout target for a stage: a guard-owned pipe, or a redirected file.
-enum Out {
-    Pipe(PipeWriter),
-    File(File),
-}
-
-impl Out {
-    fn try_clone(&self) -> io::Result<Out> {
-        Ok(match self {
-            Out::Pipe(w) => Out::Pipe(w.try_clone()?),
-            Out::File(f) => Out::File(f.try_clone()?),
-        })
     }
 
     fn into_stdio(self) -> Stdio {
         match self {
-            Out::Pipe(w) => Stdio::from(w),
-            Out::File(f) => Stdio::from(f),
+            // Explicit inherit is equivalent to leaving the fd unset.
+            Slot::Inherit(_) => Stdio::inherit(),
+            Slot::Owned(f) => Stdio::from(f),
         }
+    }
+}
+
+/// Duplicate one of the parent's standard fds (0/1/2) as an owned fd.
+fn dup_parent(n: i32) -> io::Result<OwnedFd> {
+    match n {
+        0 => io::stdin().as_fd().try_clone_to_owned(),
+        1 => io::stdout().as_fd().try_clone_to_owned(),
+        _ => io::stderr().as_fd().try_clone_to_owned(),
     }
 }
 
@@ -168,7 +173,10 @@ fn spawn_stage(stage: &Stage, stdin: Stdin, stdout: PipeWriter) -> io::Result<Ch
             let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into());
             let mut cmd = Command::new(shell);
             cmd.arg("-c").arg(text);
-            cmd.stdin(stdin.into_stdio());
+            cmd.stdin(match stdin {
+                Stdin::Inherit => Stdio::inherit(),
+                Stdin::Pipe(r) => Stdio::from(r),
+            });
             cmd.stdout(Stdio::from(stdout));
             cmd.spawn()
         }
@@ -182,66 +190,67 @@ fn spawn_stage(stage: &Stage, stdin: Stdin, stdout: PipeWriter) -> io::Result<Ch
             for (k, v) in assignments {
                 cmd.env(k, v);
             }
-            apply_io(&mut cmd, stdin, stdout, redirs)?;
+            let (in_io, out_io, err_io) = resolve_fds(stdin, stdout, redirs)?;
+            cmd.stdin(in_io);
+            cmd.stdout(out_io);
+            cmd.stderr(err_io);
             cmd.spawn()
         }
         Stage::Unsupported => Err(io::Error::other("unsupported stage")),
     }
 }
 
-/// Wire stdin/stdout/stderr, honoring the supported redirect set. Redirects
-/// override the pipe defaults, matching shell precedence.
-fn apply_io(cmd: &mut Command, stdin: Stdin, stdout: PipeWriter, redirs: &[Redir]) -> io::Result<()> {
-    let mut out = Out::Pipe(stdout);
-    let mut stdin_file: Option<File> = None;
-    let mut stderr_to_stdout = false;
-    let mut stderr_file: Option<File> = None;
+/// Resolve a simple stage's stdin/stdout/stderr by replaying its redirects over
+/// a three-slot fd table (fds 0/1/2), exactly as the shell would: left to right,
+/// each dup copying the *current* referent of the source fd. This reproduces
+/// ordering-sensitive forms such as `2>&1 1>/dev/null` (stderr keeps the pipe,
+/// stdout goes to the file). fd numbers above 2 are rejected in
+/// `parse::conv_redir` and never reach here.
+fn resolve_fds(
+    stdin: Stdin,
+    stdout: PipeWriter,
+    redirs: &[Redir],
+) -> io::Result<(Stdio, Stdio, Stdio)> {
+    let mut slots = [
+        match stdin {
+            Stdin::Inherit => Slot::Inherit(0),
+            Stdin::Pipe(r) => Slot::Owned(OwnedFd::from(r)),
+        },
+        Slot::Owned(OwnedFd::from(stdout)),
+        Slot::Inherit(2),
+    ];
 
     for r in redirs {
         match r {
-            Redir::Dup { from: 2, to: 1 } => {
-                stderr_to_stdout = true;
-                stderr_file = None;
+            Redir::File { fd, kind, path } => {
+                slots[*fd as usize] = Slot::Owned(open_target(path, kind)?);
             }
-            Redir::File { fd: 1, kind, path } => out = Out::File(open_out(path, kind)?),
-            Redir::File { fd: 2, kind, path } => {
-                stderr_file = Some(open_out(path, kind)?);
-                stderr_to_stdout = false;
+            Redir::Dup { from, to } => {
+                let dup = slots[*to as usize].clone_fd()?;
+                slots[*from as usize] = Slot::Owned(dup);
             }
-            Redir::File { fd: 0, path, .. } => stdin_file = Some(File::open(path)?),
             Redir::OutErr { path, append } => {
                 let kind = if *append { FileKind::Append } else { FileKind::Write };
-                let f = open_out(path, &kind)?;
-                stderr_file = Some(f.try_clone()?);
-                out = Out::File(f);
-                stderr_to_stdout = false;
+                let target = open_target(path, &kind)?;
+                let dup = target.as_fd().try_clone_to_owned()?;
+                slots[1] = Slot::Owned(target);
+                slots[2] = Slot::Owned(dup);
             }
-            // Other dup/fd forms are excluded by the predicate; ignore defensively.
-            _ => {}
         }
     }
 
-    cmd.stdin(match stdin_file {
-        Some(f) => Stdio::from(f),
-        None => stdin.into_stdio(),
-    });
-    if stderr_to_stdout {
-        cmd.stderr(out.try_clone()?.into_stdio());
-    } else if let Some(f) = stderr_file {
-        cmd.stderr(Stdio::from(f));
-    }
-    cmd.stdout(out.into_stdio());
-    Ok(())
+    let [s0, s1, s2] = slots;
+    Ok((s0.into_stdio(), s1.into_stdio(), s2.into_stdio()))
 }
 
-fn open_out(path: &str, kind: &FileKind) -> io::Result<File> {
-    let mut opts = OpenOptions::new();
-    opts.write(true).create(true);
-    match kind {
-        FileKind::Append => opts.append(true),
-        _ => opts.truncate(true),
+/// Open a redirect target as an owned fd, honoring the redirect kind.
+fn open_target(path: &str, kind: &FileKind) -> io::Result<OwnedFd> {
+    let file = match kind {
+        FileKind::Read => File::open(path)?,
+        FileKind::Write => OpenOptions::new().write(true).create(true).truncate(true).open(path)?,
+        FileKind::Append => OpenOptions::new().create(true).append(true).open(path)?,
     };
-    opts.open(path)
+    Ok(OwnedFd::from(file))
 }
 
 fn status_code(status: ExitStatus) -> i32 {
@@ -315,3 +324,6 @@ fn fmt_size(bytes: u64) -> String {
         format!("{bytes} B")
     }
 }
+
+#[cfg(test)]
+mod tests;

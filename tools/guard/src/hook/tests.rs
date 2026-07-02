@@ -23,6 +23,23 @@ fn rw(cmd: &str) -> Rewrite {
     "/opt/guard run 'ls | head'; /opt/guard run 'ls -la | tail'"
 )]
 #[case::no_capture_leaves_command_untouched("ls -la", 0, "ls -la")]
+#[case::no_filter_stage_not_wrapped("ls | cat", 0, "ls | cat")]
+#[case::and_chain_wraps_both(
+    "ls | head && ls | tail",
+    2,
+    "/opt/guard run 'ls | head' && /opt/guard run 'ls | tail'"
+)]
+#[case::or_chain_wraps_pipeline_only(
+    "ls | head || echo fail",
+    1,
+    "/opt/guard run 'ls | head' || echo fail"
+)]
+#[case::leading_nonpipeline_preserved(
+    "echo hi && ls | head",
+    1,
+    "echo hi && /opt/guard run 'ls | head'"
+)]
+#[case::trailing_semicolon("ls | head;", 1, "/opt/guard run 'ls | head';")]
 fn rewrite_cases(#[case] input: &str, #[case] count: usize, #[case] expected: &str) {
     let r = rw(input);
     check!(r.count == count);

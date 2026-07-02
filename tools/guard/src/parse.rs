@@ -298,29 +298,26 @@ fn conv_redir(io: &ast::IoRedirect) -> Option<Redir> {
     use ast::{IoFileRedirectKind as K, IoFileRedirectTarget as T};
     match io {
         ast::IoRedirect::File(fd, kind, target) => match (kind, target) {
-            (K::Write | K::Clobber, T::Filename(w)) => Some(Redir::File {
-                fd: fd.unwrap_or(1),
-                kind: FileKind::Write,
-                path: unquote(&w.value)?,
-            }),
-            (K::Append, T::Filename(w)) => Some(Redir::File {
-                fd: fd.unwrap_or(1),
-                kind: FileKind::Append,
-                path: unquote(&w.value)?,
-            }),
-            (K::Read, T::Filename(w)) => Some(Redir::File {
-                fd: fd.unwrap_or(0),
-                kind: FileKind::Read,
-                path: unquote(&w.value)?,
-            }),
-            (K::DuplicateOutput | K::DuplicateInput, T::Duplicate(w)) => Some(Redir::Dup {
-                from: fd.unwrap_or(1),
-                to: w.value.parse().ok()?, // rejects `-` (close) and non-numeric
-            }),
-            (K::DuplicateOutput | K::DuplicateInput, T::Fd(n)) => Some(Redir::Dup {
-                from: fd.unwrap_or(1),
-                to: *n,
-            }),
+            (K::Write | K::Clobber, T::Filename(w)) => {
+                let fd = std_fd(fd.unwrap_or(1))?;
+                Some(Redir::File { fd, kind: FileKind::Write, path: unquote(&w.value)? })
+            }
+            (K::Append, T::Filename(w)) => {
+                let fd = std_fd(fd.unwrap_or(1))?;
+                Some(Redir::File { fd, kind: FileKind::Append, path: unquote(&w.value)? })
+            }
+            (K::Read, T::Filename(w)) => {
+                let fd = std_fd(fd.unwrap_or(0))?;
+                Some(Redir::File { fd, kind: FileKind::Read, path: unquote(&w.value)? })
+            }
+            (K::DuplicateOutput | K::DuplicateInput, T::Duplicate(w)) => {
+                // rejects `-` (close) and non-numeric
+                let to = std_fd(w.value.parse().ok()?)?;
+                Some(Redir::Dup { from: std_fd(fd.unwrap_or(1))?, to })
+            }
+            (K::DuplicateOutput | K::DuplicateInput, T::Fd(n)) => {
+                Some(Redir::Dup { from: std_fd(fd.unwrap_or(1))?, to: std_fd(*n)? })
+            }
             _ => None,
         },
         ast::IoRedirect::OutputAndError(w, append) => Some(Redir::OutErr {
@@ -329,6 +326,13 @@ fn conv_redir(io: &ast::IoRedirect) -> Option<Redir> {
         }),
         ast::IoRedirect::HereDocument(_, _) | ast::IoRedirect::HereString(_, _) => None,
     }
+}
+
+/// Accept only the standard fds (0/1/2). The runner reproduces redirects by
+/// simulating a three-slot fd table; anything above 2 would need `pre_exec`
+/// fd surgery, so it is rejected here and the pipeline falls open to the shell.
+fn std_fd(fd: i32) -> Option<i32> {
+    (0..=2).contains(&fd).then_some(fd)
 }
 
 /// Apply shell quote-removal to one word, yielding the literal string the shell
