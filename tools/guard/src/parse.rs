@@ -8,6 +8,7 @@
 //! unexpanded expansions.
 
 use brush_parser::ast::{self, SourceLocation};
+use brush_parser::word::{self, WordPiece};
 use brush_parser::{Parser, ParserOptions, SourceSpan};
 use std::io::Cursor;
 use std::path::Path;
@@ -220,7 +221,7 @@ fn extract_simple(s: &ast::SimpleCommand) -> Stage {
         }
     }
     if let Some(w) = &s.word_or_name {
-        st.argv.push(w.value.clone());
+        st.push_argv(&w.value);
     }
     if let Some(suffix) = &s.suffix {
         for it in &suffix.0 {
@@ -247,6 +248,15 @@ impl SimpleBuilder {
         }
     }
 
+    /// Push one argv word, applying shell quote-removal. A word that needs a
+    /// runtime expansion the runner won't perform marks the stage unsupported.
+    fn push_argv(&mut self, raw: &str) {
+        match unquote(raw) {
+            Some(word) => self.argv.push(word),
+            None => self.ok = false,
+        }
+    }
+
     fn item(&mut self, it: &ast::CommandPrefixOrSuffixItem) {
         match it {
             ast::CommandPrefixOrSuffixItem::AssignmentWord(a, _) => match (&a.name, &a.value) {
@@ -254,13 +264,16 @@ impl SimpleBuilder {
                 (ast::AssignmentName::VariableName(name), ast::AssignmentValue::Scalar(v))
                     if self.argv.is_empty() =>
                 {
-                    self.assignments.push((name.clone(), v.value.clone()));
+                    match unquote(&v.value) {
+                        Some(value) => self.assignments.push((name.clone(), value)),
+                        None => self.ok = false,
+                    }
                 }
                 // After argv0 it is just an argument (`env X=1`).
-                _ if !self.argv.is_empty() => self.argv.push(format!("{a}")),
+                _ if !self.argv.is_empty() => self.push_argv(&format!("{a}")),
                 _ => self.ok = false,
             },
-            ast::CommandPrefixOrSuffixItem::Word(w) => self.argv.push(w.value.clone()),
+            ast::CommandPrefixOrSuffixItem::Word(w) => self.push_argv(&w.value),
             ast::CommandPrefixOrSuffixItem::IoRedirect(io) => match conv_redir(io) {
                 Some(r) => self.redirs.push(r),
                 None => self.ok = false,
@@ -288,17 +301,17 @@ fn conv_redir(io: &ast::IoRedirect) -> Option<Redir> {
             (K::Write | K::Clobber, T::Filename(w)) => Some(Redir::File {
                 fd: fd.unwrap_or(1),
                 kind: FileKind::Write,
-                path: w.value.clone(),
+                path: unquote(&w.value)?,
             }),
             (K::Append, T::Filename(w)) => Some(Redir::File {
                 fd: fd.unwrap_or(1),
                 kind: FileKind::Append,
-                path: w.value.clone(),
+                path: unquote(&w.value)?,
             }),
             (K::Read, T::Filename(w)) => Some(Redir::File {
                 fd: fd.unwrap_or(0),
                 kind: FileKind::Read,
-                path: w.value.clone(),
+                path: unquote(&w.value)?,
             }),
             (K::DuplicateOutput | K::DuplicateInput, T::Duplicate(w)) => Some(Redir::Dup {
                 from: fd.unwrap_or(1),
@@ -311,11 +324,74 @@ fn conv_redir(io: &ast::IoRedirect) -> Option<Redir> {
             _ => None,
         },
         ast::IoRedirect::OutputAndError(w, append) => Some(Redir::OutErr {
-            path: w.value.clone(),
+            path: unquote(&w.value)?,
             append: *append,
         }),
         ast::IoRedirect::HereDocument(_, _) | ast::IoRedirect::HereString(_, _) => None,
     }
+}
+
+/// Apply shell quote-removal to one word, yielding the literal string the shell
+/// would hand to `execve`. Returns `None` when the word needs an expansion the
+/// runner does not perform - tilde, glob, brace, or (already gated) parameter /
+/// command / arithmetic substitution - so the stage fails open to `Unsupported`
+/// and the pipeline runs unwrapped through the harness shell instead.
+///
+/// The runner spawns simple stages directly (no shell), so this is the only
+/// place quote-removal happens; without it, `-E 'binary(x)'` reaches the child
+/// with its quotes intact.
+fn unquote(raw: &str) -> Option<String> {
+    let pieces = word::parse(raw, &ParserOptions::default()).ok()?;
+    let mut out = String::new();
+    for wp in &pieces {
+        fold_piece(&wp.piece, &mut out)?;
+    }
+    Some(out)
+}
+
+/// Fold one top-level word piece into `out`. Unquoted literal text is rejected
+/// when it carries glob or brace metacharacters, since the runner cannot expand
+/// them; quoted text is taken verbatim.
+fn fold_piece(p: &WordPiece, out: &mut String) -> Option<()> {
+    match p {
+        WordPiece::Text(s) => {
+            if s.contains(['*', '?', '[', ']', '{', '}']) {
+                return None;
+            }
+            out.push_str(s);
+        }
+        WordPiece::SingleQuotedText(s) => out.push_str(s),
+        WordPiece::DoubleQuotedSequence(inner) => {
+            for wp in inner {
+                fold_quoted_piece(&wp.piece, out)?;
+            }
+        }
+        WordPiece::EscapeSequence(s) => push_escape(s, out)?,
+        // Tilde, ANSI-C quoting, and every expansion form need runtime state.
+        _ => return None,
+    }
+    Some(())
+}
+
+/// Fold a piece appearing inside double quotes. Globbing and brace expansion do
+/// not apply here, so literal text is verbatim; only escapes are processed.
+fn fold_quoted_piece(p: &WordPiece, out: &mut String) -> Option<()> {
+    match p {
+        WordPiece::Text(s) => out.push_str(s),
+        WordPiece::EscapeSequence(s) => push_escape(s, out)?,
+        _ => return None,
+    }
+    Some(())
+}
+
+/// Resolve a `\X` escape sequence: line continuation drops, everything else
+/// contributes the escaped character literally.
+fn push_escape(seq: &str, out: &mut String) -> Option<()> {
+    let rest = seq.strip_prefix('\\')?;
+    if rest != "\n" {
+        out.push_str(rest);
+    }
+    Some(())
 }
 
 pub fn basename(s: &str) -> &str {

@@ -141,6 +141,75 @@ fn env_assignment_becomes_stage_env() {
     }
 }
 
+/// argv of a simple stage, or panic.
+fn argv_of(stage: &Stage) -> &[String] {
+    match stage {
+        Stage::Simple { argv, .. } => argv,
+        s => panic!("expected simple stage, got {s:?}"),
+    }
+}
+
+#[test]
+fn single_quoted_arg_is_unquoted() {
+    // The regression: `-E 'binary(roundtrip)'` must reach the child without its
+    // quotes, since the runner spawns the stage with no shell to strip them.
+    let pl = only_capturable("cargo nextest run -E 'binary(roundtrip)' | tail -25");
+    assert_eq!(
+        argv_of(&pl.stages[0]),
+        &["cargo", "nextest", "run", "-E", "binary(roundtrip)"]
+    );
+}
+
+#[test]
+fn double_quoted_arg_is_unquoted() {
+    let pl = only_capturable("cargo nextest run -E \"binary(roundtrip)\" | tail");
+    assert_eq!(argv_of(&pl.stages[0]).last().unwrap(), "binary(roundtrip)");
+}
+
+#[test]
+fn quoted_arg_with_space_is_one_word() {
+    let pl = only_capturable("ls | grep 'foo bar'");
+    assert_eq!(argv_of(&pl.stages[1]), &["grep", "foo bar"]);
+}
+
+#[test]
+fn adjacent_quote_concatenation() {
+    // `pre'mid'post` is one word after quote removal.
+    let pl = only_capturable("ls | grep pre'mid'post");
+    assert_eq!(argv_of(&pl.stages[1]), &["grep", "premidpost"]);
+}
+
+#[test]
+fn quoted_assignment_value_is_unquoted() {
+    let pl = only_capturable("DB='a b' ls | head");
+    match &pl.stages[0] {
+        Stage::Simple { assignments, .. } => {
+            assert_eq!(assignments, &[("DB".to_string(), "a b".to_string())]);
+        }
+        s => panic!("expected simple stage, got {s:?}"),
+    }
+}
+
+#[test]
+fn unquoted_glob_not_capturable() {
+    // The runner can't glob-expand; fail open so it runs unwrapped.
+    none_capturable("ls *.rs | head");
+    none_capturable("ls | grep foo?bar");
+}
+
+#[test]
+fn tilde_not_capturable() {
+    // Tilde expansion needs the shell; fail open.
+    none_capturable("cat ~/file | head");
+}
+
+#[test]
+fn quoted_glob_is_literal_and_capturable() {
+    // Inside quotes the glob is literal, so the stage is reproducible.
+    let pl = only_capturable("ls | grep '*.rs'");
+    assert_eq!(argv_of(&pl.stages[1]), &["grep", "*.rs"]);
+}
+
 #[test]
 fn process_substitution_not_capturable() {
     none_capturable("diff <(ls a) b | head");
