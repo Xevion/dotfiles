@@ -39,6 +39,7 @@ ruby = "latest"
 bitwarden = "latest"
 duckdb = "latest"
 dotnet = "latest"
+zig = "latest"
 
 [settings]
 
