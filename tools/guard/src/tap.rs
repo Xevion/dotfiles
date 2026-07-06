@@ -27,6 +27,10 @@ pub struct Sink {
     lines: u64,
     last_byte: u8,
     spilled: bool,
+    /// Bytes actually written to the spill file, capped at `SPILL_CAP`. Tracked
+    /// separately from `bytes` because the source keeps flowing (still counted)
+    /// after the file stops growing.
+    spilled_bytes: u64,
     truncated: bool,
     /// Set when the spill dir/file could not be created; capture is disabled.
     broken: bool,
@@ -56,6 +60,7 @@ impl Sink {
             lines: 0,
             last_byte: b'\n',
             spilled: false,
+            spilled_bytes: 0,
             truncated: false,
             broken: false,
         }
@@ -109,14 +114,23 @@ impl Sink {
         if self.broken || self.truncated {
             return;
         }
-        if self.bytes.saturating_sub(buf.len() as u64) >= SPILL_CAP {
+        let room = SPILL_CAP.saturating_sub(self.spilled_bytes);
+        if room == 0 {
             self.truncated = true;
             return;
         }
+        // Write only what fits under the cap; a partial final chunk keeps the
+        // file bounded to exactly SPILL_CAP rather than overshooting by one read.
+        let take = room.min(buf.len() as u64) as usize;
         if let Some(f) = self.spill.as_mut() {
-            if f.write_all(buf).is_err() {
+            if f.write_all(&buf[..take]).is_err() {
                 self.broken = true;
+                return;
             }
+        }
+        self.spilled_bytes += take as u64;
+        if take < buf.len() {
+            self.truncated = true;
         }
     }
 

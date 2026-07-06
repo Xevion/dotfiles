@@ -100,3 +100,23 @@ fn spills_past_mem_cap() {
     assert!(std::fs::metadata(&path).unwrap().len() == 400 * 1024);
     std::fs::remove_file(path).ok();
 }
+
+#[test]
+fn spill_file_bounded_to_exactly_cap() {
+    // A source larger than SPILL_CAP truncates the file to exactly the cap — no
+    // whole-chunk overshoot — while the counts still reflect the full stream.
+    let mut s = Sink::new(std::process::id());
+    let chunk = vec![b'z'; 1024 * 1024]; // 1 MiB
+    let pushes = SPILL_CAP / chunk.len() as u64 + 4; // a few MiB past the cap
+    for _ in 0..pushes {
+        s.push(&chunk);
+    }
+    let total = pushes * chunk.len() as u64;
+    let cap = s.finish(0); // nothing visible -> file kept
+    check!(cap.bytes == total); // full stream counted
+    check!(cap.truncated); // flagged truncated
+    assert!(let Some(path) = cap.path);
+    let on_disk = std::fs::metadata(&path).unwrap().len();
+    check!(on_disk == SPILL_CAP, "spill file must be exactly the cap, got {on_disk}");
+    std::fs::remove_file(path).ok();
+}
