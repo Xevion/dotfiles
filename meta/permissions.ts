@@ -9,7 +9,7 @@ type Entry = { pattern: string; level: Level };
 
 const entries: Entry[] = [];
 
-// --- Builder helpers ---
+// Builder helpers
 
 /** Add patterns at a given permission level */
 function add(level: Level, ...patterns: string[]) {
@@ -49,11 +49,9 @@ function tool(
   }
 }
 
-// =============================================================================
 // PERMISSIONS
-// =============================================================================
 
-// -- Version / info (read-only, always safe) --
+// Version / info (read-only, always safe)
 allow(
   ...versions(
     "cargo",
@@ -86,7 +84,7 @@ allow(
   "go version", // go uses "go version" not "go --version"
 );
 
-// -- Cargo --
+// Cargo
 allow(
   ...subs("cargo", [
     "build",
@@ -112,7 +110,7 @@ allow(
   ]),
 );
 
-// -- Go --
+// Go
 allow(
   ...subs("go", [
     "build",
@@ -130,7 +128,7 @@ allow(
   "golangci-lint",
 );
 
-// -- Node / Bun --
+// Node / Bun
 allow(
   ...subs("npm", ["run", "audit", "ci", "list", "outdated", "info"]),
   ...subs("pnpm", ["run", "list", "exec", "audit", "outdated", "install", "add", "remove", "uninstall"]),
@@ -138,7 +136,7 @@ allow(
   "bunx",
 );
 
-// -- Python --
+// Python
 allow(
   ...subs("uv", ["sync", "run", "pip list", "pip show", "pip install", "venv", "tool"]),
   "python3",
@@ -149,10 +147,10 @@ allow(
   "black",
 );
 
-// -- Build tools --
+// Build tools
 allow("just", "./gradlew", "make run", "make build");
 
-// -- Git --
+// Git
 tool("git", {
   allow: [
     "status",
@@ -177,6 +175,12 @@ tool("git", {
     "config --get",
     "config --list",
     "worktree",
+    "reflog",
+    "cherry -v",
+    "clean -n",
+    "clean --dry-run",
+    "stash list",
+    "stash show",
   ],
   ask: [
     "checkout",
@@ -206,7 +210,7 @@ tool("git", {
   ],
 });
 
-// -- GitHub CLI --
+// GitHub CLI
 tool("gh", {
   allow: [
     "run list",
@@ -221,6 +225,15 @@ tool("gh", {
     "search",
     "repo view",
     "repo list",
+    "release list",
+    "release view",
+    "workflow list",
+    "workflow view",
+    "gist list",
+    "gist view",
+    "label list",
+    "pr diff",
+    "pr checks",
   ],
   ask: [
     "pr close",
@@ -235,7 +248,7 @@ tool("gh", {
   ],
 });
 
-// -- Docker --
+// Docker
 tool("docker", {
   allow: [
     "ps",
@@ -251,7 +264,7 @@ tool("docker", {
   ],
 });
 
-// -- General CLI (always safe) --
+// General CLI (always safe)
 allow(
   "ls",
   "tree",
@@ -310,10 +323,28 @@ allow(
   "7z",
 );
 
-// -- DB / query tools --
+// DB / query tools
 allow("psql", "sqlite3");
 
-// -- xevion (xevion.dev content CLI) --
+// System diagnostics (read-only)
+allow("whoami", "uname", "hostname", "id", "groups", "lscpu", "free", "uptime", "nproc", "lsof");
+
+// Network diagnostics
+// `ip` and `ss` can mutate/kill state, so only fully-qualified read subcommands
+// are allowed here rather than the bare tool (avoids "ip addr:*" wildcarding
+// into "ip addr add ...").
+allow("ping", "traceroute", "tracepath", "dig", "nslookup", "host", "ss");
+tool("ip", {
+  allow: ["addr show", "route show", "route get", "link show", "-s link", "neigh show", "rule show"],
+});
+
+// Package listing (read-only queries only; install/remove untouched)
+tool("apt", { allow: ["list", "search", "show", "policy"] });
+tool("dpkg", { allow: ["-l", "-L", "-s", "--list", "--listfiles"] });
+tool("brew", { allow: ["list", "info", "search", "outdated", "leaves", "deps", "--version"] });
+tool("snap", { allow: ["list", "info", "find"] });
+
+// xevion (xevion.dev content CLI)
 // Authoring is iterative and runs against production by design (edits are atomic
 // and cheap to revise), so the read + content-mutation surface is allowed wholesale.
 // Only the irreversibly-destructive verbs are gated. Node deletion (`content rm`)
@@ -332,7 +363,7 @@ tool("xevion", {
   ],
 });
 
-// -- Chezmoi --
+// Chezmoi
 tool("chezmoi", {
   allow: [
     "status",
@@ -352,8 +383,9 @@ tool("chezmoi", {
   ],
   ask: ["add", "init", "update"],
 });
+tool("doppler", { allow: ["configs", "projects"] });
 
-// -- WSL / Windows --
+// WSL / Windows
 allow(
   "wsl",
   "tasklist",
@@ -363,8 +395,13 @@ allow(
   "dir",
 );
 
-// -- Misc tools --
+// Misc tools
 allow(
+  ...versions("code", "zed", "micro"),
+  "code --list-extensions",
+  "ssh-keygen -l", // fingerprint only, no key material touched
+  "openssl version",
+  "openssl x509", // cert inspection, no key generation
   "opencode",
   "mise install",
   "mise exec",
@@ -380,7 +417,7 @@ allow(
   "/mnt/storage/unity/bin/pcommit",
 );
 
-// -- Package managers (ask — lifecycle scripts, lockfile changes) --
+// Package managers (ask, lifecycle scripts and lockfile changes)
 ask(
   ...subs("npm", ["install", "update"]),
   ...subs("pnpm", ["update", "store prune"]),
@@ -392,10 +429,10 @@ ask(
   "sudo apt",
 );
 
-// -- Destructive file operations --
+// Destructive file operations
 ask("rm", "rm -rf", "del");
 
-// -- Deploy commands --
+// Deploy commands
 ask(
   "wrangler publish",
   "wrangler deploy",
@@ -408,22 +445,20 @@ ask(
   "scp",
 );
 
-// -- Cargo dangerous --
+// Cargo dangerous
 deny("cargo clean", "cargo yank", "cargo uninstall --all");
 
-// -- Wrangler dangerous --
+// Wrangler dangerous
 deny("wrangler delete", "wrangler secret delete");
 
-// -- Windows destructive --
+// Windows destructive
 deny("rmdir /s", "rd /s", "Remove-Item -Recurse -Force", "del /s");
 
-// -- ripgrep footgun: `-r`/`--replace` is substitution, not "recursive" --
+// ripgrep footgun: `-r`/`--replace` is substitution, not "recursive"
 // (ported `grep -rn` silently rewrites matches instead of printing line numbers)
 deny("rg -r", "rg --replace");
 
-// =============================================================================
 // OUTPUT FORMATTING
-// =============================================================================
 
 type Format = "opencode" | "claude";
 
@@ -456,20 +491,20 @@ const claudeExtras = {
     "WebSearch",
     "WebFetch",
     "Skill(superpowers:*)",
-    // /tmp is scratch space — the bash-guard truncation rewrite saves full
+    // /tmp is scratch space, the bash-guard truncation rewrite saves full
     // command output under /tmp/claude-bash, and /tmp is generally throwaway.
     // Allow the file tools to operate there without prompting.
     "Read(/tmp/**)",
     "Write(/tmp/**)",
     "Edit(/tmp/**)",
-    // MCP servers — context7 (wildcards work for context7 tool names)
+    // MCP servers: context7 (wildcards work for context7 tool names)
     "mcp__context7__resolve-library-id",
     "mcp__context7__query-docs",
     // gh_grep
     "mcp__gh_grep__searchGitHub",
     // ida (reverse-engineering MCP)
     "mcp__ida__*",
-    // Linear: read-only (must be exact names — wildcards not supported in MCP permissions)
+    // Linear: read-only (must be exact names, wildcards not supported in MCP permissions)
     "mcp__linear__get_attachment",
     "mcp__linear__get_document",
     "mcp__linear__get_issue",
@@ -491,7 +526,7 @@ const claudeExtras = {
     "mcp__linear__list_users",
     "mcp__linear__search_documentation",
     "mcp__linear__extract_images",
-    // Linear: light mutations (batch-friendly) — unblocked, run without prompting
+    // Linear: light mutations (batch-friendly), unblocked, run without prompting
     "mcp__linear__save_issue",
     "mcp__linear__create_issue_label",
     "mcp__linear__save_comment",
@@ -526,7 +561,6 @@ function formatClaude(): object {
   return result;
 }
 
-// --- Main ---
 const format = process.argv[2] as Format;
 if (!format || !["opencode", "claude"].includes(format)) {
   console.error("Usage: permissions.ts <opencode|claude>");
