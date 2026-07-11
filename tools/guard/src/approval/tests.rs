@@ -37,6 +37,17 @@ fn strip_redirects_cases(#[case] input: &str, #[case] expected: &str) {
 // `tail` need not be allow-listed; the source command carries approval.
 #[case::filters_are_trusted(&["cargo test"], &[], &[], "cargo test 2>&1 | tail -20", Decision::Allow)]
 #[case::empty_allow_list_passes_through(&[], &["rm"], &[], "ls && cargo build", Decision::Passthrough)]
+// bash -c payload is unquoted and classified: the inner command decides. The
+// wrapper is transparent, so an all-allowed payload allows the compound.
+#[case::bash_c_payload_allows(&["cd", "echo"], &[], &[], "cd x && bash -c 'echo hi'", Decision::Allow)]
+#[case::bash_c_payload_denies(&["cd"], &["rm"], &[], "cd x && bash -c 'rm -rf /'", Decision::Deny)]
+#[case::bash_c_payload_unknown_passes(&["cd"], &[], &[], "cd x && bash -c 'frobnicate'", Decision::Passthrough)]
+// A payload we cannot expand keeps the wrapper opaque, so it cannot auto-allow.
+#[case::bash_c_dollar_keeps_wrapper(&["cd"], &[], &[], "cd x && bash -c \"$UNKNOWN\"", Decision::Passthrough)]
+// ssh is gated on its own: an all-allowed remote payload does NOT auto-allow
+// the ssh (the wrapper stays unknown), but a denied remote command still denies.
+#[case::ssh_payload_does_not_allow(&["cd", "ls"], &[], &[], "cd x && ssh roman 'ls'", Decision::Passthrough)]
+#[case::ssh_denied_remote_denies(&["cd"], &["cargo clean"], &[], "cd x && ssh roman 'cargo clean'", Decision::Deny)]
 fn decide_cases(
     #[case] allow: &[&str],
     #[case] deny: &[&str],

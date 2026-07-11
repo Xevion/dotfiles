@@ -4,15 +4,15 @@
 //! Pipeline filters (head/grep/...) are trusted, so a wrapped `cargo test | tail`
 //! auto-allows on `cargo test` alone.
 
-use crate::parse::{basename, parse_opt, FILTERS};
+use crate::nested::{nested_payload, Nested};
+use crate::parse::{basename, parse_opt, FILTERS, TRANSPARENT};
 use brush_parser::ast;
 use serde::Deserialize;
 use std::collections::BTreeSet;
 
-const TRANSPARENT: &[&str] = &[
-    "command", "builtin", "env", "nice", "nohup", "time", "doas", "exec", "strace", "ltrace",
-    "xargs",
-];
+/// Cap on nested-wrapper recursion (`bash -c` inside `ssh` inside ...), a
+/// backstop against pathological input; real commands nest one or two deep.
+const MAX_DEPTH: usize = 6;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Decision {
@@ -191,97 +191,122 @@ fn git_root() -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-/// Every simple command's argv in the tree, plus one level of `bash -c` /
-/// `sh -c` payload expansion.
+/// Every simple command's argv in the tree, recursing into nested wrappers
+/// (`bash -c '<script>'`, `ssh host <cmd>`) up to `MAX_DEPTH`. A local shell
+/// wrapper is transparent - only its payload is emitted - while an ssh wrapper
+/// is kept and its payload added, so ssh's own gating still applies and a
+/// denied remote command still surfaces.
 fn collect_commands(command: &str) -> Vec<Vec<String>> {
-    let Some(prog) = parse_opt(command) else {
-        return Vec::new();
-    };
     let mut out = Vec::new();
+    collect_str(command, 0, &mut out);
+    out
+}
+
+fn collect_str(command: &str, depth: usize, out: &mut Vec<Vec<String>>) {
+    let Some(prog) = parse_opt(command) else {
+        return;
+    };
     for cc in &prog.complete_commands {
-        collect_list(cc, &mut out);
+        collect_list(cc, depth, out);
     }
-    let mut expanded = out.clone();
-    for argv in &out {
-        if let Some(payload) = shell_c_payload(argv) {
-            if let Some(inner) = parse_opt(&payload) {
-                for cc in &inner.complete_commands {
-                    collect_list(cc, &mut expanded);
-                }
-            }
-        }
-    }
-    expanded
 }
 
-fn collect_list(list: &ast::CompoundList, out: &mut Vec<Vec<String>>) {
+fn collect_list(list: &ast::CompoundList, depth: usize, out: &mut Vec<Vec<String>>) {
     for item in &list.0 {
-        collect_andor(&item.0, out);
+        collect_andor(&item.0, depth, out);
     }
 }
 
-fn collect_andor(andor: &ast::AndOrList, out: &mut Vec<Vec<String>>) {
-    collect_pipeline(&andor.first, out);
+fn collect_andor(andor: &ast::AndOrList, depth: usize, out: &mut Vec<Vec<String>>) {
+    collect_pipeline(&andor.first, depth, out);
     for a in &andor.additional {
         match a {
-            ast::AndOr::And(p) | ast::AndOr::Or(p) => collect_pipeline(p, out),
+            ast::AndOr::And(p) | ast::AndOr::Or(p) => collect_pipeline(p, depth, out),
         }
     }
 }
 
-fn collect_pipeline(pl: &ast::Pipeline, out: &mut Vec<Vec<String>>) {
+fn collect_pipeline(pl: &ast::Pipeline, depth: usize, out: &mut Vec<Vec<String>>) {
     for cmd in &pl.seq {
-        collect_command(cmd, out);
+        collect_command(cmd, depth, out);
     }
 }
 
-fn collect_command(cmd: &ast::Command, out: &mut Vec<Vec<String>>) {
+fn collect_command(cmd: &ast::Command, depth: usize, out: &mut Vec<Vec<String>>) {
     use ast::CompoundCommand as C;
     match cmd {
         ast::Command::Simple(s) => {
             let argv = simple_argv(s);
             if !argv.is_empty() {
-                out.push(argv);
+                emit_simple(argv, depth, out);
             }
         }
         ast::Command::Compound(cc, _) => match cc {
-            C::BraceGroup(b) => collect_list(&b.list, out),
-            C::Subshell(s) => collect_list(&s.list, out),
-            C::ForClause(f) => collect_list(&f.body.list, out),
+            C::BraceGroup(b) => collect_list(&b.list, depth, out),
+            C::Subshell(s) => collect_list(&s.list, depth, out),
+            C::ForClause(f) => collect_list(&f.body.list, depth, out),
             C::WhileClause(w) | C::UntilClause(w) => {
-                collect_list(&w.0, out);
-                collect_list(&w.1.list, out);
+                collect_list(&w.0, depth, out);
+                collect_list(&w.1.list, depth, out);
             }
             C::IfClause(i) => {
-                collect_list(&i.condition, out);
-                collect_list(&i.then, out);
+                collect_list(&i.condition, depth, out);
+                collect_list(&i.then, depth, out);
                 if let Some(elses) = &i.elses {
                     for e in elses {
                         if let Some(c) = &e.condition {
-                            collect_list(c, out);
+                            collect_list(c, depth, out);
                         }
-                        collect_list(&e.body, out);
+                        collect_list(&e.body, depth, out);
                     }
                 }
             }
             C::CaseClause(c) => {
                 for item in &c.cases {
                     if let Some(l) = &item.cmd {
-                        collect_list(l, out);
+                        collect_list(l, depth, out);
                     }
                 }
             }
             C::Arithmetic(_) | C::ArithmeticForClause(_) | C::Coprocess(_) => {}
         },
-        ast::Command::Function(f) => collect_command_compound(&f.body.0, out),
+        ast::Command::Function(f) => collect_command_compound(&f.body.0, depth, out),
         ast::Command::ExtendedTest(_, _) => {}
     }
 }
 
-fn collect_command_compound(cc: &ast::CompoundCommand, out: &mut Vec<Vec<String>>) {
+/// Emit one simple command, recursing into a nested wrapper when present.
+fn emit_simple(argv: Vec<String>, depth: usize, out: &mut Vec<Vec<String>>) {
+    if depth < MAX_DEPTH {
+        match nested_payload(&argv) {
+            // The shell wrapper is transparent: analyze only the payload, but
+            // keep the wrapper if the payload yields nothing so an unanalyzable
+            // `bash -c` never auto-allows on its siblings.
+            Some(Nested::Local(payload)) => {
+                let before = out.len();
+                collect_str(&payload, depth + 1, out);
+                if out.len() == before {
+                    out.push(argv);
+                }
+                return;
+            }
+            // ssh is gated on its own; keep it, and add the remote command so a
+            // denied part still denies.
+            Some(Nested::Remote(payload)) => {
+                out.push(argv);
+                collect_str(&payload, depth + 1, out);
+                return;
+            }
+            None => {}
+        }
+    }
+    out.push(argv);
+}
+
+fn collect_command_compound(cc: &ast::CompoundCommand, depth: usize, out: &mut Vec<Vec<String>>) {
     // Function bodies wrap a compound; reuse the compound arm.
     let wrapper = ast::Command::Compound(cc.clone(), None);
-    collect_command(&wrapper, out);
+    collect_command(&wrapper, depth, out);
 }
 
 fn simple_argv(s: &ast::SimpleCommand) -> Vec<String> {
@@ -304,16 +329,6 @@ fn simple_argv(s: &ast::SimpleCommand) -> Vec<String> {
         }
     }
     argv
-}
-
-/// The payload of `bash -c '<payload>'` / `sh -c '<payload>'`, if this is one.
-fn shell_c_payload(argv: &[String]) -> Option<String> {
-    let base = basename(argv.first()?);
-    if base != "bash" && base != "sh" {
-        return None;
-    }
-    let idx = argv.iter().position(|a| a == "-c")?;
-    argv.get(idx + 1).cloned()
 }
 
 fn strip_transparent(argv: &[String]) -> Vec<String> {

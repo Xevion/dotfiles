@@ -19,6 +19,13 @@ pub const FILTERS: &[&str] = &[
     "head", "tail", "grep", "rg", "sed", "awk", "jq", "wc", "sort", "uniq", "cut", "tr",
 ];
 
+/// Prefixes that pass through to the real command in the next word, so the
+/// effective command is found by skipping them. Shared by rules and approval.
+pub const TRANSPARENT: &[&str] = &[
+    "command", "builtin", "env", "nice", "nohup", "time", "doas", "exec", "strace", "ltrace",
+    "xargs",
+];
+
 /// A redirection on a stage, restricted to the reproducible set. Anything else
 /// makes the stage `Unsupported`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -394,6 +401,42 @@ fn push_escape(seq: &str, out: &mut String) -> Option<()> {
     let rest = seq.strip_prefix('\\')?;
     if rest != "\n" {
         out.push_str(rest);
+    }
+    Some(())
+}
+
+/// Quote-removal for one word that keeps glob and brace metacharacters as
+/// literal text, unlike `unquote` which rejects them. Used to recover the
+/// literal text of a nested command payload (a `bash -c` string, an ssh remote
+/// word) for analysis, where a `*` is just text to inspect, not something the
+/// runner must expand. Returns None when the word carries an expansion whose
+/// value we cannot know - parameter, command, arithmetic, tilde, or ANSI-C
+/// quoting - so callers fail open rather than analyze a string that differs
+/// from what the shell will actually run.
+pub fn unquote_lenient(raw: &str) -> Option<String> {
+    let pieces = word::parse(raw, &ParserOptions::default()).ok()?;
+    let mut out = String::new();
+    for wp in &pieces {
+        fold_lenient(&wp.piece, &mut out)?;
+    }
+    Some(out)
+}
+
+fn fold_lenient(p: &WordPiece, out: &mut String) -> Option<()> {
+    match p {
+        WordPiece::Text(s) => out.push_str(s),
+        WordPiece::SingleQuotedText(s) => out.push_str(s),
+        WordPiece::DoubleQuotedSequence(inner) => {
+            for wp in inner {
+                match &wp.piece {
+                    WordPiece::Text(s) => out.push_str(s),
+                    WordPiece::EscapeSequence(s) => push_escape(s, out)?,
+                    _ => return None,
+                }
+            }
+        }
+        WordPiece::EscapeSequence(s) => push_escape(s, out)?,
+        _ => return None,
     }
     Some(())
 }

@@ -3,9 +3,14 @@
 //! pattern can't hide inside a brace group or loop. Fail-open: a parse error
 //! yields no issues, and the command runs untouched.
 
-use crate::parse::{basename, parse_opt};
+use crate::nested::{nested_payload, Nested};
+use crate::parse::{basename, parse_opt, TRANSPARENT};
 use brush_parser::ast;
 use std::collections::HashSet;
+
+/// Cap on nested-shell recursion (`bash -c` inside `bash -c` ...); real
+/// commands nest one or two deep, this is a backstop against pathological input.
+const MAX_DEPTH: usize = 6;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verdict {
@@ -17,12 +22,6 @@ pub struct Issue {
     pub verdict: Verdict,
     pub message: String,
 }
-
-/// Prefixes that pass through to the real command in the next word.
-const TRANSPARENT: &[&str] = &[
-    "command", "builtin", "env", "nice", "nohup", "time", "doas", "exec", "strace", "ltrace",
-    "xargs",
-];
 
 /// One simple command in the tree, with the context a rule needs.
 struct Cmd {
@@ -65,6 +64,7 @@ pub fn evaluate(command: &str) -> Vec<Issue> {
 struct Evaluator {
     issues: Vec<Issue>,
     seen: HashSet<String>,
+    depth: usize,
 }
 
 impl Evaluator {
@@ -105,6 +105,7 @@ impl Evaluator {
             ast::Command::Simple(s) => {
                 if let Some(ctx) = build_cmd(s, right_of_pipe, in_pipeline) {
                     self.apply_rules(&ctx);
+                    self.recurse_local(&ctx.argv);
                 }
             }
             ast::Command::Compound(cc, _) => self.walk_compound(cc),
@@ -164,6 +165,27 @@ impl Evaluator {
                 }
             }
         }
+    }
+
+    /// Descend into a local shell payload (`bash -c '<script>'`) so discipline
+    /// rules apply inside it too: `bash -c 'sudo ...'` must still block. ssh
+    /// (remote) payloads are skipped - the rule messages assume this
+    /// environment, and "sudo won't work here" is false on a remote host.
+    fn recurse_local(&mut self, argv: &[String]) {
+        if self.depth >= MAX_DEPTH {
+            return;
+        }
+        let Some(Nested::Local(payload)) = nested_payload(argv) else {
+            return;
+        };
+        let Some(prog) = parse_opt(&payload) else {
+            return;
+        };
+        self.depth += 1;
+        for cc in &prog.complete_commands {
+            self.walk_list(cc);
+        }
+        self.depth -= 1;
     }
 
     fn apply_rules(&mut self, c: &Cmd) {

@@ -153,6 +153,14 @@ New rules enabled by the mined data (small, additive):
 | `\|\| true` / `\|\| echo …` swallowing a build/test command's status | warn — footer now reports exit; suppression is unnecessary |
 | `echo $?` / `echo "exit: $?"` | warn — exit code is in the footer |
 
+Rules recurse into **local** shell payloads (`bash -c '<script>'`, `sh -c`,
+`zsh -c`, ...) up to a depth bound, so a block cannot hide one level down:
+`bash -c 'sudo x'` and `bash -c 'git stash'` still block. Remote payloads
+(`ssh host …`) are **not** walked — the rule messages assume this environment
+("sudo won't work here" is false on a remote host). Payloads carrying an
+unexpanded expansion (`bash -c "sudo $CMD"`) fail open, as everywhere else.
+Extraction lives in `nested.rs` and is shared with approval (§4.5).
+
 ### 4.2 Rewrite
 
 Parse the command line (bash grammar, spans/byte offsets — parser per §8).
@@ -217,9 +225,19 @@ system and must be property-tested (random pipelines: rewrite → zsh eval →
 ### 4.5 Approval (ported, with one simplification)
 
 Same phase-2 logic as today: decompose compound commands, match sub-commands
-against merged allow/deny/ask prefixes from user + project settings, expand
-`bash -c` payloads, auto-allow when all sub-commands are allowed, deny → exit 2.
-The `xevion projects content` carve-out ports unchanged.
+against merged allow/deny/ask prefixes from user + project settings, recurse
+into nested wrappers, auto-allow when all sub-commands are allowed, deny →
+exit 2. The `xevion projects content` carve-out ports unchanged.
+
+Wrapper recursion (shared with §4.1 via `nested.rs`) is asymmetric by trust:
+a **local** shell (`bash -c '<script>'`) is transparent — only its unquoted
+payload is classified, so `... && bash -c 'git log'` auto-allows on the inner
+command. An **ssh** wrapper is kept alongside its payload: ssh is gated on its
+own, so an all-allowed remote command does **not** auto-allow the ssh (the
+wrapper stays unknown → passthrough), but a denied remote command still denies.
+ssh's argv flattening is reproduced (operands after the host joined by spaces,
+quoting dropped), matching real ssh behavior. A wrapper whose payload cannot be
+recovered stays opaque, so it never auto-allows on its siblings.
 
 Approval evaluates the **original** commands (what the agent asked for);
 `guard run '<pipeline>'` wrapping is approval-transparent: the runner is

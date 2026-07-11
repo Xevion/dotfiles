@@ -9,6 +9,7 @@
 
 pub mod approval;
 pub mod hook;
+pub mod nested;
 pub mod parse;
 pub mod rules;
 pub mod run;
