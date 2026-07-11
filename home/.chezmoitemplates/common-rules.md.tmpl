@@ -265,7 +265,23 @@ Detect the project's formatter from config files or a `Justfile` `fmt`/`format` 
 
 ## Comments & Documentation
 
-- Write comments that explain **WHY**, not **WHAT**
+- **Default to no comment.** Simple code gets zero comments or one short line; only genuinely
+  non-obvious invariants earn more, and even then scale length to the complexity actually being
+  explained, not to how tricky the code looks. Terseness and density are separate axes — a short
+  comment can still be overstuffed; keep the wording as plain as the length.
+- **Never reference external documents, tickets, or conversations from code.** No `// see design
+  doc`, no ticket IDs (Linear, GitHub issues, etc.), no section numbers, no pointers to plans or
+  chats. Comments must stand on their own — explain the invariant or the *why* directly, in the
+  comment, so it stays correct as code moves and doesn't depend on a source that can drift, go
+  private, or disappear. A citation to something the reader can't see is worse than no comment.
+- **Keep local/non-public details out of committed files.** Untracked files (scratch notes,
+  planning drafts, local CLAUDE.md variants) are often untracked *on purpose* and may freely
+  reference personal context — don't treat them as raw material to fold into tracked code or
+  comments. If unsure whether an untracked file is intentional scratch vs. forgotten `git add`,
+  ask.
+- **When editing an existing comment, rewrite it whole** rather than appending a clause. Fold the
+  new detail in, cut whatever's no longer load-bearing, and keep the result at the length the
+  current content actually needs — don't let comments grow by accretion.
 - **Never reference old implementations, migrations, or refactoring history**
 - **Never add banner comments** (`===`, `-----`, etc.) — decorative dividers composed of repeated symbols add noise without information
 - **Never add bare section-label comments** (`// Handlers`, `// Utilities`, `// Private`) — if a label adds real context, use a doc comment (`///` or `/** */`) instead
@@ -274,6 +290,7 @@ Detect the project's formatter from config files or a `Justfile` `fmt`/`format` 
   - "Refactored from previous version that used X approach." (never mention past implementations)
   - "This function was changed to improve performance." (utterly useless, belongs in a commit message potentially, but not code!)
   - "Logging removed for cleaner output." (also useless, belongs in commit message if anything)
+  - "// XEV-482: retry logic here" (ticket reference — comment must explain the why itself, not point at the ticket)
 
 ## Git Commits
 
