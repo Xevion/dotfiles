@@ -109,6 +109,7 @@ allow(
     "bench",
   ]),
 );
+tool("rustup", { allow: ["show", "component", "target", "toolchain"] });
 
 // Go
 allow(
@@ -127,6 +128,7 @@ allow(
   "gopls",
   "golangci-lint",
 );
+tool("mvn", { allow: ["test", "compile", "package", "verify", "clean package", "clean install", "dependency:tree", "assembly:single"] });
 
 // Node / Bun
 allow(
@@ -134,18 +136,28 @@ allow(
   ...subs("pnpm", ["run", "list", "exec", "audit", "outdated", "install", "add", "remove", "uninstall"]),
   "bun",
   "bunx",
+  "npx",
+  "eslint",
+  "prettier",
+  "tsc",
+  "dprint",
 );
 
 // Python
 allow(
-  ...subs("uv", ["sync", "run", "pip list", "pip show", "pip install", "venv", "tool"]),
+  ...subs("uv", ["sync", "run", "pip list", "pip show", "pip install", "venv", "tool", "add", "build", "init"]),
   "python3",
+  "python",
+  ".venv/bin/python",
   "pytest",
   "mypy",
   "ruff check",
   "ruff format",
   "black",
+  "uvx",
 );
+tool("pyenv", { allow: ["install", "versions", "version", "global", "local", "which"] });
+tool("pipenv", { allow: ["run", "sync", "install", "lock"] });
 
 // Build tools
 allow("just", "./gradlew", "make run", "make build");
@@ -193,8 +205,6 @@ tool("git", {
     "switch",
     "clone",
     "restore",
-  ],
-  deny: [
     "push --force",
     "push -f",
     "push --force-with-lease",
@@ -239,12 +249,12 @@ tool("gh", {
     "pr close",
     "issue close",
     "run cancel",
-  ],
-  deny: [
-    "repo delete",
     "repo archive",
     "secret delete",
     "release delete",
+  ],
+  deny: [
+    "repo delete", // no recovery path once GitHub's grace window lapses
   ],
 });
 
@@ -321,10 +331,35 @@ allow(
   "whois",
   "apt-cache",
   "7z",
+  "ln",
+  "eza",
+  "ps",
+  "perf",
+  "xz",
+  "ast-grep",
 );
+// ast-grep footgun: `-U`/`--update-all` rewrites every match across the codebase unattended
+ask("ast-grep run -U", "ast-grep run --update-all", "ast-grep scan --update-all");
 
 // DB / query tools
-allow("psql", "sqlite3");
+allow("psql", "sqlite3", "sqlc", "tygo");
+
+// Binary inspection (read-only)
+allow("nm", "objdump", "ldd", "ilspycmd", "rabin2");
+
+// Process management
+allow("kill", "pkill");
+
+// systemd (status queries only; start/stop/enable/disable stay ungated)
+tool("systemctl", {
+  allow: ["is-active", "list-unit-files", "list-units", "status", "--user list-unit-files", "--user list-units", "--user show-environment", "--user status"],
+});
+
+// Deployment CLIs (read-only status checks; up/deploy stay ungated)
+tool("railway", { allow: ["status", "whoami"] });
+
+// Privileged reads: dmidecode only reads SMBIOS data, no state change despite needing root
+tool("pkexec", { allow: ["dmidecode"] });
 
 // System diagnostics (read-only)
 allow("whoami", "uname", "hostname", "id", "groups", "lscpu", "free", "uptime", "nproc", "lsof");
@@ -340,7 +375,7 @@ tool("ip", {
 
 // Package listing (read-only queries only; install/remove untouched)
 tool("apt", { allow: ["list", "search", "show", "policy"] });
-tool("dpkg", { allow: ["-l", "-L", "-s", "--list", "--listfiles"] });
+tool("dpkg", { allow: ["-l", "-L", "-s", "-S", "--list", "--listfiles"] });
 tool("brew", { allow: ["list", "info", "search", "outdated", "leaves", "deps", "--version"] });
 tool("snap", { allow: ["list", "info", "find"] });
 
@@ -412,9 +447,14 @@ allow(
   "mise use",
   "mise run",
   "claude mcp add",
+  "tempo",
+  "ffprobe",
   // Custom local tooling on external storage
   "/mnt/storage/unity/bin/unity",
   "/mnt/storage/unity/bin/pcommit",
+  // Personal tools deployed by this dotfiles repo or ~/.local/bin
+  "~/.claude/hooks/guard",
+  "~/.local/bin/protonhax",
 );
 
 // Package managers (ask, lifecycle scripts and lockfile changes)
@@ -446,13 +486,15 @@ ask(
 );
 
 // Cargo dangerous
-deny("cargo clean", "cargo yank", "cargo uninstall --all");
+ask("cargo yank", "cargo uninstall --all"); // recoverable (un-yank, reinstall), but affects a public registry / local toolchain
+deny("cargo clean"); // not unsafe, just wastes time re-compiling; never run per standing instruction
 
 // Wrangler dangerous
-deny("wrangler delete", "wrangler secret delete");
+ask("wrangler secret delete"); // recoverable by re-setting the secret
+deny("wrangler delete"); // deletes a live Worker, no undo
 
 // Windows destructive
-deny("rmdir /s", "rd /s", "Remove-Item -Recurse -Force", "del /s");
+ask("rmdir /s", "rd /s", "Remove-Item -Recurse -Force", "del /s"); // Windows equivalents of `rm -rf`, which is already ask
 
 // ripgrep footgun: `-r`/`--replace` is substitution, not "recursive"
 // (ported `grep -rn` silently rewrites matches instead of printing line numbers)
@@ -491,6 +533,8 @@ const claudeExtras = {
     "WebSearch",
     "WebFetch",
     "Skill(superpowers:*)",
+    "Skill(brainstorming)",
+    "Skill(interview)",
     // /tmp is scratch space, the bash-guard truncation rewrite saves full
     // command output under /tmp/claude-bash, and /tmp is generally throwaway.
     // Allow the file tools to operate there without prompting.
@@ -502,8 +546,16 @@ const claudeExtras = {
     "mcp__context7__query-docs",
     // gh_grep
     "mcp__gh_grep__searchGitHub",
-    // ida (reverse-engineering MCP)
+    // reverse-engineering MCPs (read-only inspection tools; no rename/patch/write tools exist)
     "mcp__ida__*",
+    "mcp__ida-pro-mcp__*",
+    "mcp__ghidra__*",
+    // rustdoc-mcp (crate/item docs lookup)
+    "mcp__rustdoc-mcp__*",
+    // local-web-fetch (read-only URL fetch, same trust level as built-in WebFetch)
+    "mcp__local-web-fetch__*",
+    // ark-ui (component doc/example lookup)
+    "mcp__ark-ui__*",
     // Linear: read-only (must be exact names, wildcards not supported in MCP permissions)
     "mcp__linear__get_attachment",
     "mcp__linear__get_document",
