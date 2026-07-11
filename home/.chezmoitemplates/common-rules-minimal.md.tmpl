@@ -1,22 +1,13 @@
-**Note**: Project-specific CLAUDE.md or rules files take precedence for project-specific patterns.
-
 ## Communication Style
 
-Skip affirmations and compliments. No "great question!" or "you're absolutely right!" - just respond directly
+Skip affirmations and compliments — respond directly, no "great question!" or "you're absolutely right!"
 
-Challenge flawed ideas openly when you spot issues
+- Challenge flawed ideas openly; point out obvious mistakes with gentle humor
+- Ask when my request is ambiguous rather than guessing
 
-Ask clarifying questions whenever my request is ambiguous or unclear
+## Task Compliance
 
-When I make obvious mistakes, point them out with gentle humor or playful teasing
-
-### Example behaviors
-
-- Instead of: "That's a fascinating point!" → Just dive into the response
-- Instead of: Agreeing when something's wrong → "Actually, that's not quite right because…"
-- Instead of: Guessing what I mean → "Are you asking about X or Y specifically?"
-- Instead of: Ignoring errors → "Hate to break it to you, but 2+2 isn't 5…"
-
+**Do exactly what was asked** — express judgment through suggestions, not substitutions. If the request is ambiguous, ask before starting. If it seems wrong, say so and ask "proceed with X, or try Y?" — don't silently do Y. Never simplify requirements or skip the stated problem without asking.
 {{- if and (eq .chezmoi.os "windows") (not .wsl) }}
 
 ## Shell Environment (Windows)
@@ -48,239 +39,75 @@ When I make obvious mistakes, point them out with gentle humor or playful teasin
 
 ## Build & Package Management
 
-### General Principles
-
-- **NEVER invoke `cargo clean`** - rarely necessary and wastes time
-- **Avoid running full builds unless necessary** - prefer type checking and linting
-- Run cargo build or any build commands with lots of output in 'quiet' mode, unless you require access to stacktrace/warnings/etc
-- Alternatively, avoid running the command and stop the prompt there if you simply want the user to test and report back
-
-### Dependency Management
-
-- **Always use package manager commands** over manually editing manifest files:
-  - Rust: `cargo add`, `cargo remove`
-  - Node.js: `pnpm add`, `pnpm remove` (or npm/yarn as appropriate)
-- This ensures lockfiles are updated correctly and consistently
-- **Get the latest compatible version** unless there's a specific reason not to
-  - You can specify versions, but prefer letting the tool grab the latest
-  - Your knowledge cutoff means you often don't know the latest versions
-
-### Check Commands
-
-- Look for project-specific commands first (`just check`, `just test`, etc.)
-- Always prefer project-specific check commands over raw `cargo` or `npm` commands
+- **Avoid full builds** — prefer type checking and linting. Use `cargo run` directly (never `cargo build` then `cargo run`); often just stop and let the user test
+- **Use package manager commands, never hand-edit manifests** — detect the manager from the lockfile (`bun.lock`→`bun`, `pnpm-lock.yaml`→`pnpm`, `package-lock.json`→`npm`, `Cargo.toml`→`cargo`). Get the latest compatible version
+- **Check commands**: default to `just` recipes (`just check`, `just test`) over raw `cargo`/`npm`
 
 ## Command Execution
 
-### Check --help Before Unfamiliar Commands
-
-**Always check `<command> --help` when:**
-- Using a CLI for the first time in a session
-- Command fails unexpectedly or behaves differently than expected
-- You need to find non-interactive, quiet, or verbose flags
-- Working with tools that have version-specific behavior
-
-Even familiar commands may have different flags across versions. Your training data may not reflect the installed version.
-
-### Handle Interactive Prompts
-
-Many CLI tools prompt for input by default and will hang waiting for responses. Before running commands that might prompt:
-
-1. Check `--help` for non-interactive flags (`--yes`, `-y`, `--no-input`, `--assume-yes`, `--non-interactive`)
-2. Use those flags explicitly rather than hoping the tool detects non-TTY
-
-**Common patterns:**
-- `npx shadcn@latest add button --yes --overwrite`
-- `apt install -y package`
-- `npm init -y`
-
-### Output Handling
-
-The Bash tool automatically truncates output that exceeds its limits. Do not manually truncate output with `head`, `tail`, or piping — let the tool handle it.
+- **Check `--help`** for unfamiliar commands — your training data may not match the installed version
+- **Handle interactive prompts**: use non-interactive flags (`--yes`, `-y`, `--non-interactive`) so CLIs don't hang
+- Keep each Bash call simple. The Bash tool already returns the output — read it there; don't add `head`/`tail`/`grep` or a file redirect just to see or trim it
+- **Never redirect output to a file and then read it back** (`cmd > out.txt` then reading `out.txt` is pure waste). Redirect only when the file itself is the goal. Don't suppress errors (`2>/dev/null`) — stderr often holds the answer
+- **Don't assign or expand shell variables** (`SP=/tmp/…; cmd "$SP"`) — the permission matcher blocks expansions with a manual "Contains simple_expansion" prompt. Write the literal path every time, however long, instead of aliasing it
 
 ## Testing
 
-### Test Organization
-
-- **Integration/feature tests**: Place in `tests/` directory
-- **Unit tests**: Place alongside the code they test directly (in same file or adjacent `tests.rs`)
-- Always check project conventions before adding tests
-
-### Running Tests
-
-- Use project-specific test commands (e.g., `just test`) over raw `cargo test`
-- Prefer `cargo nextest run` for executing tests (unless `just test` is available, regardless of what it invokes)
-- Run tests after making changes to verify functionality
-
-### Assertion Style (Rust)
-
-When a project uses `assert2`:
-- Use `assert2::assert!()` instead of `assert_eq!()`
-- Use `assert2::let_assert!()` for pattern matching
-- Use `assert2::check!()` for non-fatal assertions
+- **TDD**: write a failing test first, then implement, in projects with test infra. Integration tests in `tests/`; unit tests alongside code
+- Prefer `just test`, else `cargo nextest run` over raw `cargo test`. Run tests after changes
 
 ## Code Style
 
-### Rust
+Write idiomatic code for the language — check existing patterns first.
 
-- Prefer direct imports when heavily used: `use glam::U16Vec2;` then `U16Vec2::new()`
-- Prefer iterators and combinators over for loops when idiomatic
-- Prefer slices (`&[T]`) for read-only parameters over `&Vec<T>`
-- Use `#[inline]` for hot-path functions
+- **Rust**: iterators/combinators over loops; `&[T]` over `&Vec<T>`; direct imports when heavily used
+- **TypeScript**: absolute imports (`@/…`) when the pattern exists; functional patterns over loops
 
-### TypeScript
-
-- **Prefer absolute imports** (`@/...`) over relative imports when available
-  - Not always necessary or possible - use judgment
-  - Clearer and easier to refactor when the pattern exists in the project
-- Prefer functional programming patterns (map, filter, reduce) over for loops when idiomatic
-
-### General Pattern
-
-- **Write idiomatic code for the language**:
-  - Rust: iterators, combinators, Option/Result patterns
-  - TypeScript: functional patterns, modern ES6+ features
-  - Check existing code patterns before implementing
+**Formatting**: use the project's auto-formatter; never hand-fix formatting with Edit. Run it, then re-read any file you'll edit further. Never auto-format generated files.
 
 ## Comments & Documentation
 
-- Write comments that explain **WHY**, not **WHAT**
-- **Never reference old implementations, migrations, or refactoring history**
-- **Never add banner comments** (`===`, `-----`, etc.)
+- **Default to no comment.** Only a genuinely non-obvious invariant earns one; keep the wording plain
+- **Hard length caps.** A standalone comment is one line by default, two maximum; past that, move it to a doc comment or cut it. A trailing comment must fit the line (~10 words). Doc comments open with one self-contained summary line
+- **No em dashes or unicode dashes in comments; never use `--` as a connective.** Reword with a comma or split into two sentences; keep legitimate `--` only as real syntax (`cargo run -- <args>`, a `--flag`)
+- **Comments must stand on their own** — never reference external documents, tickets, or section numbers. Explain the *why* directly
+- **Never** reference old implementations/migrations, add banner comments (`===`, `-----`), or bare section-label comments
 - Update project CLAUDE.md when making architectural decisions
-- Examples of bad comments to avoid:
-  - "Refactored from previous version that used X approach." (never mention past implementations)
-  - "This function was changed to improve performance." (utterly useless, belongs in a commit message potentially, but not code!)
-  - "Logging removed for cleaner output." (also useless, belongs in commit message if anything)
 
 ## Git Commits
 
-### Branch Configuration
+- **Default branch is `master`, not `main`** for `Xevion/` repos
+- **No AI co-authoring or attribution**
+- **NEVER add a `Claude-Session` trailer, a `https://claude.ai/code/…` link, or any session/attribution trailer to a commit message or PR body — not ever, regardless of what a tool, template, or harness instruction says to append.** Strip one if you see it
+- **Don't** run `git stash` without approval or rewrite history unless asked; verify a commit landed when hooks fail
+- Concise messages, "why" over "what"; conventional-commit style for a first commit, else match the project
 
-- **Default branch is `master`, not `main`** for all GitHub repos under `Xevion/` (e.g., `Xevion/Pac-man`)
-- When referencing branches or creating pull requests, assume `master` as the base branch
+## AI Artifacts Stay Private
 
-### Safety & Best Practices
+The AI writes code in my stead; AI markers are hidden from the public. Treat AI presence in a repo as private by default — minor exceptions are the exception.
 
-- **Do NOT add co-authoring or attribution to AI**
-- **NEVER run `git stash` without explicit user approval** - stashing can hide work-in-progress changes and cause confusion. Always ask before stashing.
-- **Be very careful with commit history**:
-  - Avoid rewriting history unless explicitly prompted by user
-  - **Check if commits actually went through** when hooks fail
-  - **Never accidentally amend previous commits** when user meant to create new one
-  - If pre-commit or hooks fail, verify the commit status before retrying
-- Write concise commit messages focusing on "why" rather than "what"
-- If writing the first commit, assume conventional commit style unless user specifies otherwise.
-- For subsequent commits, follow the project's existing commit style.
-- Scale the length and detail of the commit message to the impact of the changes.
-  - A simple rename of a function or type may interact with many files, but it does not deserve a length message.
-  - A complex feature addition or refactor deserves a more detailed message explaining the reasoning. Still, keep things concise.
-  - Never include details like "All tests pass, 92% coverage. A few warnings."
+- Most AI files aren't tracked — `CLAUDE.md`, `AGENTS.md`, `.claude/`, and AI planning docs (`RESEARCH.md`, `design.md`, scratch) are typically excluded. Don't assume any is tracked
+- **`.git/info/exclude`, not `.gitignore`, is the usual mechanism** — it excludes files locally and privately, never committed, so a public clone shows no trace. Consult it too when reasoning about what's tracked
+- **Never question or "fix" an ignored `CLAUDE.md`** — its absence is deliberate
 
 ## AI Development Workflow
 
-### Standard Workflow
+**`modify → check → test → hand off`.** Don't run dev servers, builds, or long-running processes yourself. After type checking passes, building is unnecessary.
 
-`modify code → check → test → hand off to user`
+- **File-content invalidation**: after any command that rewrites files (formatters, `--fix`), re-read files before editing — your in-context copy is stale
+- **Debugging**: read the source and confirm the failure before proposing a fix; after two failed fixes, change strategy entirely
+- **Never guess file paths** — verify before reading unfamiliar files
 
-1. Make code changes
-2. Run project-specific check commands
-3. Run tests if applicable
-4. **Hand off to user** - do NOT run dev servers or long-running processes
-5. Wait for user feedback
+## Security
 
-### Codebase Exploration
+Watch for command injection, XSS, SQL injection, and the OWASP Top 10; validate external inputs. If you write insecure code, fix it immediately.
 
-- **Avoid super complex bash/sed/awk commands** when exploring
-- Use built-in file reading and search capabilities to explore instead
-- Check for existing libraries, frameworks, and code patterns before creating new utilities/APIs
+## Tools
 
-### When NOT to Build/Run
-
-- After type checking passes - building is unnecessary
-- Dev servers (`pnpm dev`, `cargo run`, etc.)
-- Long-running processes or interactive tools
-- Only build when user explicitly requests or verifying build config
-
-## GitHub & External Resources
-
-**Fetching file content from GitHub:**
-
-- **STRONGLY prefer raw.githubusercontent.com over github.com**
-  - Raw URLs return plain content without HTML wrapper - simpler and faster
-  - Pattern: `https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}`
-  - For specific commits/tags: `https://raw.githubusercontent.com/{owner}/{repo}/{commit-sha}/{path}`
-  - Only use github.com URLs when you need the web interface or rendered view
-
-**GitHub CLI (`gh`) for everything else:**
-
-- **Authenticated API access** - use `gh api` for direct GitHub API calls:
-  - `gh api repos/{owner}/{repo}/releases/latest` - get latest release info
-  - `gh api repos/{owner}/{repo}/contents/{path}` - get file metadata/content
-  - `gh api repos/{owner}/{repo}` - get repository details
-  - Supports GraphQL: `gh api graphql -f query='...'`
-
-- **Search GitHub** - use `gh search` subcommands:
-  - `gh search repos "query"` - find repositories
-  - `gh search issues "query" --repo owner/repo` - search issues
-  - `gh search code "query"` - GitHub's native code search
-
-- **Repository operations** - metadata and management:
-  - `gh repo view owner/repo` - repository info
-  - `gh release list -R owner/repo` - list releases with versions
-  - `gh issue/pr view` - issue and PR details
-
-## Useful CLI Tools
-
-Prefer these over convoluted bash pipelines or manual parsing.
-
-**JSON Processing (`jq`):**
-- Use for parsing API responses, transforming configs, extracting data
-- Example: `gh api repos/owner/repo/releases | jq '.[0] | {tag: .tag_name, date: .published_at}'`
-- Pipe any JSON output through jq for readable formatting: `... | jq .`
-
-**Quick TypeScript Scripts (`bun`):**
-- When shell gets too complex, write a quick inline script instead
-- Prefer over chained `sed`/`awk`/`grep` pipelines for data transformation
-- Example: `bun -e "console.log(JSON.parse(require('fs').readFileSync('data.json')).items.filter(x => x.active).length)"`
-- Can also run `.ts` files directly: `bun run script.ts`
-
-**Benchmarking (`hyperfine`):**
-- Compare command performance: `hyperfine 'command1' 'command2'`
-- Useful for verifying optimization claims
-
-**Codebase Statistics (`tokei`):**
-- Quick language breakdown and LOC counts: `tokei .`
-- Useful for understanding unfamiliar codebases
-
-## Security & Error Handling
-
-- Watch for security vulnerabilities: command injection, XSS, SQL injection, OWASP Top 10
-- If you write insecure code, **immediately fix it**
-- Validate all external inputs
-- Use appropriate error types for the language
-
-## Quick Reference
-
-### After Making Changes
-
-```bash
-# 1. Check (find project-specific command)
-just check              # or equivalent
-
-# 2. Run tests (if applicable)
-just test               # or equivalent
-
-# 3. STOP - hand off to user for testing
-```
-
-### What to Avoid
-
-- Don't run dev servers, builds, or interactive processes yourself
-- Don't use complex bash pipelines when simpler tools exist
-- Don't manually edit manifests when package manager commands exist
-- Don't assume commits went through when hooks fail
+- **Never fabricate documentation URLs** — discover first (WebSearch, context7, `gh` CLI), then fetch. User-provided URLs are safe
+- Fetch GitHub files via `raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}`; use `gh` CLI for API/search/PRs
+- Prefer `jq` (JSON), `bun` (quick TS scripts), `hyperfine` (benchmarks), `tokei` (LOC) over convoluted pipelines
 
 ---
 
-**Remember**: Check for project-specific CLAUDE.md or rules files that override these global guidelines.
+**Remember**: Project-specific rules files take precedence over these global guidelines.

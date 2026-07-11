@@ -25,7 +25,12 @@ const permissions = JSON.parse(permProc.stdout.toString());
 
 // Desired state — keys chezmoi manages. Anything not here is left as-is.
 const desired: Record<string, unknown> = {
-  includeCoAuthoredBy: false,
+  includeCoAuthoredBy: false, // legacy fallback for pre-attribution Claude Code
+  attribution: {
+    commit: "",
+    pr: "",
+    sessionUrl: false, // suppresses the Claude-Session: URL trailer
+  },
   permissions,
   hooks: {
     PreToolUse: [
