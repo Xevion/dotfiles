@@ -1,5 +1,13 @@
 # Chezmoi Dotfiles Repository - AI Assistant Guidelines
 
+## ⚠️ CRITICAL: Do Not Auto-Write Memories on Complaints
+
+**When the user complains about your behavior (in this repo or reporting behavior from another session), that is NOT a trigger to write an auto-memory.** Fix the actual thing being pointed at — stop the offending action, and if it's a standing instruction, edit the relevant tracked file (this file, or `home/dot_claude/CLAUDE.md.tmpl` / `home/.chezmoitemplates/common-rules.md.tmpl` for user-level rules) — then say so directly.
+
+- Do not silently log the complaint to `~/.claude/projects/*/memory/` as the response. Venting is not consent to write anything, and doing so repeats the exact "acting without asking" problem being complained about.
+- If something should be remembered across sessions, that belongs in a tracked file the user can see and edit themselves, not a memory file they never look at — unless the user explicitly asks for a memory.
+- If unsure whether project-level or user-level applies, ask (see clarification rules below) instead of guessing or defaulting to memory.
+
 ## ⚠️ CRITICAL: Clarify Before Acting
 
 **When in doubt, ALWAYS present options instead of guessing.**
