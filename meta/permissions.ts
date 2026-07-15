@@ -541,6 +541,22 @@ const claudeExtras = {
     "Read(/tmp/**)",
     "Write(/tmp/**)",
     "Edit(/tmp/**)",
+    // Dependency source/cache directories - read the actual source of installed
+    // packages (registries, module caches, extracted stores) without prompting.
+    "Read(~/.cargo/registry/**)", // crates.io source + index
+    "Read(~/.cargo/git/**)", // git-sourced crate checkouts
+    "Read(~/go/pkg/mod/**)", // Go module cache (verified via `go env GOMODCACHE`)
+    "Read(~/.npm/**)",
+    "Read(~/.local/share/pnpm/store/**)", // pnpm content-addressable store (verified via `pnpm store path`)
+    "Read(~/.cache/yarn/**)",
+    "Read(~/.bun/install/cache/**)",
+    "Read(~/.cache/pip/**)",
+    "Read(~/.cache/uv/**)", // verified via `uv cache dir`
+    "Read(~/.local/share/uv/**)", // uv-managed tool venvs
+    "Read(~/.gem/**)",
+    "Read(~/.m2/repository/**)",
+    "Read(~/.gradle/**)",
+    "Read(~/.local/share/mise/installs/**)", // mise-managed toolchains (ruby gems, python site-packages, etc. live here on this machine)
     // MCP servers: context7 (wildcards work for context7 tool names)
     "mcp__context7__resolve-library-id",
     "mcp__context7__query-docs",

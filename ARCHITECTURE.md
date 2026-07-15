@@ -177,24 +177,32 @@ AI assistant config is split between tool-specific and shared:
 
 ```
 home/dot_claude/
-├── CLAUDE.md.tmpl          # Claude Code: includes common-rules + subagent guidance
-├── settings.json.tmpl      # Claude Code settings
-├── agents/                 # Custom subagent definitions
-├── skills/                 # Skill definitions
-├── commands/               # Slash command definitions (shared with OpenCode via symlinks)
-└── hooks/                  # Claude Code hooks
+├── CLAUDE.md.tmpl           # Claude Code: includes common-rules + subagent guidance
+├── modify_settings.json     # chezmoi modify_ shim: shells out to dot_modify_settings.ts
+├── dot_modify_settings.ts   # deep-merges managed keys (incl. permissions from meta/permissions.ts) into ~/.claude/settings.json
+├── agents/                  # Custom subagent definitions
+├── skills/                  # Skill definitions
+├── commands/                # Slash command definitions (shared with OpenCode via symlinks)
+└── hooks/                   # Claude Code hooks
 
 home/dot_config/opencode/
 ├── AGENTS.md.tmpl          # OpenCode: includes common-rules + OpenCode-specific rules
-├── opencode.jsonc.tmpl     # OpenCode settings
+├── opencode.jsonc.tmpl     # OpenCode settings; calls meta/permissions.ts via `output` for its permission map
 └── command/                # Symlinks → ../../../dot_claude/commands/*.md
 
 home/.chezmoitemplates/
 ├── common-rules.md.tmpl    # Shared rules (used by Claude + OpenCode)
 └── common-rules-minimal.md.tmpl  # Reduced ruleset (used by Gemini)
+
+meta/permissions.ts         # Single source of truth for tool permissions: Bash allow/ask/deny
+                             # rules, plus Claude-only Read/Write/Edit path grants and MCP tool
+                             # rules. Run standalone: `bun meta/permissions.ts claude` or
+                             # `bun meta/permissions.ts opencode`.
 ```
 
 When adding a new slash command, create the definition in `dot_claude/commands/` and add a `symlink_<name>.md` in `dot_config/opencode/command/` pointing to it.
+
+When adding or changing tool permissions (Bash allow/ask/deny rules, or Claude-only `Read(...)`/`Write(...)`/`Edit(...)` path grants), edit `meta/permissions.ts` directly — both `~/.claude/settings.json` and `~/.config/opencode/opencode.jsonc` are regenerated from it on `chezmoi apply`, so hand-editing either deployed file is a no-op after the next apply.
 
 ## Stale File Cleanup
 
