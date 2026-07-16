@@ -539,7 +539,6 @@ const claudeExtras = {
     // command output under /tmp/claude-bash, and /tmp is generally throwaway.
     // Allow the file tools to operate there without prompting.
     "Read(/tmp/**)",
-    "Write(/tmp/**)",
     "Edit(/tmp/**)",
     // Dependency source/cache directories - read the actual source of installed
     // packages (registries, module caches, extracted stores) without prompting.
