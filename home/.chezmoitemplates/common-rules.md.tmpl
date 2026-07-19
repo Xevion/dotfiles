@@ -74,6 +74,8 @@ Get the latest compatible version unless there's a reason not to — your knowle
 
 **Check commands**: default to `just` recipes (`just check`, `just test`, `just format`) over raw `cargo`/`npm`. Run `just --list` in unfamiliar projects; fall back to raw commands only when no `Justfile` exists.
 
+**Local Linux linker**: `~/.cargo/config.toml` sets `[target.x86_64-unknown-linux-gnu] rustflags = ["-C", "link-arg=-fuse-ld=mold"]` — a machine-level opt-in, so CI and fresh clones link with rustc's default (LLD on x86_64-unknown-linux-gnu since 1.90) instead. Never commit `-fuse-ld=mold` into a project's `.cargo/config.toml`: it's a hard error for anyone without mold installed.
+
 ## Command Execution
 
 **Check `--help` for unfamiliar commands** — first use in a session, unexpected failures, or when you need non-interactive/quiet flags. Your training data may not match the installed version.
@@ -102,7 +104,7 @@ Keep each Bash call simple. The Bash tool already returns a command's output —
 - **TDD**: in projects with test infra (Vitest, nextest, Playwright, Jest, pytest…), load the `test-driven-development` skill before writing implementation code — failing test first, then implement. Applies to any feature/bugfix/refactor. When planning, offer TDD decomposition ("write failing test → verify fails → implement → verify passes") where viable.
 - **Organization**: integration/feature tests in `tests/`; unit tests alongside code (or adjacent `tests.rs`). Check project conventions first.
 - **Running**: prefer `just test`, else `cargo nextest run` over raw `cargo test`. Run tests after changes.
-- **assert2 (Rust)**: use `assert2::assert!()`, `let_assert!()`, `check!()` over `assert_eq!()`.
+- **assert2 (Rust)**: use `assert2::assert!()`, `assert!(let ...)` for pattern matches, and `check!()` over `assert_eq!()` — `let_assert!()` is deprecated, don't use it.
 
 ## Code Style
 
