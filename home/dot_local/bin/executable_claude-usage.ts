@@ -1,5 +1,3 @@
-#!/usr/bin/env -S bun --install=auto
-
 /**
  * claude-usage - Fast CLI tool to fetch Anthropic Claude usage percentages
  */
