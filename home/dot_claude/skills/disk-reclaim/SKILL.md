@@ -16,10 +16,11 @@ A naive cleanup re-reads the disk for every question (`du -sh this`, `ncdu that`
 ## 1. Scan once
 
 ```sh
-duc index -x -p -d /path/to/scan.duc /
+duc index -x -H -p -d /path/to/scan.duc /
 ```
 
 - `-x` stays on one filesystem (won't wander into network mounts or other drives).
+- `-H` counts each hard link **once**. Off by default — omitting it silently multiplies hardlinked trees. Never omit it; see the hardlink gotcha below.
 - `-p` shows progress.
 - `-d` is the database path. **Store it off the disk you're cleaning** (another drive, `/tmp` if it has room) so the index itself doesn't compete for the last free bytes.
 
@@ -28,6 +29,13 @@ Confirm it landed:
 ```sh
 duc info -d /path/to/scan.duc
 ```
+
+**Reconcile the index against `df` before trusting it.** Indexed total and `df` used should roughly agree. They diverge for two opposite reasons, and both are silent:
+
+- **Over-count**: hardlinks without `-H` (index > df).
+- **Under-count**: directories the scanning user can't read are skipped with a `Permission denied` warning buried in the scan output (index < df).
+
+Root-only trees are the usual blind spot — `/var/lib/docker` is `drwx--x---`, so a user-run scan reports `/var` without Docker's storage in it and quietly omits a hundred-plus GB. Re-index those paths with `pkexec duc index -x -H -d ...` rather than assuming the parent's number covers them. If index and `df` don't reconcile, find out why before recommending deletions.
 
 ## 2. Inspect from the cache
 
@@ -39,7 +47,11 @@ duc ui   -d scan.duc                   # interactive browse, still no re-scan
 
 **The one gotcha — apparent vs real size.** `--apparent` reports logical file size; without it you get actual blocks on disk. They diverge hard on **sparse files** (VM/container disk images, database files). A "32G" image may occupy 11G. Decide what to delete based on **real** usage; compare against `--apparent` to detect sparseness.
 
-**Hardlinks/dedup.** `duc` (like `du`) counts a shared inode once. If two trees look big but are hardlinked, you are *not* double-paying. Verify with the link count (`ls -l` — the number after permissions) before assuming duplication or "fixing" it.
+**Hardlinks — duc does NOT dedupe by default.** Unlike `du`, plain `duc index` counts every hard link in full, so a shared inode is charged once per link. Two hardlinked trees each report the full size and the total is fabricated. Always index with `-H`; verified on duc 1.4.6, where a 48M blob hardlinked into two dirs reports 47.7M + 47.7M without `-H` and 47.7M + 4.0K with it.
+
+This matters most where hardlinks are the whole point: `uv`/`pnpm`/Nix stores that link a cache into venvs, and Steam/game installs that link shared assets. A uv cache indexed without `-H` read as 117G when it held ~17G.
+
+Deleting a link frees **nothing** until the last link to that inode goes — so a tree can vanish from the index while `df` barely moves. Before believing a reclaim estimate, check the link count (`find DIR -printf '%n %p\n'`, or the number after permissions in `ls -l`) and trace surviving links by inode (`find ROOT -inum N`). To size a tree the way `df` will feel it, sum only single-link files: `find DIR -type f -links 1 -printf '%s\n'`.
 
 ## 3. Triage by category
 
