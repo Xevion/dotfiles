@@ -40,6 +40,8 @@ bitwarden = "latest"
 duckdb = "latest"
 dotnet = "latest"
 zig = "latest"
+zizmor = "latest"
+pinact = "latest"
 
 [settings]
 
