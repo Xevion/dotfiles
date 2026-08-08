@@ -35,6 +35,8 @@ chezmoi/
 │   ├── private_dot_ssh/           # ~/.ssh/ (600 permissions, encrypted content)
 │   ├── AppData/                   # Windows-only: %APPDATA% targets
 │   └── Documents/                 # Windows-only: ~/Documents/ targets
+├── src/                           # Sources for compiled binaries (outside .chezmoiroot,
+│   └── claude-usage.ts            #   so only the built binary is deployed)
 ├── docs/                          # Reference documentation
 │   ├── platform-detection.md      # Template variable reference
 │   └── symlink-patterns.md        # How .managed/ symlinks work

@@ -8,7 +8,7 @@ import {
   getCycleStart,
   activeHoursInPartialCycle,
   elapsedActiveHoursBetween,
-} from "../home/dot_local/bin/executable_claude-usage.ts";
+} from "../src/claude-usage.ts";
 
 /** Helper: create a Date for a specific day/hour/minute */
 function makeDate(
