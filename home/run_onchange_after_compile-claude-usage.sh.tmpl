@@ -1,6 +1,6 @@
 {{ if eq .chezmoi.os "linux" -}}
 #!/bin/bash
-# hash: {{ include "dot_local/bin/claude-usage.ts" | sha256sum }}
+# hash: {{ include "dot_local/bin/executable_claude-usage.ts" | sha256sum }}
 set -euo pipefail
 
 SRC="{{ .chezmoi.homeDir }}/.local/bin/claude-usage.ts"

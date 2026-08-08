@@ -30,18 +30,17 @@ async function getStatus(): Promise<StatusEntry[]> {
   const result = await $`chezmoi status`.quiet().nothrow();
 
   if (result.exitCode !== 0) {
-    console.error(formatError("chezmoi command failed"));
+    console.error(formatError(`chezmoi status exited ${result.exitCode}`));
+    const detail = result.stderr.toString().trim();
+    if (detail) console.error(detail);
     process.exit(1);
   }
 
   // Don't trim() - it removes leading spaces which are part of the status format
   const lines = result.text().split("\n").filter(line => line.length > 0);
   
-  if (lines.length === 0) {
-    // No changes - this is a success, not an error
-    console.error("✅ No changes to apply - target is in sync with source");
-    process.exit(0);
-  }
+  // No changes is success with empty stdout; the caller reports it
+  if (lines.length === 0) process.exit(0);
 
   const entries: StatusEntry[] = [];
 
@@ -76,7 +75,11 @@ async function getSourcePaths(targets: string[]): Promise<Map<string, string>> {
   const result = await $`chezmoi source-path ${targetPaths}`.quiet().nothrow();
 
   if (result.exitCode !== 0) {
-    return new Map(); // Fallback to no source paths
+    // Source paths are cosmetic; warn but let the picker render without them
+    const detail = result.stderr.toString().trim();
+    console.error(formatError(`chezmoi source-path exited ${result.exitCode}`));
+    if (detail) console.error(detail);
+    return new Map();
   }
 
   const sourcePaths = result.text().trim().split("\n").filter(Boolean);
