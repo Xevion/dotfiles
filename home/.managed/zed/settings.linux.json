@@ -37,7 +37,7 @@
   },
   "project_panel": {
     "dock": "left",
-    "hide_hidden": true,
+    "hide_hidden": false,
     "hide_gitignore": false,
   },
   "agent": {
@@ -50,7 +50,7 @@
   },
   "vim_mode": false,
   "icon_theme": {
-    "mode": "light",
+    "mode": "dark",
     "light": "Material Icon Theme",
     "dark": "Material Icon Theme",
   },
@@ -60,11 +60,19 @@
   "buffer_font_size": 15,
   "auto_signature_help": false,
   "theme": {
-    "mode": "light",
+    "mode": "dark",
     "light": "One Light",
     "dark": "Ayu Dark",
   },
   "terminal": {
     "font_family": "ZedMono Nerd Font",
+  },
+  "lsp": {
+    "kotlin-lsp": {
+      "binary": {
+        "path": "/home/xevion/.local/share/kotlin-lsp/bin/intellij-server",
+        "arguments": ["--stdio"],
+      },
+    },
   },
 }

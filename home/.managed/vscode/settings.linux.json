@@ -7,9 +7,6 @@
   "editor.linkedEditing": true,
   "editor.minimap.showSlider": "always",
   "diffEditor.renderSideBySide": false,
-
-  // Workbench Settings
-  "workbench.startupEditor": "none",
   "workbench.tree.indent": 24,
   "workbench.colorTheme": "GitHub Light",
   "workbench.iconTheme": "material-icon-theme",
@@ -20,7 +17,7 @@
 
   // Terminal Settings
   "terminal.integrated.commandsToSkipShell": [
-    "-workbench.action.quickOpenView"
+    "-workbench.action.quickOpenView",
   ],
   "terminal.integrated.fontFamily": "Iosevka Nerd Font Mono",
   "terminal.integrated.enablePersistentSessions": false,
@@ -28,26 +25,26 @@
   "terminal.integrated.profiles.linux": {
     "bash": {
       "path": "bash",
-      "icon": "terminal-bash"
+      "icon": "terminal-bash",
     },
     "fish": {
-      "path": "fish"
+      "path": "fish",
     },
     "tmux": {
       "path": "tmux",
-      "icon": "terminal-tmux"
+      "icon": "terminal-tmux",
     },
     "pwsh": {
       "path": "pwsh",
-      "icon": "terminal-powershell"
-    }
+      "icon": "terminal-powershell",
+    },
   },
 
   // File Explorer Settings
   "explorer.confirmDragAndDrop": false,
   "explorer.confirmDelete": false,
   "files.associations": {
-    "*.dialogue": "plaintext"
+    "*.dialogue": "plaintext",
   },
 
   // Git Settings
@@ -66,7 +63,7 @@
     ".git/{info,lfs,logs,refs,objects}/**",
     ".git/{index,*refs,*HEAD}",
     ".vscode",
-    ".vscode-insiders"
+    ".vscode-insiders",
   ],
   "cSpell.userWords": [
     "asgi",
@@ -116,45 +113,54 @@
     "vite",
     "vitejs",
     "wakatime",
-    "Xevion"
+    "Xevion",
   ],
 
   // Language-specific Formatters
   "[javascript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
   },
   "[typescript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
   },
   "[typescriptreact]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
   },
   "[json]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
   },
   "[html]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
   },
   "[scss]": {
-    "editor.defaultFormatter": "sibiraj-s.vscode-scss-formatter"
+    "editor.defaultFormatter": "sibiraj-s.vscode-scss-formatter",
   },
   "[python]": {
     "editor.formatOnType": true,
-    "editor.defaultFormatter": "ms-python.black-formatter"
+    "editor.defaultFormatter": "ms-python.black-formatter",
   },
   "[go]": {
-    "editor.defaultFormatter": "golang.go"
+    "editor.defaultFormatter": "golang.go",
   },
   "[rust]": {
-    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
   },
   "[astro]": {
-    "editor.defaultFormatter": "astro-build.astro-vscode"
+    "editor.defaultFormatter": "astro-build.astro-vscode",
   },
   "[caddyfile]": {
-    "editor.defaultFormatter": "matthewpi.caddyfile-support"
+    "editor.defaultFormatter": "matthewpi.caddyfile-support",
   },
   "[shellscript]": {
-    "editor.defaultFormatter": "foxundermoon.shell-format"
-  }
+    "editor.defaultFormatter": "foxundermoon.shell-format",
+  },
+  "chat.editor.claude.preferAgentHost": true,
+  "github.copilot.chat.claudeAgent.allowAutoPermissions": true,
+  "github.copilot.chat.claudeAgent.useSdkExtension": true,
+  "github.copilot.chat.claudeAgent.allowDangerouslySkipPermissions": true,
+  "chat.useClaudeHooks": true,
+  "gitlens.ai.model": "vscode",
+  "gitlens.ai.vscode.model": "copilot:gpt-4o-mini",
+  "claudeCode.allowDangerouslySkipPermissions": true,
+  "chat.agents.claude.preferAgentHost": true,
 }
