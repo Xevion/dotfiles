@@ -1,0 +1,41 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# hash: {{ include "../src/banner-comment-lint.ts" | sha256sum }}
+# hash: {{ include "../src/claude-usage.ts" | sha256sum }}
+set -euo pipefail
+
+# Sources live outside the chezmoi root, so only the compiled binaries deploy.
+REPO="{{ .chezmoi.sourceDir }}/.."
+
+# <src basename>:<deploy path>. Add a hash line above for every entry, or the
+# script will not re-run when that source changes.
+BINARIES=(
+  "banner-comment-lint:{{ .chezmoi.homeDir }}/.claude/hooks/banner-comment-lint"
+  "claude-usage:{{ .chezmoi.homeDir }}/.local/bin/claude-usage"
+)
+
+if ! command -v bun &>/dev/null; then
+  echo "[compile-bun] bun not found, skipping compilation"
+  exit 0
+fi
+
+echo "[compile-bun] Installing repo dependencies"
+bun install --cwd "$REPO" --frozen-lockfile
+
+for entry in "${BINARIES[@]}"; do
+  name="${entry%%:*}"
+  out="${entry#*:}"
+
+  # Nothing under home/ maps to ~/.claude/hooks any more, so chezmoi will not
+  # create it on a fresh machine.
+  mkdir -p "$(dirname "$out")"
+
+  # --compile implies --production. --bytecode trades ~200KB of binary size for
+  # faster startup, and emits CJS, so sources must avoid top-level await.
+  echo "[compile-bun] Compiling $name -> $out"
+  bun build --compile --bytecode "$REPO/src/$name.ts" --outfile "$out"
+  chmod +x "$out"
+done
+
+echo "[compile-bun] Done"
+{{ end -}}

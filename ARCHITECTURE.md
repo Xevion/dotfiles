@@ -35,8 +35,11 @@ chezmoi/
 │   ├── private_dot_ssh/           # ~/.ssh/ (600 permissions, encrypted content)
 │   ├── AppData/                   # Windows-only: %APPDATA% targets
 │   └── Documents/                 # Windows-only: ~/Documents/ targets
-├── src/                           # Sources for compiled binaries (outside .chezmoiroot,
-│   └── claude-usage.ts            #   so only the built binary is deployed)
+├── src/                           # Bun sources for compiled binaries (outside
+│   ├── banner-comment-lint.ts     #   .chezmoiroot, so only the built binary
+│   └── claude-usage.ts            #   is deployed)
+├── tools/                         # Rust sources for compiled binaries
+│   └── guard/                     # PreToolUse hook crate
 ├── docs/                          # Reference documentation
 │   ├── platform-detection.md      # Template variable reference
 │   └── symlink-patterns.md        # How .managed/ symlinks work
@@ -172,6 +175,19 @@ Hooks are TypeScript scripts run by Bun before chezmoi applies changes:
 | `run_onchange_after_install-fonts.sh.tmpl` | Font list changes | Install Nerd Fonts |
 | `run_onchange_before_setup-wsl-gpg.sh.tmpl` | GPG setup script changes | Symlink Windows GPG into WSL |
 | `run_onchange_before_setup-intellij-keymaps.ts.tmpl` | Keymap files change | Symlink JetBrains keymaps |
+| `run_onchange_after_compile-bun-binaries.sh.tmpl` | Any `src/*.ts` listed in it changes | Compile every Bun binary to its deploy path |
+| `run_onchange_after_build-guard.sh.tmpl` | `tools/guard` crate changes | Build the Rust PreToolUse hook |
+| `run_onchange_after_compile-git-revival.sh.tmpl` | Private CLI source changes | Build `git-revival` when the repo is cloned |
+
+Adding a Bun binary means adding an entry to the `BINARIES` array in that script
+**and** a matching `include` hash line at the top; without the hash line the
+script never re-runs when that source changes.
+
+Binaries are built from sources **outside** `.chezmoiroot` (`src/`, `tools/`), so
+only the compiled artifact is deployed. A source placed under `home/` would be
+copied to the target as well, and `.chezmoiignore` cannot prevent that cleanly:
+ignoring a path also exempts it from `.chezmoiremove`, leaving the stale copy on
+disk forever.
 
 ## AI Assistant Configuration
 
@@ -184,8 +200,11 @@ home/dot_claude/
 ├── dot_modify_settings.ts   # deep-merges managed keys (incl. permissions from meta/permissions.ts) into ~/.claude/settings.json
 ├── agents/                  # Custom subagent definitions
 ├── skills/                  # Skill definitions
-├── commands/                # Slash command definitions (shared with OpenCode via symlinks)
-└── hooks/                   # Claude Code hooks
+└── commands/                # Slash command definitions (shared with OpenCode via symlinks)
+
+# Claude Code hooks are compiled binaries, not managed files: their sources live
+# in <repo>/src (Bun) and <repo>/tools/guard (Rust), and run_onchange scripts
+# build them into ~/.claude/hooks/.
 
 home/dot_config/opencode/
 ├── AGENTS.md.tmpl          # OpenCode: includes common-rules + OpenCode-specific rules

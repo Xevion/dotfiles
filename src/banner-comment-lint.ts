@@ -205,53 +205,59 @@ interface HookInput {
   tool_input: { content?: string; new_string?: string; file_path?: string };
 }
 
-let input: HookInput;
-try {
-  input = await Bun.stdin.json();
-} catch {
-  process.exit(0);
-}
-
-if (input.tool_name !== "Write" && input.tool_name !== "Edit")
-  process.exit(0);
-
-const filePath = input.tool_input?.file_path ?? "";
-if (isExcluded(filePath)) process.exit(0);
-
-const content =
-  input.tool_name === "Write"
-    ? input.tool_input?.content
-    : input.tool_input?.new_string;
-if (!content) process.exit(0);
-
-const issues = findIssues(content);
-if (issues.length === 0) process.exit(0);
-
-const locationNote =
-  input.tool_name === "Edit"
-    ? " (line numbers relative to replacement text)"
-    : "";
-
-// Group by category for clear feedback
-const categories = [...new Set(issues.map((i) => i.category))] as Category[];
-const out: string[] = [`Comment lint issues in ${filePath}${locationNote}:`];
-
-for (const cat of categories) {
-  const catIssues = issues.filter((i) => i.category === cat);
-  for (const issue of catIssues.slice(0, 5)) {
-    out.push(`  ${filePath}:${issue.line}: ${issue.text.trim()}`);
+// Wrapped rather than top-level: the binary is built with --bytecode, which
+// emits CJS, and CJS has no top-level await.
+async function main(): Promise<void> {
+  let input: HookInput;
+  try {
+    input = await Bun.stdin.json();
+  } catch {
+    process.exit(0);
   }
-  if (catIssues.length > 5) {
-    out.push(`  ... and ${catIssues.length - 5} more`);
+
+  if (input.tool_name !== "Write" && input.tool_name !== "Edit")
+    process.exit(0);
+
+  const filePath = input.tool_input?.file_path ?? "";
+  if (isExcluded(filePath)) process.exit(0);
+
+  const content =
+    input.tool_name === "Write"
+      ? input.tool_input?.content
+      : input.tool_input?.new_string;
+  if (!content) process.exit(0);
+
+  const issues = findIssues(content);
+  if (issues.length === 0) process.exit(0);
+
+  const locationNote =
+    input.tool_name === "Edit"
+      ? " (line numbers relative to replacement text)"
+      : "";
+
+  // Group by category for clear feedback
+  const categories = [...new Set(issues.map((i) => i.category))] as Category[];
+  const out: string[] = [`Comment lint issues in ${filePath}${locationNote}:`];
+
+  for (const cat of categories) {
+    const catIssues = issues.filter((i) => i.category === cat);
+    for (const issue of catIssues.slice(0, 5)) {
+      out.push(`  ${filePath}:${issue.line}: ${issue.text.trim()}`);
+    }
+    if (catIssues.length > 5) {
+      out.push(`  ... and ${catIssues.length - 5} more`);
+    }
+    out.push("");
+    out.push(CATEGORY_MESSAGES[cat]);
   }
+
   out.push("");
-  out.push(CATEGORY_MESSAGES[cat]);
+  out.push(
+    "If this is a false positive (generated file, intentional delimiter), disregard.",
+  );
+
+  console.error(out.join("\n"));
+  process.exit(2);
 }
 
-out.push("");
-out.push(
-  "If this is a false positive (generated file, intentional delimiter), disregard.",
-);
-
-console.error(out.join("\n"));
-process.exit(2);
+main();

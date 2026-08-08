@@ -21,8 +21,13 @@
 # Kitty compiled-bytecode cache (was tracked by mistake; regenerated at runtime)
 .config/kitty/__pycache__
 
-# claude-usage.ts is now source-only; the compiled binary is the sole artifact
+# Bun CLI sources moved to <repo>/src; the compiled binaries are the sole artifacts
 .local/bin/claude-usage.ts
+.claude/hooks/banner-comment-lint.ts
+
+# bash-guard superseded by the Rust guard hook at ~/.claude/hooks/guard
+.claude/hooks/bash-guard.ts
+.claude/hooks/bash-guard
 
 # Old hook files replaced by compiled bash-guard and banner-comment-lint binaries
 .claude/hooks/bash-discipline.py

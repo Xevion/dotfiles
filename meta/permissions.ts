@@ -535,8 +535,8 @@ const claudeExtras = {
     "Skill(superpowers:*)",
     "Skill(brainstorming)",
     "Skill(interview)",
-    // /tmp is scratch space, the bash-guard truncation rewrite saves full
-    // command output under /tmp/claude-bash, and /tmp is generally throwaway.
+    // /tmp is scratch space, the guard hook saves captured command output
+    // under /tmp/claude-guard, and /tmp is generally throwaway.
     // Allow the file tools to operate there without prompting.
     "Read(/tmp/**)",
     "Edit(/tmp/**)",
