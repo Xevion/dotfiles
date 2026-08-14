@@ -76,6 +76,7 @@ const desired: Record<string, unknown> = {
       },
     ],
   },
+  worktree: { baseRef: "head" }, // branch off local HEAD; origin/<default> runs stale
   statusLine: {
     type: "command",
     command: "bunx -y ccstatusline@latest",
