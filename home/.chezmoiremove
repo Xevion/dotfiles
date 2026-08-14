@@ -7,6 +7,9 @@
 # reminder.fish replaced by Bun-based ~/.local/bin/reminder
 .config/fish/functions/reminder.fish
 
+# pip/pip3 redirect removed: it reported success for installs that were no-ops
+.config/fish/conf.d/uv-python.fish
+
 # fontconfig: fonts.toml replaced by fonts.conf
 .config/fontconfig/fonts.toml
 

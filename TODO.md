@@ -180,6 +180,7 @@
 **Language Tools:**
 - [ ] Add Python development configs (pyproject.toml templates, .python-version)
   - [x] `~/.config/uv/uv.toml` — python-preference=managed, compile-bytecode
+  - [x] Python CLIs declared in mise `[tools]` via `pipx:` backend (extras survive reinstall)
 - [x] Add Node.js configs (.npmrc) — fund=false via modify script (preserves authTokens)
 - [ ] Add Rust configs (rustfmt.toml, clippy settings)
   - [x] `~/.cargo/config.toml` — mold linker on Linux, net.retry=3

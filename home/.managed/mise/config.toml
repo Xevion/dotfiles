@@ -26,7 +26,8 @@ delta = "latest"
 lazydocker = "latest"
 lazyssh = "latest"
 lazyjournal = "latest"
-gradle-profiler = "latest"
+# asdf plugin pulls from Maven Central, which stopped publishing the dist zip after 0.24.0.
+"github:gradle/gradle-profiler" = "latest"
 oxipng = "latest"
 mold = "latest"
 golangci-lint = "v2.10.1"
@@ -42,6 +43,22 @@ dotnet = "latest"
 zig = "latest"
 zizmor = "latest"
 pinact = "latest"
+gcloud = "latest"
+
+# Python CLIs: the pipx backend shells out to uv, so extras land in the tool's own venv.
+"pipx:comfy-cli" = "latest"
+"pipx:fonttools" = { version = "latest", extras = ["woff"] }
+"pipx:frida-tools" = "latest"
+"pipx:mitmproxy" = "latest"
+"pipx:vastai" = "latest"
+"pipx:voice-mode" = "latest"
+"pipx:ya-frida-mcp" = "latest"
+"pipx:yt-dlp" = { version = "latest", extras = ["default", "secretstorage"] }
+
+# Git-sourced Python CLIs stay on uv; mise's pipx backend resolves these as GitHub
+# release slugs and 404s. Reinstall with:
+#   uv tool install git+https://github.com/oraios/serena
+#   uv tool install git+https://github.com/matus-chochlik/ctcache.git@0c7fee26e09ae8a393ed7d56164102da118ab23a
 
 [settings]
 
