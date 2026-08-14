@@ -61,6 +61,10 @@ fn block_detection(#[case] cmd: &str, #[case] expect: bool) {
 #[case::or_true_warns_colon("make check || :", true)]
 #[case::echo_status_warns_bare("echo $?", true)]
 #[case::echo_status_warns_inline("some_cmd; echo \"exit: $?\"", true)]
+#[case::pipe_to_head_warns("cmd | head -20", true)]
+#[case::pipe_to_tail_warns("cmd | tail -n 50", true)]
+#[case::head_standalone_ok("head -20 file.txt", false)]
+#[case::tail_follow_standalone_ok("tail -f app.log", false)]
 fn warn_detection(#[case] cmd: &str, #[case] expect: bool) {
     assert!(warns(cmd) == expect);
 }

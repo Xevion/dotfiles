@@ -197,6 +197,7 @@ impl Evaluator {
         self.rule_rg_replace(c);
         self.rule_dev_null(c);
         self.rule_echo_status(c);
+        self.rule_head_tail(c);
     }
 
     fn rule_sudo(&mut self, c: &Cmd) {
@@ -327,6 +328,24 @@ impl Evaluator {
                 "`echo $?` is unnecessary - guard's footer already reports the exit code.".into(),
             );
         }
+    }
+
+    /// Piping into `head`/`tail` to peek at a command's own output: the Bash
+    /// tool already returns it in full, so this just truncates what's visible
+    /// and invites a second run with a bigger count.
+    fn rule_head_tail(&mut self, c: &Cmd) {
+        if !c.right_of_pipe || !matches!(c.name.as_str(), "head" | "tail") {
+            return;
+        }
+        self.push(
+            Verdict::Warn,
+            format!(
+                "Piping into `{}` to peek at output - the Bash tool already returns it in full; \
+                 read it there, or get the command right once instead of re-running with a \
+                 bigger count.",
+                c.name
+            ),
+        );
     }
 }
 
