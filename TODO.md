@@ -190,6 +190,8 @@
 
 **Terminal Emulators:**
 - [ ] Expand Kitty configuration (currently at `home/dot_config/kitty/`)
+  - [x] Two-stage path pickers (`ctrl+shift+d` hints, `ctrl+shift+space` fzf list) via `screen_paths.py`
+  - [x] Restore native `ctrl+shift+e`/`x`/`u` and the `ctrl+shift+p` hints chord (scratch pad → `ctrl+alt+p`)
 - [ ] Add Alacritty config (if used)
 - [ ] Document terminal color schemes
 - [ ] Add font configuration and Nerd Fonts setup

@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""Entry point for kitty's path picker overlays.
+
+The logic lives beside the kitty config because the hints kitten imports the
+same file in-process; loading it by path here keeps the two entry points on one
+copy of the matching rules.
+"""
+import importlib.util
+import os
+import sys
+
+MODULE = os.path.join(os.path.expanduser("~"), ".config", "kitty", "screen_paths.py")
+
+spec = importlib.util.spec_from_file_location("screen_paths", MODULE)
+screen_paths = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(screen_paths)
+screen_paths.main(sys.argv[1:])

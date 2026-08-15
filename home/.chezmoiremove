@@ -24,6 +24,9 @@
 # Kitty compiled-bytecode cache (was tracked by mistake; regenerated at runtime)
 .config/kitty/__pycache__
 
+# hints-trim.py replaced by screen_paths.py (matching plus a two-stage action menu)
+.config/kitty/hints-trim.py
+
 # Bun CLI sources moved to <repo>/src; the compiled binaries are the sole artifacts
 .local/bin/claude-usage.ts
 .claude/hooks/banner-comment-lint.ts
