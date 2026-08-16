@@ -88,6 +88,8 @@ interface DisplayWindow {
   severity: string | null;
   /** false for anything not in the known kind/key list below — surfaced but not trusted for pace math */
   known: boolean;
+  /** Display order: weekly windows first (0/1), hourly next (2), unrecognized last (3) */
+  priority: number;
 }
 
 /**
@@ -551,6 +553,7 @@ export function buildDisplayWindows(raw: OAuthUsageResponse): DisplayWindow[] {
         kind: '5h',
         severity,
         known: true,
+        priority: 2,
       });
     } else if (kind === 'weekly_all') {
       renderedKinds.add('weekly_all');
@@ -563,6 +566,7 @@ export function buildDisplayWindows(raw: OAuthUsageResponse): DisplayWindow[] {
         kind: '7d',
         severity,
         known: true,
+        priority: 0,
       });
     } else if (kind === 'weekly_scoped') {
       windows.push({
@@ -572,6 +576,7 @@ export function buildDisplayWindows(raw: OAuthUsageResponse): DisplayWindow[] {
         kind: '7d',
         severity,
         known: true,
+        priority: 1,
       });
     } else {
       // A `limits[]` kind we don't recognize — Anthropic added something new.
@@ -584,6 +589,7 @@ export function buildDisplayWindows(raw: OAuthUsageResponse): DisplayWindow[] {
         kind: null,
         severity,
         known: false,
+        priority: 3,
       });
     }
   }
@@ -600,6 +606,7 @@ export function buildDisplayWindows(raw: OAuthUsageResponse): DisplayWindow[] {
         kind: '5h',
         severity: null,
         known: true,
+        priority: 2,
       });
     }
   }
@@ -613,6 +620,7 @@ export function buildDisplayWindows(raw: OAuthUsageResponse): DisplayWindow[] {
         kind: '7d',
         severity: null,
         known: true,
+        priority: 0,
       });
     }
   }
@@ -633,8 +641,14 @@ export function buildDisplayWindows(raw: OAuthUsageResponse): DisplayWindow[] {
       kind: null,
       severity: null,
       known: false,
+      priority: 3,
     });
   }
+
+  // Weekly first (the number that actually matters day to day), then weekly-scoped
+  // breakdowns, then hourly, then anything unrecognized. Stable sort keeps discovery
+  // order within each tier (e.g. multiple weekly_scoped entries stay in response order).
+  windows.sort((a, b) => a.priority - b.priority);
 
   return windows;
 }
@@ -783,53 +797,48 @@ function calculate7DayPace(utilization: number, resetTimestamp: number): PaceRes
 }
 
 /**
- * Format reset time from Unix timestamp with relative time and contextual absolute time
+ * Split a reset timestamp into the two pieces that get styled differently: the
+ * countdown ("4h 43m" — the number people actually act on) and the surrounding
+ * context ("7:09 PM today" — useful, but secondary). Kept separate rather than one
+ * formatted string so callers can color them apart instead of the whole thing reading
+ * as one indistinguishable block of text.
  */
-function formatResetTime(resetTimestamp: number): string {
-  if (!resetTimestamp) return '';
-  
-  const resetDate = new Date(resetTimestamp * 1000); // Convert to milliseconds
+function formatResetTimeParts(resetTimestamp: number): { relative: string; context: string } {
+  if (!resetTimestamp) return { relative: '', context: '' };
+
+  const resetDate = new Date(resetTimestamp * 1000);
   const now = new Date();
   const diffMs = resetDate.getTime() - now.getTime();
-  
-  if (diffMs < 0) return 'reset overdue';
-  
+
+  if (diffMs < 0) return { relative: 'overdue', context: '' };
+
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  
-  // Format time in local timezone
+
   const timeStr = resetDate.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true
   });
-  
-  // Calculate day difference
+
   const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const resetDay = new Date(resetDate.getFullYear(), resetDate.getMonth(), resetDate.getDate());
   const dayDiff = Math.round((resetDay.getTime() - nowDay.getTime()) / (1000 * 60 * 60 * 24));
-  
+
   let dateContext: string;
   if (dayDiff === 0) {
     dateContext = `${timeStr} today`;
   } else if (dayDiff === 1) {
     dateContext = `${timeStr} tomorrow`;
   } else if (dayDiff < 7) {
-    // Day of week (abbreviated)
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayName = dayNames[resetDate.getDay()];
-    dateContext = `${dayName} ${timeStr}`;
+    dateContext = `${dayNames[resetDate.getDay()]} ${timeStr}`;
   } else {
-    // Check if it's exactly 7 days (same day of week)
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const dayName = dayNames[resetDate.getDay()];
-    if (resetDate.getDay() === now.getDay()) {
-      dateContext = `next ${dayName} ${timeStr}`;
-    } else {
-      dateContext = `${dayName} ${timeStr}`;
-    }
+    dateContext = resetDate.getDay() === now.getDay() ? `next ${dayName} ${timeStr}` : `${dayName} ${timeStr}`;
   }
-  
+
   let relativeTime: string;
   if (diffHours < 24) {
     relativeTime = `${diffHours}h ${diffMins}m`;
@@ -838,148 +847,190 @@ function formatResetTime(resetTimestamp: number): string {
     const remainingHours = diffHours % 24;
     relativeTime = `${diffDays}d ${remainingHours}h`;
   }
-  
-  return `resets in ${relativeTime} (${dateContext})`;
+
+  return { relative: relativeTime, context: dateContext };
+}
+
+// Deliberately small palette. LABEL_HEX is bright — labels are a primary piece of
+// info, not a caption. DETAIL_HEX is the one dim tone for prose/secondary numbers
+// (budget, absolute reset time), so it never competes with the colored numbers next
+// to it. Nothing here is bold — color alone carries the emphasis.
+const LABEL_HEX = '#E5E7EB';
+const DETAIL_HEX = '#6B7280';
+const WARN_HEX = '#F4B8A4';
+const ERROR_HEX = '#E89999';
+const PALETTE = {
+  header: chalk.hex('#9CA3AF'),
+  detail: chalk.hex(DETAIL_HEX),
+  error: chalk.hex(ERROR_HEX),
+};
+
+const LABEL_WIDTH_CAP = 28;
+
+/**
+ * One printable table row — every field pre-formatted as plain text plus its color.
+ * The core numbers read as an equation: `expected + delta = current` (e.g.
+ * "88.88% +6.12% = 95.00%"), so the delta sits right where it's earned — between the
+ * plan and the actual number, not off in a separate word. `hasEquation` is false for
+ * windows with no known period (unrecognized `limits[]` kind): there's nothing to
+ * compute a plan against, so only `current` is shown.
+ */
+interface TableRow {
+  label: string;
+  expectedStr: string; // '' when hasEquation is false
+  deltaStr: string;    // signed, '' when hasEquation is false
+  deltaColor: string;
+  currentStr: string;
+  currentColor: string;
+  hasEquation: boolean;
+  detailStr: string;   // budget rate when hasEquation, else a fallback note (severity / schema drift)
+  detailColor: string;
+  resetRelative: string;
+  resetContext: string;
+  resetColor: string;
+}
+
+function buildPaceRow(label: string, percent: number, pace: PaceResult, resetTimestamp: number): TableRow {
+  const expectedPct = percent - pace.diff;
+  const signedDelta = (pace.diff >= 0 ? '+' : '') + pace.diff.toFixed(2) + '%';
+  const budgetStr = pace.remainingHours >= BUDGET_SUPPRESS_THRESHOLD_HOURS
+    ? `budget ${pace.budgetRate.toFixed(2)}%/h (avg ${pace.avgRate.toFixed(2)}%/h)`
+    : '';
+  const { relative, context } = formatResetTimeParts(resetTimestamp);
+
+  return {
+    label,
+    expectedStr: expectedPct.toFixed(2) + '%',
+    deltaStr: signedDelta,
+    deltaColor: getDiffColor(pace.diff),
+    currentStr: percent.toFixed(2) + '%',
+    currentColor: getColorForPercentage(percent),
+    hasEquation: true,
+    detailStr: budgetStr,
+    detailColor: DETAIL_HEX,
+    resetRelative: relative,
+    resetContext: context ? `(${context})` : '',
+    resetColor: getResetColor(resetTimestamp),
+  };
+}
+
+/** Same as buildPaceRow, but for a DisplayWindow that may lack a known period or reset time. */
+function buildWindowRow(w: DisplayWindow): TableRow {
+  if (w.kind && w.resetTimestamp !== null) {
+    const pace = w.kind === '5h'
+      ? calculate5HourPace(w.percent / 100, w.resetTimestamp)
+      : calculate7DayPace(w.percent / 100, w.resetTimestamp);
+    return buildPaceRow(w.label, w.percent, pace, w.resetTimestamp);
+  }
+
+  const detailStr = !w.known
+    ? 'unrecognized — schema drift'
+    : (w.severity && w.severity !== 'normal' ? w.severity : '');
+  const detailColor = !w.known ? DETAIL_HEX : WARN_HEX;
+  const currentStr = w.percent.toFixed(2) + '%';
+  const currentColor = getColorForPercentage(w.percent);
+
+  if (w.resetTimestamp !== null) {
+    const { relative, context } = formatResetTimeParts(w.resetTimestamp);
+    return {
+      label: w.label, expectedStr: '', deltaStr: '', deltaColor: DETAIL_HEX,
+      currentStr, currentColor, hasEquation: false, detailStr, detailColor,
+      resetRelative: relative,
+      resetContext: context ? `(${context})` : '',
+      resetColor: getResetColor(w.resetTimestamp),
+    };
+  }
+
+  return {
+    label: w.label, expectedStr: '', deltaStr: '', deltaColor: DETAIL_HEX,
+    currentStr, currentColor, hasEquation: false, detailStr, detailColor,
+    resetRelative: 'no reset info', resetContext: '', resetColor: DETAIL_HEX,
+  };
 }
 
 /**
- * Format and display usage output with pastel colors and condensed layout
+ * Print rows as an aligned table: one line per window, columns padded to the widest
+ * value in each column. Padding is applied to the plain (uncolored) text and only
+ * colored afterward, since ANSI escape codes would otherwise throw off `padEnd`/
+ * `padStart` width math. Rows without an equation get blank-padded expected/delta/`=`
+ * cells so `current` still lands in the same visual column as the equation rows.
+ */
+function printUsageTable(rows: TableRow[]): void {
+  const labelW = Math.min(LABEL_WIDTH_CAP, Math.max(...rows.map(r => r.label.length)));
+  const expW = Math.max(0, ...rows.filter(r => r.hasEquation).map(r => r.expectedStr.length));
+  const deltaW = Math.max(0, ...rows.filter(r => r.hasEquation).map(r => r.deltaStr.length));
+  const curW = Math.max(...rows.map(r => r.currentStr.length));
+  const detailW = Math.max(...rows.map(r => r.detailStr.length));
+  const relW = Math.max(...rows.map(r => r.resetRelative.length));
+
+  console.log(PALETTE.header('Usage:'));
+  for (const r of rows) {
+    const label = chalk.hex(LABEL_HEX)(r.label.padEnd(labelW));
+    const expected = PALETTE.detail((r.hasEquation ? r.expectedStr : '').padStart(expW));
+    const delta = chalk.hex(r.hasEquation ? r.deltaColor : DETAIL_HEX)((r.hasEquation ? r.deltaStr : '').padStart(deltaW));
+    const eq = PALETTE.detail(r.hasEquation ? '=' : ' ');
+    const current = chalk.hex(r.currentColor)(r.currentStr.padStart(curW));
+    const detail = chalk.hex(r.detailColor)(r.detailStr.padEnd(detailW));
+    const resetRel = chalk.hex(r.resetColor)(r.resetRelative.padEnd(relW));
+    const resetCtx = PALETTE.detail(r.resetContext);
+    console.log(`  ${label}  ${expected} ${delta} ${eq} ${current}  ${detail}  ${resetRel} ${resetCtx}`.trimEnd());
+  }
+}
+
+/**
+ * Format and display legacy (--legacy) usage output — the two windows the old
+ * POST /v1/messages header probe can see, weekly first.
  */
 function formatOutput(usage: UsageData): void {
-  const fiveHourPct = usage.five_hour.utilization * 100;
-  const sevenDayPct = usage.seven_day.utilization * 100;
-  
-  const fiveHourColor = getColorForPercentage(fiveHourPct);
-  const sevenDayColor = getColorForPercentage(sevenDayPct);
-  
-  const fiveHourReset = formatResetTime(usage.five_hour.reset);
-  const sevenDayReset = formatResetTime(usage.seven_day.reset);
-  
-  const fiveHourResetColor = getResetColor(usage.five_hour.reset);
-  const sevenDayResetColor = getResetColor(usage.seven_day.reset);
-  
   const fiveHourPace = calculate5HourPace(usage.five_hour.utilization, usage.five_hour.reset);
   const sevenDayPace = calculate7DayPace(usage.seven_day.utilization, usage.seven_day.reset);
-  
-  const fiveHourDiffColor = getDiffColor(fiveHourPace.diff);
-  const sevenDayDiffColor = getDiffColor(sevenDayPace.diff);
-  
-  const fiveHourPctStr = fiveHourPct.toFixed(2) + '%';
-  const sevenDayPctStr = sevenDayPct.toFixed(2) + '%';
-  
-  const fiveHourDiffStr = (fiveHourPace.diff >= 0 ? '+' : '') + fiveHourPace.diff.toFixed(2) + '%';
-  const sevenDayDiffStr = (sevenDayPace.diff >= 0 ? '+' : '') + sevenDayPace.diff.toFixed(2) + '%';
-  
-  // Pastel color palette
-  const headerColor = chalk.hex('#9CA3AF');  // Gray 400 - header
-  const labelColor = chalk.hex('#6B7280');   // Gray 500 - period labels
-  const bulletColor = chalk.hex('#9CA3AF');  // Gray 400 - bullets
-  
-  const fiveHourBudgetStr = fiveHourPace.remainingHours >= BUDGET_SUPPRESS_THRESHOLD_HOURS
-    ? `budget ${fiveHourPace.budgetRate.toFixed(2)}%/h (avg ${fiveHourPace.avgRate.toFixed(2)}%/h)`
-    : null;
-  const sevenDayBudgetStr = sevenDayPace.remainingHours >= BUDGET_SUPPRESS_THRESHOLD_HOURS
-    ? `budget ${sevenDayPace.budgetRate.toFixed(2)}%/h (avg ${sevenDayPace.avgRate.toFixed(2)}%/h)`
-    : null;
 
-  const fiveHourSegments = [
-    chalk.hex(fiveHourColor)(fiveHourPctStr),
-    `${chalk.hex(fiveHourDiffColor)(fiveHourPace.status)} ${chalk.hex(fiveHourDiffColor)(`(${fiveHourDiffStr} ${fiveHourPace.diff >= 0 ? 'ahead' : 'under'})`)}`,
-    fiveHourBudgetStr ? labelColor(fiveHourBudgetStr) : null,
-    chalk.hex(fiveHourResetColor)(fiveHourReset),
-  ].filter((segment): segment is string => segment !== null);
-
-  const sevenDaySegments = [
-    chalk.hex(sevenDayColor)(sevenDayPctStr),
-    `${chalk.hex(sevenDayDiffColor)(sevenDayPace.status)} ${chalk.hex(sevenDayDiffColor)(`(${sevenDayDiffStr} ${sevenDayPace.diff >= 0 ? 'ahead' : 'below'})`)}`,
-    sevenDayBudgetStr ? labelColor(sevenDayBudgetStr) : null,
-    chalk.hex(sevenDayResetColor)(sevenDayReset),
-  ].filter((segment): segment is string => segment !== null);
-
-  console.log(headerColor('Usage:'));
-  console.log(`  ${labelColor('Hourly (5h)')} ${bulletColor('·')} ${fiveHourSegments.join(` ${bulletColor('•')} `)}`);
-  console.log(`  ${labelColor('Weekly (7d)')} ${bulletColor('·')} ${sevenDaySegments.join(` ${bulletColor('•')} `)}`);
-}
-
-/**
- * Render one DisplayWindow as a line. Known 5h/7d windows get the full pace treatment
- * (status, diff, budget rate) via the same calculate5HourPace/calculate7DayPace used by
- * the legacy formatter. Unrecognized windows (kind === null) just show percent + reset —
- * guessing a period for pace math on a window we've never seen before would be worse
- * than not showing one.
- */
-function buildWindowLine(w: DisplayWindow): string {
-  const labelColor = chalk.hex('#6B7280');
-  const bulletColor = chalk.hex('#9CA3AF');
-
-  const pctColor = getColorForPercentage(w.percent);
-  const segments: string[] = [chalk.hex(pctColor)(w.percent.toFixed(2) + '%')];
-
-  if (w.kind && w.resetTimestamp !== null) {
-    const utilFraction = w.percent / 100;
-    const pace = w.kind === '5h'
-      ? calculate5HourPace(utilFraction, w.resetTimestamp)
-      : calculate7DayPace(utilFraction, w.resetTimestamp);
-    const diffColor = getDiffColor(pace.diff);
-    const diffStr = (pace.diff >= 0 ? '+' : '') + pace.diff.toFixed(2) + '%';
-    const direction = pace.diff >= 0 ? 'ahead' : 'under';
-
-    segments.push(`${chalk.hex(diffColor)(pace.status)} ${chalk.hex(diffColor)(`(${diffStr} ${direction})`)}`);
-    if (pace.remainingHours >= BUDGET_SUPPRESS_THRESHOLD_HOURS) {
-      segments.push(labelColor(`budget ${pace.budgetRate.toFixed(2)}%/h (avg ${pace.avgRate.toFixed(2)}%/h)`));
-    }
-  } else if (w.severity && w.severity !== 'normal') {
-    segments.push(chalk.hex('#F4B8A4')(w.severity));
-  }
-
-  segments.push(
-    w.resetTimestamp !== null
-      ? chalk.hex(getResetColor(w.resetTimestamp))(formatResetTime(w.resetTimestamp))
-      : labelColor('no reset info')
-  );
-
-  if (!w.known) {
-    segments.push(chalk.hex('#9CA3AF')('unrecognized — schema may have changed'));
-  }
-
-  return `${labelColor(w.label)} ${bulletColor('·')} ${segments.join(` ${bulletColor('•')} `)}`;
+  printUsageTable([
+    buildPaceRow('Weekly (7d)', usage.seven_day.utilization * 100, sevenDayPace, usage.seven_day.reset),
+    buildPaceRow('Hourly (5h)', usage.five_hour.utilization * 100, fiveHourPace, usage.five_hour.reset),
+  ]);
 }
 
 /**
  * Format output from the dynamic /api/oauth/usage endpoint. Every window is rendered
  * independently, so a parse failure or unexpected shape on one window degrades to an
- * error line for that window rather than taking down the whole display.
+ * error row for that window rather than taking down the whole display.
  */
 function formatDynamicOutput(raw: OAuthUsageResponse): void {
-  const headerColor = chalk.hex('#9CA3AF');
-  const labelColor = chalk.hex('#6B7280');
-  const bulletColor = chalk.hex('#9CA3AF');
-  const errorColor = chalk.hex('#E89999');
-
   let windows: DisplayWindow[];
   try {
     windows = buildDisplayWindows(raw);
   } catch (error) {
-    console.log(headerColor('Usage:'));
-    console.log(`  ${errorColor('Failed to interpret /api/oauth/usage response')} ${bulletColor('•')} ${labelColor(error instanceof Error ? error.message : 'unknown error')}`);
-    if (VERBOSE) console.log(labelColor(JSON.stringify(raw, null, 2)));
+    console.log(PALETTE.header('Usage:'));
+    console.log(`  ${PALETTE.error('Failed to interpret /api/oauth/usage response')}`);
+    console.log(`  ${PALETTE.detail(error instanceof Error ? error.message : 'unknown error')}`);
+    if (VERBOSE) console.log(PALETTE.detail(JSON.stringify(raw, null, 2)));
     return;
   }
 
   if (windows.length === 0) {
-    console.log(headerColor('Usage:'));
-    console.log(`  ${errorColor('No recognizable usage windows in response')} ${bulletColor('•')} ${labelColor('run with -v to inspect the raw payload')}`);
+    console.log(PALETTE.header('Usage:'));
+    console.log(`  ${PALETTE.error('No recognizable usage windows in response')}`);
+    console.log(`  ${PALETTE.detail('run with -v to inspect the raw payload')}`);
     return;
   }
 
-  console.log(headerColor('Usage:'));
-  for (const w of windows) {
+  const rows: TableRow[] = windows.map(w => {
     try {
-      console.log(`  ${buildWindowLine(w)}`);
+      return buildWindowRow(w);
     } catch (error) {
-      console.log(`  ${labelColor(w.label)} ${bulletColor('•')} ${errorColor('failed to render')} (${error instanceof Error ? error.message : 'unknown error'})`);
+      return {
+        label: w.label,
+        expectedStr: '', deltaStr: '', deltaColor: DETAIL_HEX,
+        currentStr: '?', currentColor: DETAIL_HEX, hasEquation: false,
+        detailStr: `failed to render (${error instanceof Error ? error.message : 'unknown error'})`,
+        detailColor: ERROR_HEX,
+        resetRelative: '', resetContext: '', resetColor: DETAIL_HEX,
+      };
     }
-  }
+  });
+
+  printUsageTable(rows);
 }
 
 /**
