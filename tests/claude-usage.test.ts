@@ -8,6 +8,7 @@ import {
   getCycleStart,
   activeHoursInPartialCycle,
   elapsedActiveHoursBetween,
+  buildDisplayWindows,
 } from "../src/claude-usage.ts";
 
 /** Helper: create a Date for a specific day/hour/minute */
@@ -289,5 +290,97 @@ describe("pace calculation sanity", () => {
     const ratio = elapsed / totalActive;
     expect(ratio).toBeGreaterThan(0.35);
     expect(ratio).toBeLessThan(0.65);
+  });
+});
+
+describe("buildDisplayWindows (/api/oauth/usage parsing + drift handling)", () => {
+  test("parses a full real-shaped response into labeled windows", () => {
+    const raw = {
+      five_hour: { utilization: 25.0, resets_at: "2026-08-16T19:09:59.592282+00:00" },
+      seven_day: { utilization: 94.0, resets_at: "2026-08-17T15:59:59.592302+00:00" },
+      nimbus_quill: { utilization: 0.0, resets_at: null },
+      cinder_cove: null,
+      limits: [
+        { kind: "session", group: "session", percent: 25, severity: "normal", resets_at: "2026-08-16T19:09:59.592282+00:00", scope: null, is_active: false },
+        { kind: "weekly_all", group: "weekly", percent: 94, severity: "critical", resets_at: "2026-08-17T15:59:59.592302+00:00", scope: null, is_active: true },
+        { kind: "weekly_scoped", group: "weekly", percent: 23, severity: "normal", resets_at: "2026-08-17T15:59:59.592516+00:00", scope: { model: { id: null, display_name: "Fable" }, surface: null }, is_active: false },
+      ],
+      extra_usage: { is_enabled: false },
+      spend: { used: { amount_minor: 0 } },
+    };
+
+    const windows = buildDisplayWindows(raw);
+    const byLabel = Object.fromEntries(windows.map(w => [w.label, w]));
+
+    expect(windows.length).toBe(4); // Hourly, Weekly, Weekly - Fable, Nimbus Quill (new)
+    expect(byLabel["Hourly (5h)"]).toMatchObject({ percent: 25, kind: "5h", known: true });
+    expect(byLabel["Weekly (7d)"]).toMatchObject({ percent: 94, kind: "7d", known: true, severity: "critical" });
+    expect(byLabel["Weekly — Fable (7d)"]).toMatchObject({ percent: 23, kind: "7d", known: true });
+    expect(byLabel["Nimbus Quill (new)"]).toMatchObject({ percent: 0, kind: null, known: false, resetTimestamp: null });
+  });
+
+  test("empty object yields zero windows instead of throwing", () => {
+    expect(buildDisplayWindows({})).toEqual([]);
+  });
+
+  test("falls back to top-level five_hour/seven_day when limits[] is entirely missing", () => {
+    const raw = {
+      five_hour: { utilization: 10.0, resets_at: "2026-08-16T19:09:59Z" },
+      seven_day: { utilization: 40.0, resets_at: "2026-08-17T15:59:59Z" },
+    };
+    const windows = buildDisplayWindows(raw);
+    const byLabel = Object.fromEntries(windows.map(w => [w.label, w]));
+    expect(byLabel["Hourly (5h)"]).toMatchObject({ percent: 10, kind: "5h" });
+    expect(byLabel["Weekly (7d)"]).toMatchObject({ percent: 40, kind: "7d" });
+  });
+
+  test("malformed limits entries (wrong types, missing fields) are skipped, not thrown", () => {
+    const raw = {
+      limits: [
+        "not an object",
+        42,
+        null,
+        { kind: "session" }, // missing percent — should be skipped
+        { kind: "session", percent: "not a number" }, // wrong type — should be skipped
+        { kind: "session", percent: 5, resets_at: "2026-08-16T19:09:59Z" }, // valid
+      ],
+    };
+    expect(() => buildDisplayWindows(raw)).not.toThrow();
+    const windows = buildDisplayWindows(raw);
+    expect(windows.length).toBe(1);
+    expect(windows[0]).toMatchObject({ percent: 5, kind: "5h" });
+  });
+
+  test("unrecognized limits kind surfaces as a new, unlabeled-period window", () => {
+    const raw = {
+      limits: [
+        { kind: "monthly_all", group: "monthly", percent: 12, resets_at: "2026-09-01T00:00:00Z" },
+      ],
+    };
+    const windows = buildDisplayWindows(raw);
+    expect(windows.length).toBe(1);
+    expect(windows[0]).toMatchObject({ label: "Monthly All (new)", percent: 12, kind: null, known: false });
+  });
+
+  test("weekly_scoped without a model scope falls back to a generic label", () => {
+    const raw = {
+      limits: [
+        { kind: "weekly_scoped", percent: 30, resets_at: "2026-08-17T15:59:59Z", scope: {} },
+      ],
+    };
+    const windows = buildDisplayWindows(raw);
+    expect(windows[0].label).toBe("Weekly — Scoped (7d)");
+  });
+
+  test("entirely garbage top-level values (non-objects, arrays) are ignored, not thrown", () => {
+    const raw = {
+      five_hour: "not an object",
+      seven_day: ["also", "not", "an", "object"],
+      limits: "not an array either",
+      random_string_field: "hello",
+      random_number_field: 42,
+    };
+    expect(() => buildDisplayWindows(raw)).not.toThrow();
+    expect(buildDisplayWindows(raw)).toEqual([]);
   });
 });

@@ -17,9 +17,17 @@ export const WAKE_HOUR = 9;         // Active period begins at 9:00 AM
 export const SLEEP_HOURS_PER_DAY = 7;   // 2 AM to 9 AM
 export const ACTIVE_HOURS_PER_DAY = 17; // 9 AM to 2 AM
 
+// Below this much time left until reset, a %/hour budget rate is too noisy to be
+// useful (small denominator blows up the rate) — suppress it instead of showing it.
+const BUDGET_SUPPRESS_THRESHOLD_HOURS = 0.5;
+
 // Parse CLI flags
 const args = process.argv.slice(2);
 const VERBOSE = args.includes('-v') || args.includes('--verbose') || args.includes('-d') || args.includes('--debug');
+// Default is the dedicated GET /api/oauth/usage endpoint. --legacy falls back to the
+// original approach (a throwaway 1-token POST /v1/messages probe read for its rate-limit
+// headers) — kept around for comparison/fallback, not used unless explicitly requested.
+const LEGACY = args.includes('--legacy');
 
 interface UsagePeriod {
   utilization: number;
@@ -55,6 +63,31 @@ interface TokenResult {
 interface PaceResult {
   diff: number;
   status: string;
+  /** %/hour still available between now and reset to land exactly at 100% */
+  budgetRate: number;
+  /** %/hour used on average since the period started */
+  avgRate: number;
+  /** Hours left until reset (the denominator behind budgetRate) */
+  remainingHours: number;
+}
+
+// The /api/oauth/usage response is undocumented and Anthropic has reshaped it before
+// (per-model 7d buckets appeared unannounced in April 2026) — so it's parsed loosely,
+// field-by-field, rather than trusting a fixed shape end to end.
+type OAuthUsageResponse = Record<string, unknown>;
+
+/** A single renderable usage window, after loosely parsing the raw API response. */
+interface DisplayWindow {
+  label: string;
+  /** 0-100 */
+  percent: number;
+  /** Unix seconds, or null if the response didn't include a usable reset time */
+  resetTimestamp: number | null;
+  /** Which pace model to apply — null means "unrecognized window, don't guess a period" */
+  kind: '5h' | '7d' | null;
+  severity: string | null;
+  /** false for anything not in the known kind/key list below — surfaced but not trusted for pace math */
+  known: boolean;
 }
 
 /**
@@ -382,6 +415,231 @@ async function fetchUsage(accessToken: string, tokenSource?: string): Promise<Us
 }
 
 /**
+ * Fetch usage data from the dedicated (undocumented) OAuth usage endpoint — a single
+ * GET instead of a throwaway message probe. Same Bearer token Claude Code itself uses.
+ * Returns the parsed JSON body as-is; callers must not assume a fixed shape, since this
+ * endpoint isn't part of any published contract and Anthropic has reshaped it before.
+ */
+async function fetchOAuthUsage(accessToken: string, tokenSource?: string): Promise<OAuthUsageResponse> {
+  const apiUrl = 'https://api.anthropic.com/api/oauth/usage';
+
+  const requestHeaders = {
+    'Accept': 'application/json',
+    'Authorization': `Bearer ${accessToken}`,
+    'anthropic-beta': 'oauth-2025-04-20',
+    'anthropic-dangerous-direct-browser-access': 'true',
+    'User-Agent': 'claude-cli/2.0.76 (external, sdk-cli)',
+  };
+
+  if (VERBOSE) {
+    console.log(chalk.hex('#6B7280')('\n=== Debug: API Request ==='));
+    console.log(chalk.hex('#9CA3AF')('URL:'), apiUrl);
+    console.log(chalk.hex('#9CA3AF')('Method:'), 'GET');
+    console.log(chalk.hex('#9CA3AF')('Headers:'), JSON.stringify({ ...requestHeaders, Authorization: `Bearer ${accessToken.substring(0, 20)}...` }, null, 2));
+    console.log();
+  }
+
+  const response = await fetch(apiUrl, { method: 'GET', headers: requestHeaders });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(formatApiError(response.status, apiUrl, accessToken, text, tokenSource));
+  }
+
+  const text = await response.text();
+
+  if (VERBOSE) {
+    console.log(chalk.hex('#6B7280')('=== Debug: Response Body ==='));
+    console.log(chalk.hex('#9CA3AF')('Status:'), response.status, response.statusText);
+    console.log(chalk.hex('#9CA3AF')('Body:'), text);
+    console.log();
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`/api/oauth/usage returned unparseable JSON (schema may have changed): ${error instanceof Error ? error.message : 'unknown error'}\nRaw body (first 300 chars): ${text.slice(0, 300)}`);
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`/api/oauth/usage returned a non-object JSON body (schema may have changed): ${text.slice(0, 300)}`);
+  }
+
+  return parsed as OAuthUsageResponse;
+}
+
+function safeNumber(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+function safeString(v: unknown): string | null {
+  return typeof v === 'string' && v.length > 0 ? v : null;
+}
+
+function safeObject(v: unknown): Record<string, unknown> | null {
+  return typeof v === 'object' && v !== null && !Array.isArray(v) ? v as Record<string, unknown> : null;
+}
+
+function parseIsoToUnixSeconds(iso: string | null): number | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms / 1000 : null;
+}
+
+/** "weekly_all" -> "Weekly All", "nimbus_quill" -> "Nimbus Quill" */
+function humanizeKey(key: string): string {
+  return key
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+/** Best-effort human label for a `limits[].scope` object of unknown shape. */
+function describeScope(scope: unknown): string | null {
+  const obj = safeObject(scope);
+  if (!obj) return null;
+  const model = safeObject(obj.model);
+  const displayName = model ? safeString(model.display_name) : null;
+  if (displayName) return displayName;
+  return typeof obj.surface === 'string' ? obj.surface : null;
+}
+
+/**
+ * Turn a raw /api/oauth/usage response into renderable windows. Drives primarily off
+ * the `limits[]` array (the most structured, self-describing part of the response),
+ * falls back to the top-level `five_hour`/`seven_day` objects if `limits` is missing
+ * a window it's expected to have, and finally scans every other top-level key for
+ * anything window-shaped (`{ utilization, resets_at, ... }`) that isn't accounted for
+ * yet — that last pass is what lets a brand-new window Anthropic ships unannounced
+ * (they've done exactly this before, e.g. `seven_day_opus` in April 2026) show up
+ * automatically instead of silently vanishing.
+ */
+export function buildDisplayWindows(raw: OAuthUsageResponse): DisplayWindow[] {
+  const windows: DisplayWindow[] = [];
+
+  const fiveHourObj = safeObject(raw.five_hour);
+  const sevenDayObj = safeObject(raw.seven_day);
+
+  const limitsArr = Array.isArray(raw.limits) ? raw.limits : [];
+  const renderedKinds = new Set<string>();
+
+  for (const entry of limitsArr) {
+    const obj = safeObject(entry);
+    if (!obj) continue;
+
+    const kind = safeString(obj.kind) ?? '';
+    const group = safeString(obj.group) ?? '';
+    const percent = safeNumber(obj.percent);
+    if (percent === null) continue; // nothing to render without a percentage
+
+    const resetTimestamp = parseIsoToUnixSeconds(safeString(obj.resets_at));
+    const severity = safeString(obj.severity);
+    const scopeLabel = describeScope(obj.scope);
+
+    if (kind === 'session') {
+      renderedKinds.add('session');
+      // Prefer the top-level `five_hour` object in case it ever carries sub-percent
+      // precision the `limits[].percent` integer doesn't.
+      const preciseUtil = fiveHourObj ? safeNumber(fiveHourObj.utilization) : null;
+      const preciseReset = fiveHourObj ? parseIsoToUnixSeconds(safeString(fiveHourObj.resets_at)) : null;
+      windows.push({
+        label: 'Hourly (5h)',
+        percent: preciseUtil ?? percent,
+        resetTimestamp: preciseReset ?? resetTimestamp,
+        kind: '5h',
+        severity,
+        known: true,
+      });
+    } else if (kind === 'weekly_all') {
+      renderedKinds.add('weekly_all');
+      const preciseUtil = sevenDayObj ? safeNumber(sevenDayObj.utilization) : null;
+      const preciseReset = sevenDayObj ? parseIsoToUnixSeconds(safeString(sevenDayObj.resets_at)) : null;
+      windows.push({
+        label: 'Weekly (7d)',
+        percent: preciseUtil ?? percent,
+        resetTimestamp: preciseReset ?? resetTimestamp,
+        kind: '7d',
+        severity,
+        known: true,
+      });
+    } else if (kind === 'weekly_scoped') {
+      windows.push({
+        label: `Weekly — ${scopeLabel ?? 'Scoped'} (7d)`,
+        percent,
+        resetTimestamp,
+        kind: '7d',
+        severity,
+        known: true,
+      });
+    } else {
+      // A `limits[]` kind we don't recognize — Anthropic added something new.
+      // Show it, but don't guess at a period length for pace math.
+      const base = humanizeKey(kind || group || 'Unknown');
+      windows.push({
+        label: `${base}${scopeLabel ? ` — ${scopeLabel}` : ''} (new)`,
+        percent,
+        resetTimestamp,
+        kind: null,
+        severity,
+        known: false,
+      });
+    }
+  }
+
+  // `limits[]` didn't include a session and/or weekly_all entry — fall back to the
+  // top-level objects directly so the two headline numbers never silently disappear.
+  if (!renderedKinds.has('session') && fiveHourObj) {
+    const util = safeNumber(fiveHourObj.utilization);
+    if (util !== null) {
+      windows.unshift({
+        label: 'Hourly (5h)',
+        percent: util,
+        resetTimestamp: parseIsoToUnixSeconds(safeString(fiveHourObj.resets_at)),
+        kind: '5h',
+        severity: null,
+        known: true,
+      });
+    }
+  }
+  if (!renderedKinds.has('weekly_all') && sevenDayObj) {
+    const util = safeNumber(sevenDayObj.utilization);
+    if (util !== null) {
+      windows.splice(1, 0, {
+        label: 'Weekly (7d)',
+        percent: util,
+        resetTimestamp: parseIsoToUnixSeconds(safeString(sevenDayObj.resets_at)),
+        kind: '7d',
+        severity: null,
+        known: true,
+      });
+    }
+  }
+
+  // Anything else window-shaped at the top level that `limits[]` didn't cover
+  // (e.g. a newly-populated `seven_day_opus`, or a codenamed field like `nimbus_quill`).
+  const HANDLED_TOP_LEVEL_KEYS = new Set(['five_hour', 'seven_day', 'limits', 'extra_usage', 'spend', 'member_dashboard_available']);
+  for (const [key, value] of Object.entries(raw)) {
+    if (HANDLED_TOP_LEVEL_KEYS.has(key)) continue;
+    const obj = safeObject(value);
+    if (!obj) continue; // null / non-object — not a populated window
+    const util = safeNumber(obj.utilization);
+    if (util === null) continue; // not window-shaped
+    windows.push({
+      label: `${humanizeKey(key)} (new)`,
+      percent: util,
+      resetTimestamp: parseIsoToUnixSeconds(safeString(obj.resets_at)),
+      kind: null,
+      severity: null,
+      known: false,
+    });
+  }
+
+  return windows;
+}
+
+/**
  * Get pastel color for ahead/under pace difference
  */
 function getDiffColor(diffPct: number): string {
@@ -425,13 +683,20 @@ function calculate5HourPace(utilization: number, resetTimestamp: number): PaceRe
   const secondsRemaining = resetTimestamp - now;
   const totalSeconds = 5 * 3600;
   const secondsElapsed = totalSeconds - secondsRemaining;
-  
+
   const expectedUtil = secondsElapsed / totalSeconds;
   const diff = (utilization - expectedUtil) * 100;
-  
+
+  const pctUsed = utilization * 100;
+  const hoursRemaining = secondsRemaining / 3600;
+  const hoursElapsed = secondsElapsed / 3600;
+
   return {
     diff,
-    status: getPaceStatus(diff)
+    status: getPaceStatus(diff),
+    budgetRate: hoursRemaining > 0 ? (100 - pctUsed) / hoursRemaining : 0,
+    avgRate: hoursElapsed > 0 ? pctUsed / hoursElapsed : 0,
+    remainingHours: hoursRemaining,
   };
 }
 
@@ -501,13 +766,19 @@ function calculate7DayPace(utilization: number, resetTimestamp: number): PaceRes
   
   const totalActiveHours = 7 * ACTIVE_HOURS_PER_DAY;
   const elapsed = elapsedActiveHoursBetween(periodStart, now);
-  
+  const remainingActive = elapsedActiveHoursBetween(now, resetDate);
+
   const expectedUtil = elapsed / totalActiveHours;
   const diff = (utilization - expectedUtil) * 100;
-  
+
+  const pctUsed = utilization * 100;
+
   return {
     diff,
-    status: getPaceStatus(diff)
+    status: getPaceStatus(diff),
+    budgetRate: remainingActive > 0 ? (100 - pctUsed) / remainingActive : 0,
+    avgRate: elapsed > 0 ? pctUsed / elapsed : 0,
+    remainingHours: remainingActive,
   };
 }
 
@@ -604,9 +875,111 @@ function formatOutput(usage: UsageData): void {
   const labelColor = chalk.hex('#6B7280');   // Gray 500 - period labels
   const bulletColor = chalk.hex('#9CA3AF');  // Gray 400 - bullets
   
+  const fiveHourBudgetStr = fiveHourPace.remainingHours >= BUDGET_SUPPRESS_THRESHOLD_HOURS
+    ? `budget ${fiveHourPace.budgetRate.toFixed(2)}%/h (avg ${fiveHourPace.avgRate.toFixed(2)}%/h)`
+    : null;
+  const sevenDayBudgetStr = sevenDayPace.remainingHours >= BUDGET_SUPPRESS_THRESHOLD_HOURS
+    ? `budget ${sevenDayPace.budgetRate.toFixed(2)}%/h (avg ${sevenDayPace.avgRate.toFixed(2)}%/h)`
+    : null;
+
+  const fiveHourSegments = [
+    chalk.hex(fiveHourColor)(fiveHourPctStr),
+    `${chalk.hex(fiveHourDiffColor)(fiveHourPace.status)} ${chalk.hex(fiveHourDiffColor)(`(${fiveHourDiffStr} ${fiveHourPace.diff >= 0 ? 'ahead' : 'under'})`)}`,
+    fiveHourBudgetStr ? labelColor(fiveHourBudgetStr) : null,
+    chalk.hex(fiveHourResetColor)(fiveHourReset),
+  ].filter((segment): segment is string => segment !== null);
+
+  const sevenDaySegments = [
+    chalk.hex(sevenDayColor)(sevenDayPctStr),
+    `${chalk.hex(sevenDayDiffColor)(sevenDayPace.status)} ${chalk.hex(sevenDayDiffColor)(`(${sevenDayDiffStr} ${sevenDayPace.diff >= 0 ? 'ahead' : 'below'})`)}`,
+    sevenDayBudgetStr ? labelColor(sevenDayBudgetStr) : null,
+    chalk.hex(sevenDayResetColor)(sevenDayReset),
+  ].filter((segment): segment is string => segment !== null);
+
   console.log(headerColor('Usage:'));
-  console.log(`  ${labelColor('Hourly (5h)')} ${bulletColor('·')} ${chalk.hex(fiveHourColor)(fiveHourPctStr)} ${bulletColor('•')} ${chalk.hex(fiveHourDiffColor)(fiveHourPace.status)} ${chalk.hex(fiveHourDiffColor)(`(${fiveHourDiffStr} ${fiveHourPace.diff >= 0 ? 'ahead' : 'under'})`)} ${bulletColor('•')} ${chalk.hex(fiveHourResetColor)(fiveHourReset)}`);
-  console.log(`  ${labelColor('Weekly (7d)')} ${bulletColor('·')} ${chalk.hex(sevenDayColor)(sevenDayPctStr)} ${bulletColor('•')} ${chalk.hex(sevenDayDiffColor)(sevenDayPace.status)} ${chalk.hex(sevenDayDiffColor)(`(${sevenDayDiffStr} ${sevenDayPace.diff >= 0 ? 'ahead' : 'below'})`)} ${bulletColor('•')} ${chalk.hex(sevenDayResetColor)(sevenDayReset)}`);
+  console.log(`  ${labelColor('Hourly (5h)')} ${bulletColor('·')} ${fiveHourSegments.join(` ${bulletColor('•')} `)}`);
+  console.log(`  ${labelColor('Weekly (7d)')} ${bulletColor('·')} ${sevenDaySegments.join(` ${bulletColor('•')} `)}`);
+}
+
+/**
+ * Render one DisplayWindow as a line. Known 5h/7d windows get the full pace treatment
+ * (status, diff, budget rate) via the same calculate5HourPace/calculate7DayPace used by
+ * the legacy formatter. Unrecognized windows (kind === null) just show percent + reset —
+ * guessing a period for pace math on a window we've never seen before would be worse
+ * than not showing one.
+ */
+function buildWindowLine(w: DisplayWindow): string {
+  const labelColor = chalk.hex('#6B7280');
+  const bulletColor = chalk.hex('#9CA3AF');
+
+  const pctColor = getColorForPercentage(w.percent);
+  const segments: string[] = [chalk.hex(pctColor)(w.percent.toFixed(2) + '%')];
+
+  if (w.kind && w.resetTimestamp !== null) {
+    const utilFraction = w.percent / 100;
+    const pace = w.kind === '5h'
+      ? calculate5HourPace(utilFraction, w.resetTimestamp)
+      : calculate7DayPace(utilFraction, w.resetTimestamp);
+    const diffColor = getDiffColor(pace.diff);
+    const diffStr = (pace.diff >= 0 ? '+' : '') + pace.diff.toFixed(2) + '%';
+    const direction = pace.diff >= 0 ? 'ahead' : 'under';
+
+    segments.push(`${chalk.hex(diffColor)(pace.status)} ${chalk.hex(diffColor)(`(${diffStr} ${direction})`)}`);
+    if (pace.remainingHours >= BUDGET_SUPPRESS_THRESHOLD_HOURS) {
+      segments.push(labelColor(`budget ${pace.budgetRate.toFixed(2)}%/h (avg ${pace.avgRate.toFixed(2)}%/h)`));
+    }
+  } else if (w.severity && w.severity !== 'normal') {
+    segments.push(chalk.hex('#F4B8A4')(w.severity));
+  }
+
+  segments.push(
+    w.resetTimestamp !== null
+      ? chalk.hex(getResetColor(w.resetTimestamp))(formatResetTime(w.resetTimestamp))
+      : labelColor('no reset info')
+  );
+
+  if (!w.known) {
+    segments.push(chalk.hex('#9CA3AF')('unrecognized — schema may have changed'));
+  }
+
+  return `${labelColor(w.label)} ${bulletColor('·')} ${segments.join(` ${bulletColor('•')} `)}`;
+}
+
+/**
+ * Format output from the dynamic /api/oauth/usage endpoint. Every window is rendered
+ * independently, so a parse failure or unexpected shape on one window degrades to an
+ * error line for that window rather than taking down the whole display.
+ */
+function formatDynamicOutput(raw: OAuthUsageResponse): void {
+  const headerColor = chalk.hex('#9CA3AF');
+  const labelColor = chalk.hex('#6B7280');
+  const bulletColor = chalk.hex('#9CA3AF');
+  const errorColor = chalk.hex('#E89999');
+
+  let windows: DisplayWindow[];
+  try {
+    windows = buildDisplayWindows(raw);
+  } catch (error) {
+    console.log(headerColor('Usage:'));
+    console.log(`  ${errorColor('Failed to interpret /api/oauth/usage response')} ${bulletColor('•')} ${labelColor(error instanceof Error ? error.message : 'unknown error')}`);
+    if (VERBOSE) console.log(labelColor(JSON.stringify(raw, null, 2)));
+    return;
+  }
+
+  if (windows.length === 0) {
+    console.log(headerColor('Usage:'));
+    console.log(`  ${errorColor('No recognizable usage windows in response')} ${bulletColor('•')} ${labelColor('run with -v to inspect the raw payload')}`);
+    return;
+  }
+
+  console.log(headerColor('Usage:'));
+  for (const w of windows) {
+    try {
+      console.log(`  ${buildWindowLine(w)}`);
+    } catch (error) {
+      console.log(`  ${labelColor(w.label)} ${bulletColor('•')} ${errorColor('failed to render')} (${error instanceof Error ? error.message : 'unknown error'})`);
+    }
+  }
 }
 
 /**
@@ -642,12 +1015,16 @@ async function main() {
     if (!VERBOSE) {
       spinner.start('Fetching usage data...');
     }
-    const usage = await fetchUsage(tokenResult.token, tokenResult.source);
-    if (!VERBOSE) {
-      spinner.stop();
-    }
 
-    formatOutput(usage);
+    if (LEGACY) {
+      const usage = await fetchUsage(tokenResult.token, tokenResult.source);
+      if (!VERBOSE) spinner.stop();
+      formatOutput(usage);
+    } else {
+      const raw = await fetchOAuthUsage(tokenResult.token, tokenResult.source);
+      if (!VERBOSE) spinner.stop();
+      formatDynamicOutput(raw);
+    }
 
   } catch (error) {
     spinner.stop();
