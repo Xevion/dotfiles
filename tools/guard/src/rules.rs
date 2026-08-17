@@ -193,7 +193,13 @@ impl Evaluator {
         self.rule_pipe_to_shell(c);
         self.rule_git_stash(c);
         self.rule_cat(c);
-        self.rule_find(c);
+        self.rule_find_root_scope(c);
+        self.rule_find_unquoted_glob(c);
+        self.rule_find_bare(c);
+        self.rule_grep_recursive(c);
+        self.rule_du_unbounded(c);
+        self.rule_tree_unbounded(c);
+        self.rule_locate(c);
         self.rule_rg_replace(c);
         self.rule_dev_null(c);
         self.rule_echo_status(c);
@@ -259,18 +265,201 @@ impl Evaluator {
         );
     }
 
-    fn rule_find(&mut self, c: &Cmd) {
-        if c.name != "find" || c.right_of_pipe {
+    /// `find /` (or another huge system root) with no `-maxdepth`: walks the
+    /// whole tree, almost always slower and noisier than intended. A
+    /// `-maxdepth` on the same root is treated as deliberate, not wasteful.
+    fn rule_find_root_scope(&mut self, c: &Cmd) {
+        if c.name != "find" {
             return;
         }
-        if c.argv.iter().any(|a| matches!(a.as_str(), "-name" | "-iname" | "-type")) {
+        let own = find_own_args(c);
+        let paths = find_leading_paths(own);
+        if paths.iter().any(|p| is_dangerous_find_root(p)) && !own.iter().any(|a| a == "-maxdepth")
+        {
             self.push(
                 Verdict::Warn,
-                "Consider `fd` or `rg --files` over `find -name/-type` - faster and respects \
-                 .gitignore."
+                format!(
+                    "`find {}` scans without a depth limit from a large system directory - \
+                     likely slow and mostly noise. Scope it to a project directory, add \
+                     -maxdepth, or use `fd` if a system-wide search is genuinely needed.",
+                    paths.join(" ")
+                ),
+            );
+        }
+    }
+
+    /// `-name *.rs` (unquoted): if a local match exists, the shell glob-expands
+    /// the pattern before `find` ever sees it, so `find` silently searches for
+    /// one literal filename instead of matching the pattern. Detectable
+    /// because brush-parser keeps quote characters in the raw word text.
+    fn rule_find_unquoted_glob(&mut self, c: &Cmd) {
+        if c.name != "find" {
+            return;
+        }
+        const NAME_LIKE: &[&str] = &[
+            "-name",
+            "-iname",
+            "-path",
+            "-ipath",
+            "-wholename",
+            "-iwholename",
+            "-regex",
+            "-iregex",
+        ];
+        let own = find_own_args(c);
+        for w in own.windows(2) {
+            let (flag, val) = (w[0].as_str(), w[1].as_str());
+            if !NAME_LIKE.contains(&flag) {
+                continue;
+            }
+            let quoted = val.starts_with('\'') || val.starts_with('"');
+            let has_glob = val.contains(['*', '?', '[']);
+            if has_glob && !quoted {
+                self.push(
+                    Verdict::Warn,
+                    format!(
+                        "`{flag} {val}` looks unquoted - if a local match exists the shell \
+                         glob-expands it before find runs, so find silently searches for one \
+                         literal filename instead of the pattern. Quote it: `{flag} '{val}'`."
+                    ),
+                );
+                return;
+            }
+        }
+    }
+
+    /// `find <path>` with no `-name`/`-type`/`-size`/etc.: lists every path
+    /// under the tree with nothing to narrow it. `-maxdepth` alone counts as a
+    /// deliberate bound, not a wasteful dump.
+    fn rule_find_bare(&mut self, c: &Cmd) {
+        if c.name != "find" {
+            return;
+        }
+        const NON_FILTERING: &[&str] = &[
+            "-print",
+            "-print0",
+            "-fprintf",
+            "-depth",
+            "-follow",
+            "-H",
+            "-L",
+            "-P",
+            "-D",
+            "-daystart",
+            "-noleaf",
+            "-xdev",
+            "-mount",
+        ];
+        let own = find_own_args(c);
+        let flags = &own[find_leading_paths(own).len()..];
+        if flags.iter().any(|a| a == "-maxdepth") {
+            return;
+        }
+        let has_filter = flags
+            .iter()
+            .any(|a| a.starts_with('-') && !NON_FILTERING.contains(&a.as_str()));
+        if !has_filter {
+            self.push(
+                Verdict::Warn,
+                "Unscoped `find` with no -name/-type/-size (or similar) filter lists every path \
+                 under the tree. Add a filter, cap depth with -maxdepth, or use `fd`/`rg \
+                 --files` for a faster, .gitignore-aware listing."
                     .into(),
             );
         }
+    }
+
+    /// `grep -r`/`-R` (bare or bundled): unlike `rg`, plain grep ignores
+    /// `.gitignore` and crawls `node_modules`/`.git`/build directories.
+    fn rule_grep_recursive(&mut self, c: &Cmd) {
+        if !matches!(c.name.as_str(), "grep" | "egrep" | "fgrep") {
+            return;
+        }
+        for a in c.argv.iter().skip(1) {
+            if a == "--" {
+                break;
+            }
+            let exact = matches!(
+                a.as_str(),
+                "-r" | "-R" | "--recursive" | "--dereference-recursive"
+            );
+            let bundled = a.len() > 2
+                && a.starts_with('-')
+                && !a.starts_with("--")
+                && a[1..].chars().all(|ch| ch.is_ascii_alphabetic())
+                && a[1..].contains(['r', 'R']);
+            if exact || bundled {
+                self.push(
+                    Verdict::Warn,
+                    format!(
+                        "`{} {a}` doesn't respect .gitignore and will crawl \
+                         node_modules/.git/build directories. Use `rg` instead - same basic \
+                         syntax, .gitignore-aware, much faster.",
+                        c.name
+                    ),
+                );
+                return;
+            }
+        }
+    }
+
+    /// `du` with no `-s`/`-d`: prints a line per subdirectory across the whole
+    /// tree. The `disk-reclaim` skill already asks for `duc` instead of
+    /// re-running `du`/`ncdu`; this enforces that at the command level.
+    fn rule_du_unbounded(&mut self, c: &Cmd) {
+        if c.name != "du" {
+            return;
+        }
+        let bounded = c.argv.iter().skip(1).any(|a| {
+            a == "-d"
+                || a == "--summarize"
+                || a.starts_with("--max-depth")
+                || (a.starts_with('-')
+                    && !a.starts_with("--")
+                    && a[1..].chars().all(|ch| ch.is_ascii_alphabetic())
+                    && a[1..].contains('s'))
+        });
+        if bounded {
+            return;
+        }
+        self.push(
+            Verdict::Warn,
+            "Unbounded `du` prints a line per subdirectory - slow and noisy on a large tree. \
+             Use `duc index` once and `duc ls`/`duc find` to query it, or add -s/-d N to bound \
+             this."
+                .into(),
+        );
+    }
+
+    /// `tree` with no `-L`: prints the entire subtree.
+    fn rule_tree_unbounded(&mut self, c: &Cmd) {
+        if c.name != "tree" {
+            return;
+        }
+        if c.argv.iter().skip(1).any(|a| a == "-L") {
+            return;
+        }
+        self.push(
+            Verdict::Warn,
+            "Unbounded `tree` prints the entire subtree - add `-L N` to cap depth, or use `fd` \
+             for a filtered listing."
+                .into(),
+        );
+    }
+
+    /// `locate`: reads a periodically-updated index, not a live filesystem
+    /// walk, so it can miss files created or moved recently. A different
+    /// failure mode than the other rules here (stale, not slow).
+    fn rule_locate(&mut self, c: &Cmd) {
+        if !matches!(c.name.as_str(), "locate" | "mlocate" | "plocate") {
+            return;
+        }
+        self.push(
+            Verdict::Warn,
+            "`locate` reads a periodically-updated index and may miss files created or moved \
+             recently. Use `fd`/`rg --files` for a live, accurate search."
+                .into(),
+        );
     }
 
     fn rule_rg_replace(&mut self, c: &Cmd) {
@@ -387,7 +576,11 @@ fn git_subcommand(argv: &[String]) -> Option<&str> {
         let a = &argv[i];
         if a.starts_with('-') {
             // `--git-dir=x` carries its value in one token; bare `-c` takes the next.
-            i += if TAKES_ARG.contains(&a.as_str()) { 2 } else { 1 };
+            i += if TAKES_ARG.contains(&a.as_str()) {
+                2
+            } else {
+                1
+            };
             continue;
         }
         return Some(a);
@@ -439,11 +632,49 @@ fn describe_redir(io: &ast::IoRedirect) -> Option<Redir> {
         }
         ast::IoRedirect::OutputAndError(w, append) => Some(Redir {
             fd: 1,
-            kind: if *append { RedirKind::Append } else { RedirKind::Write },
+            kind: if *append {
+                RedirKind::Append
+            } else {
+                RedirKind::Write
+            },
             target: w.value.clone(),
         }),
         ast::IoRedirect::HereDocument(_, _) | ast::IoRedirect::HereString(_, _) => None,
     }
+}
+
+/// `find`'s own argv: everything after the command word itself, skipping any
+/// transparent prefix (`command find ...`, `nice find ...`).
+fn find_own_args(c: &Cmd) -> &[String] {
+    let idx = c
+        .argv
+        .iter()
+        .position(|a| !TRANSPARENT.contains(&basename(a)))
+        .unwrap_or_else(|| c.argv.len().saturating_sub(1));
+    &c.argv[idx + 1..]
+}
+
+/// The leading path operands of `find`'s own argv - tokens before the first
+/// one starting with `-` (find's expression). Per find's grammar, paths
+/// always precede the expression.
+fn find_leading_paths(args: &[String]) -> &[String] {
+    let end = args
+        .iter()
+        .position(|a| a.starts_with('-'))
+        .unwrap_or(args.len());
+    &args[..end]
+}
+
+/// Whether a `find` path operand is a large system directory worth flagging
+/// when scanned without `-maxdepth`. Exact match only - `/home/xevion/proj` is
+/// a normal scoped path, not a root scan.
+fn is_dangerous_find_root(p: &str) -> bool {
+    let trimmed = p.trim_end_matches('/');
+    let trimmed = if trimmed.is_empty() { "/" } else { trimmed };
+    matches!(
+        trimmed,
+        "/" | "/home" | "/usr" | "/var" | "/etc" | "/mnt" | "/root" | "~" | "$HOME" | "${HOME}"
+    )
 }
 
 /// argv with transparent prefixes stripped, reduced to a basename.
@@ -454,7 +685,9 @@ fn effective_name(argv: &[String]) -> String {
             return base.to_string();
         }
     }
-    argv.last().map(|a| basename(a).to_string()).unwrap_or_default()
+    argv.last()
+        .map(|a| basename(a).to_string())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
