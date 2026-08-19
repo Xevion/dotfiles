@@ -40,6 +40,25 @@ fn warns(cmd: &str) -> bool {
 #[case::ssh_git_stash_not_local("ssh roman 'git stash'", false)]
 // A payload we cannot expand fails open rather than guessing.
 #[case::dollar_payload_fails_open("bash -c \"sudo $CMD\"", false)]
+// `-r` first in the cluster: matches replaced with the remainder.
+#[case::rg_replace_bundle_blocks_rn("rg -rn pattern", true)]
+#[case::rg_replace_bundle_blocks_ri("rg -ri foo", true)]
+// `-r` last, other flags first: worse failure mode, `r` swallows the next
+// whole argument instead of just the remainder of this token.
+#[case::rg_replace_bundle_blocks_nr("rg -nr pattern dir", true)]
+#[case::rg_replace_bundle_blocks_vr("rg -vr pattern", true)]
+// Non-alphabetic remainders: the old alphabetic-only check missed these.
+#[case::rg_replace_bundle_blocks_digit_suffix("rg -r5 pattern", true)]
+#[case::rg_replace_bundle_blocks_equals("rg -r=n pattern", true)]
+// Bare `-r VALUE` (space-separated) is ripgrep's real documented form.
+#[case::rg_replace_bare_allowed("rg -r TEXT pattern file", false)]
+#[case::rg_replace_long_form_allowed("rg --replace=TEXT foo file", false)]
+#[case::rg_normal_dash_n_allowed("rg -n pattern", false)]
+// A different value-taking flag claims the rest of the cluster before `r`
+// ever gets a chance to mean `--replace`.
+#[case::rg_other_value_flag_takes_precedence("rg -fr pattern", false)]
+// `--` ends option parsing; a literal `-rn` after it is a positional arg.
+#[case::rg_replace_after_double_dash_ignored("rg pattern -- -rn", false)]
 fn block_detection(#[case] cmd: &str, #[case] expect: bool) {
     assert!(blocks(cmd) == expect);
 }
@@ -71,10 +90,6 @@ fn block_detection(#[case] cmd: &str, #[case] expect: bool) {
 #[case::tree_unbounded_warns("tree", true)]
 #[case::tree_bounded_ok("tree -L 2", false)]
 #[case::locate_warns("locate foo.conf", true)]
-#[case::rg_replace_bundle_warns_rn("rg -rn pattern", true)]
-#[case::rg_replace_bundle_warns_ri("rg -ri foo", true)]
-#[case::rg_normal_ok_dash_n("rg -n pattern", false)]
-#[case::rg_normal_ok_explicit_replace("rg --replace=x foo", false)]
 #[case::dev_null_warns("some_tool 2>/dev/null", true)]
 #[case::dev_null_feature_detection_ok_command("command -v foo 2>/dev/null", false)]
 #[case::dev_null_feature_detection_ok_type("type bar 2>/dev/null", false)]

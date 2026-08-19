@@ -462,31 +462,85 @@ impl Evaluator {
         );
     }
 
+    /// `rg` has no recursive flag at all, unlike grep, since it always
+    /// recurses; `-r` is exclusively `--replace`. Any short-flag cluster
+    /// with `r` in it is grep muscle memory (`-rn`, `-nr`, `-vr`, ...), not
+    /// intentional replace usage, and the failure is silent: `r` swallows
+    /// either the rest of the cluster or, if nothing follows it, the whole
+    /// next argument (shifting pattern/path over by one - worse, since it
+    /// can search the wrong directory and return empty results instead of
+    /// erroring). Bare `-r VALUE` and `--replace=VALUE` are the unambiguous
+    /// real forms and stay untouched. Fails open on any short flag rg
+    /// doesn't actually have, rather than guessing.
     fn rule_rg_replace(&mut self, c: &Cmd) {
         if c.name != "rg" {
             return;
         }
+        // ripgrep 15.1.0's full short-flag set (`rg --help`). Value-taking
+        // flags consume the rest of the cluster, or the next argument if
+        // nothing remains, and stop that cluster's parsing.
+        const VALUE_FLAGS: &[char] =
+            &['e', 'f', 'E', 'm', 'j', 'g', 'd', 't', 'T', 'A', 'B', 'C', 'M', 'r'];
+        const BOOL_FLAGS: &[char] = &[
+            'z', 's', 'F', 'i', 'v', 'x', 'U', 'P', 'S', 'a', 'w', 'L', 'u', 'b', 'h', 'n', 'N',
+            'o', 'p', 'q', 'H', 'I', 'c', 'l', 'V',
+        ];
         for a in c.argv.iter().skip(1) {
             if a == "--" {
                 break;
             }
-            // grep muscle memory: `-rN` bundles. ripgrep recurses by default and
-            // `-r` is `--replace`, so `-rn` means "replace matches with 'n'".
-            if a.len() > 2
-                && a.starts_with("-r")
-                && a[2..].chars().all(|ch| ch.is_ascii_alphabetic())
-            {
-                let repl = &a[2..];
-                self.push(
-                    Verdict::Warn,
-                    format!(
-                        "`rg {a}` is grep muscle memory: ripgrep recurses by default and `-r` is \
-                         `--replace`, so this prints each match with the matched text replaced by \
-                         \"{repl}\" instead of line numbers. Use `rg -n` for line numbers, or \
-                         `rg --replace=TEXT` to actually replace."
-                    ),
-                );
-                return;
+            // Long options (`--replace=...`) are unambiguous; only a
+            // single-dash cluster can hide a bundled `-r`.
+            if !a.starts_with('-') || a.starts_with("--") || a.len() < 2 {
+                continue;
+            }
+            let body = &a[1..];
+            // Bare `-r` alone (value as the next argument) is ripgrep's
+            // documented form, not a typo.
+            if body == "r" {
+                continue;
+            }
+            for (idx, ch) in body.char_indices() {
+                if ch == 'r' {
+                    let remainder = &body[idx + 1..];
+                    let message = if remainder.is_empty() {
+                        format!(
+                            "`rg {a}` is grep muscle memory: ripgrep has no recursive flag at \
+                             all (it always recurses - there's no `-r`/`--recursive` to reach \
+                             for), so `-r` here means `--replace`. Nothing follows `r` in this \
+                             cluster, so ripgrep swallows your *next* argument whole as the \
+                             replacement text, silently shifting your pattern and path arguments \
+                             over by one - it can search the wrong directory (or none) and return \
+                             misleadingly empty results instead of erroring. Split the flags \
+                             apart (e.g. `rg -{prefix} -r TEXT ...`) or spell out \
+                             `--replace=TEXT`.",
+                            prefix = &body[..idx],
+                        )
+                    } else {
+                        let shown = remainder.strip_prefix('=').unwrap_or(remainder);
+                        format!(
+                            "`rg {a}` is grep muscle memory: ripgrep has no recursive flag at \
+                             all (it always recurses), so `-r` here means `--replace`. Everything \
+                             after `r` in this cluster becomes the literal replacement text, so \
+                             every match is silently swapped for \"{shown}\" instead of your \
+                             other flags taking effect. Split the flags apart (`rg -n`, `rg -i`, \
+                             ...) and only reach for `rg -r TEXT` (space-separated) or \
+                             `rg --replace=TEXT` when you actually want to replace matched text."
+                        )
+                    };
+                    self.push(Verdict::Block, message);
+                    return;
+                }
+                if VALUE_FLAGS.contains(&ch) {
+                    // A different value-taking flag claims the rest of this
+                    // cluster (or the next token); `r` never gets a chance
+                    // to mean `--replace` here.
+                    break;
+                }
+                if !BOOL_FLAGS.contains(&ch) {
+                    // Not a real rg short flag - rg will reject it itself.
+                    break;
+                }
             }
         }
     }
