@@ -23,8 +23,95 @@ pub const FILTERS: &[&str] = &[
 /// effective command is found by skipping them. Shared by rules and approval.
 pub const TRANSPARENT: &[&str] = &[
     "command", "builtin", "env", "nice", "nohup", "time", "doas", "exec", "strace", "ltrace",
-    "xargs",
+    "xargs", "timeout", "flock",
 ];
+
+/// How many of a wrapper's own non-flag positional operands (beyond its
+/// flags) come before the wrapped command: `timeout 10 cmd` has one
+/// (the duration), `flock /tmp/x cmd` has one (the lockfile), everything else
+/// in `TRANSPARENT` takes flags only.
+fn wrapper_positional_args(name: &str) -> usize {
+    match name {
+        "timeout" | "flock" => 1,
+        _ => 0,
+    }
+}
+
+/// A bare `NAME=value` token, the shape a leading env assignment takes when
+/// it appears as a literal argument rather than a shell prefix assignment
+/// (e.g. the `FOO=1` in `env FOO=1 cmd`, which the grammar treats as an
+/// ordinary word once it follows argv0).
+fn looks_like_assignment(tok: &str) -> bool {
+    let Some((name, _)) = tok.split_once('=') else {
+        return false;
+    };
+    !name.is_empty()
+        && name
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// Skip past a chain of `TRANSPARENT` wrapper commands - and each one's own
+/// flags, positional args, and any `NAME=value` operands - to find where the
+/// wrapped command actually begins. Returns `argv.len()` if the whole argv is
+/// wrapper syntax with no command left (e.g. `timeout 10`).
+pub fn skip_transparent(argv: &[String]) -> usize {
+    let mut i = 0;
+    while i < argv.len() {
+        let base = basename(&argv[i]);
+        if !TRANSPARENT.contains(&base) {
+            break;
+        }
+        i += 1;
+        while i < argv.len() && argv[i].starts_with('-') && argv[i] != "-" {
+            i += 1;
+        }
+        let positional = wrapper_positional_args(base);
+        let take = positional.min(argv.len() - i);
+        i += take;
+        while i < argv.len() && looks_like_assignment(&argv[i]) {
+            i += 1;
+        }
+    }
+    i
+}
+
+/// git global options that consume the following token as their value
+/// (`git -c k=v stash`, `git -C dir stash`); everything else is a boolean
+/// global flag. Shared by rules (discipline) and approval (permission
+/// matching) so both see the same subcommand regardless of global flags.
+const GIT_TAKES_ARG: &[&str] = &[
+    "-c",
+    "-C",
+    "--git-dir",
+    "--work-tree",
+    "--namespace",
+    "--super-prefix",
+    "--config-env",
+];
+
+/// The index of a git invocation's subcommand in `argv` (which must start
+/// with `git`), skipping any leading global options. `None` when the argv is
+/// all global options with no subcommand (e.g. `git --version` handled
+/// elsewhere, or a bare `git`).
+pub fn git_subcommand_index(argv: &[String]) -> Option<usize> {
+    let mut i = 1;
+    while i < argv.len() {
+        let a = &argv[i];
+        if a.starts_with('-') {
+            i += if GIT_TAKES_ARG.contains(&a.as_str()) {
+                2
+            } else {
+                1
+            };
+            continue;
+        }
+        return Some(i);
+    }
+    None
+}
 
 /// A redirection on a stage, restricted to the reproducible set. Anything else
 /// makes the stage `Unsupported`.
@@ -33,7 +120,11 @@ pub enum Redir {
     /// `N>&M`, e.g. `2>&1`.
     Dup { from: i32, to: i32 },
     /// `>f` / `>>f` / `<f` / `2>f`.
-    File { fd: i32, kind: FileKind, path: String },
+    File {
+        fd: i32,
+        kind: FileKind,
+        path: String,
+    },
     /// `&>f` / `&>>f`.
     OutErr { path: String, append: bool },
 }
@@ -111,7 +202,11 @@ impl PipelineInfo {
                     let Some((bs, be)) = pl.location().and_then(|sp| table.span(&sp)) else {
                         continue;
                     };
-                    let stages = pl.seq.iter().map(|c| extract_stage(c, cmd, &table)).collect();
+                    let stages = pl
+                        .seq
+                        .iter()
+                        .map(|c| extract_stage(c, cmd, &table))
+                        .collect();
                     out.push(PipelineInfo {
                         byte_span: (bs, be),
                         stages,
@@ -307,24 +402,40 @@ fn conv_redir(io: &ast::IoRedirect) -> Option<Redir> {
         ast::IoRedirect::File(fd, kind, target) => match (kind, target) {
             (K::Write | K::Clobber, T::Filename(w)) => {
                 let fd = std_fd(fd.unwrap_or(1))?;
-                Some(Redir::File { fd, kind: FileKind::Write, path: unquote(&w.value)? })
+                Some(Redir::File {
+                    fd,
+                    kind: FileKind::Write,
+                    path: unquote(&w.value)?,
+                })
             }
             (K::Append, T::Filename(w)) => {
                 let fd = std_fd(fd.unwrap_or(1))?;
-                Some(Redir::File { fd, kind: FileKind::Append, path: unquote(&w.value)? })
+                Some(Redir::File {
+                    fd,
+                    kind: FileKind::Append,
+                    path: unquote(&w.value)?,
+                })
             }
             (K::Read, T::Filename(w)) => {
                 let fd = std_fd(fd.unwrap_or(0))?;
-                Some(Redir::File { fd, kind: FileKind::Read, path: unquote(&w.value)? })
+                Some(Redir::File {
+                    fd,
+                    kind: FileKind::Read,
+                    path: unquote(&w.value)?,
+                })
             }
             (K::DuplicateOutput | K::DuplicateInput, T::Duplicate(w)) => {
                 // rejects `-` (close) and non-numeric
                 let to = std_fd(w.value.parse().ok()?)?;
-                Some(Redir::Dup { from: std_fd(fd.unwrap_or(1))?, to })
+                Some(Redir::Dup {
+                    from: std_fd(fd.unwrap_or(1))?,
+                    to,
+                })
             }
-            (K::DuplicateOutput | K::DuplicateInput, T::Fd(n)) => {
-                Some(Redir::Dup { from: std_fd(fd.unwrap_or(1))?, to: std_fd(*n)? })
-            }
+            (K::DuplicateOutput | K::DuplicateInput, T::Fd(n)) => Some(Redir::Dup {
+                from: std_fd(fd.unwrap_or(1))?,
+                to: std_fd(*n)?,
+            }),
             _ => None,
         },
         ast::IoRedirect::OutputAndError(w, append) => Some(Redir::OutErr {
@@ -351,7 +462,7 @@ fn std_fd(fd: i32) -> Option<i32> {
 /// The runner spawns simple stages directly (no shell), so this is the only
 /// place quote-removal happens; without it, `-E 'binary(x)'` reaches the child
 /// with its quotes intact.
-fn unquote(raw: &str) -> Option<String> {
+pub(crate) fn unquote(raw: &str) -> Option<String> {
     let pieces = word::parse(raw, &ParserOptions::default()).ok()?;
     let mut out = String::new();
     for wp in &pieces {

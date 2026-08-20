@@ -4,7 +4,7 @@
 //! yields no issues, and the command runs untouched.
 
 use crate::nested::{nested_payload, Nested};
-use crate::parse::{basename, parse_opt, TRANSPARENT};
+use crate::parse::{basename, git_subcommand_index, parse_opt, skip_transparent};
 use brush_parser::ast;
 use std::collections::HashSet;
 
@@ -267,7 +267,9 @@ impl Evaluator {
 
     /// `find /` (or another huge system root) with no `-maxdepth`: walks the
     /// whole tree, almost always slower and noisier than intended. A
-    /// `-maxdepth` on the same root is treated as deliberate, not wasteful.
+    /// `-maxdepth` on the same root is treated as deliberate, not wasteful -
+    /// any generous value (e.g. 20) is a cheap, always-available escape
+    /// hatch, so blocking here doesn't cost real capability.
     fn rule_find_root_scope(&mut self, c: &Cmd) {
         if c.name != "find" {
             return;
@@ -277,7 +279,7 @@ impl Evaluator {
         if paths.iter().any(|p| is_dangerous_find_root(p)) && !own.iter().any(|a| a == "-maxdepth")
         {
             self.push(
-                Verdict::Warn,
+                Verdict::Block,
                 format!(
                     "`find {}` scans without a depth limit from a large system directory - \
                      likely slow and mostly noise. Scope it to a project directory, add \
@@ -479,8 +481,9 @@ impl Evaluator {
         // ripgrep 15.1.0's full short-flag set (`rg --help`). Value-taking
         // flags consume the rest of the cluster, or the next argument if
         // nothing remains, and stop that cluster's parsing.
-        const VALUE_FLAGS: &[char] =
-            &['e', 'f', 'E', 'm', 'j', 'g', 'd', 't', 'T', 'A', 'B', 'C', 'M', 'r'];
+        const VALUE_FLAGS: &[char] = &[
+            'e', 'f', 'E', 'm', 'j', 'g', 'd', 't', 'T', 'A', 'B', 'C', 'M', 'r',
+        ];
         const BOOL_FLAGS: &[char] = &[
             'z', 's', 'F', 'i', 'v', 'x', 'U', 'P', 'S', 'a', 'w', 'L', 'u', 'b', 'h', 'n', 'N',
             'o', 'p', 'q', 'H', 'I', 'c', 'l', 'V',
@@ -616,30 +619,7 @@ fn build_cmd(s: &ast::SimpleCommand, right_of_pipe: bool, in_pipeline: bool) -> 
 /// The git subcommand, skipping global options that consume a following value
 /// (`git -c k=v stash`, `git -C dir stash`). None when there is no subcommand.
 fn git_subcommand(argv: &[String]) -> Option<&str> {
-    const TAKES_ARG: &[&str] = &[
-        "-c",
-        "-C",
-        "--git-dir",
-        "--work-tree",
-        "--namespace",
-        "--super-prefix",
-        "--config-env",
-    ];
-    let mut i = 1;
-    while i < argv.len() {
-        let a = &argv[i];
-        if a.starts_with('-') {
-            // `--git-dir=x` carries its value in one token; bare `-c` takes the next.
-            i += if TAKES_ARG.contains(&a.as_str()) {
-                2
-            } else {
-                1
-            };
-            continue;
-        }
-        return Some(a);
-    }
-    None
+    git_subcommand_index(argv).map(|i| argv[i].as_str())
 }
 
 fn collect_items(
@@ -700,11 +680,12 @@ fn describe_redir(io: &ast::IoRedirect) -> Option<Redir> {
 /// `find`'s own argv: everything after the command word itself, skipping any
 /// transparent prefix (`command find ...`, `nice find ...`).
 fn find_own_args(c: &Cmd) -> &[String] {
-    let idx = c
-        .argv
-        .iter()
-        .position(|a| !TRANSPARENT.contains(&basename(a)))
-        .unwrap_or_else(|| c.argv.len().saturating_sub(1));
+    let idx = skip_transparent(&c.argv);
+    let idx = if idx < c.argv.len() {
+        idx
+    } else {
+        c.argv.len().saturating_sub(1)
+    };
     &c.argv[idx + 1..]
 }
 
@@ -731,17 +712,17 @@ fn is_dangerous_find_root(p: &str) -> bool {
     )
 }
 
-/// argv with transparent prefixes stripped, reduced to a basename.
+/// argv with transparent prefixes (and their own flags/positional args)
+/// stripped, reduced to a basename.
 fn effective_name(argv: &[String]) -> String {
-    for a in argv {
-        let base = basename(a);
-        if !TRANSPARENT.contains(&base) {
-            return base.to_string();
-        }
+    let idx = skip_transparent(argv);
+    if idx < argv.len() {
+        basename(&argv[idx]).to_string()
+    } else {
+        argv.last()
+            .map(|a| basename(a).to_string())
+            .unwrap_or_default()
     }
-    argv.last()
-        .map(|a| basename(a).to_string())
-        .unwrap_or_default()
 }
 
 #[cfg(test)]

@@ -107,6 +107,10 @@ allow(
     "metadata",
     "run",
     "bench",
+    "info",
+    "install",
+    "update",
+    "uninstall",
   ]),
 );
 tool("rustup", { allow: ["show", "component", "target", "toolchain"] });
@@ -123,17 +127,21 @@ allow(
     "env",
     "doc",
     "generate",
+    "run",
   ]),
   "gofmt",
+  "gofumpt",
   "gopls",
   "golangci-lint",
+  "go get",
+  "go install",
 );
 tool("mvn", { allow: ["test", "compile", "package", "verify", "clean package", "clean install", "dependency:tree", "assembly:single"] });
 
 // Node / Bun
 allow(
-  ...subs("npm", ["run", "audit", "ci", "list", "outdated", "info"]),
-  ...subs("pnpm", ["run", "list", "exec", "audit", "outdated", "install", "add", "remove", "uninstall"]),
+  ...subs("npm", ["run", "audit", "ci", "list", "outdated", "info", "view", "show", "install", "update"]),
+  ...subs("pnpm", ["run", "list", "exec", "audit", "outdated", "install", "add", "remove", "uninstall", "update", "store prune"]),
   "bun",
   "bunx",
   "npx",
@@ -193,17 +201,16 @@ tool("git", {
     "clean --dry-run",
     "stash list",
     "stash show",
+    "checkout",
+    "switch",
+    "clone",
   ],
   ask: [
-    "checkout",
     "pull",
     "merge",
-    "branch -d",
     "rebase",
     "push",
     "stash",
-    "switch",
-    "clone",
     "restore",
     "push --force",
     "push -f",
@@ -244,11 +251,11 @@ tool("gh", {
     "label list",
     "pr diff",
     "pr checks",
+    "run cancel",
   ],
   ask: [
     "pr close",
     "issue close",
-    "run cancel",
     "repo archive",
     "secret delete",
     "release delete",
@@ -271,8 +278,12 @@ tool("docker", {
     "compose up",
     "compose down",
     "compose logs",
+    "rm",
   ],
 });
+
+// `timeout`/`flock` are absent on purpose: guard's TRANSPARENT list
+// evaluates the wrapped command against these rules instead of bypassing.
 
 // General CLI (always safe)
 allow(
@@ -290,7 +301,6 @@ allow(
   "curl",
   "netstat",
   "awk",
-  "timeout",
   "chmod",
   "jq",
   "grep",
@@ -337,15 +347,42 @@ allow(
   "perf",
   "xz",
   "ast-grep",
+  "gzip",
+  "zstd",
+  "ffmpeg",
+  "convert",
+  "magick",
+  "xmllint",
+  "protoc",
+  "shellcheck",
+  "shfmt",
+  "typos",
+  "zizmor",
+  "actionlint",
+  "lychee",
+  "ktlint",
+  "dust",
+  "pkg-config",
+  "nvidia-smi",
+  "lspci",
+  "lsusb",
 );
 // ast-grep footgun: `-U`/`--update-all` rewrites every match across the codebase unattended
 ask("ast-grep run -U", "ast-grep run --update-all", "ast-grep scan --update-all");
 
 // DB / query tools
-allow("psql", "sqlite3", "sqlc", "tygo");
+allow("psql", "sqlite3", "sqlc", "tygo", "mysql", "duckdb");
+// redis-cli mixes read commands with destructive ones (FLUSHALL, DEL, SET) at
+// the same argument position, so only the read verbs are allowed.
+tool("redis-cli", { allow: ["GET", "KEYS", "TTL", "TYPE", "INFO", "PING", "DBSIZE"] });
 
-// Binary inspection (read-only)
-allow("nm", "objdump", "ldd", "ilspycmd", "rabin2");
+// Binary inspection (read-only unless -w is passed to patch)
+allow("nm", "objdump", "ldd", "ilspycmd", "rabin2", "r2", "radare2");
+ask("r2 -w", "radare2 -w");
+
+// Disk usage
+allow("dust");
+tool("dua", { allow: ["aggregate"] }); // `dua interactive` has an in-TUI delete key
 
 // Process management
 allow("kill", "pkill");
@@ -358,8 +395,70 @@ tool("systemctl", {
 // Deployment CLIs (read-only status checks; up/deploy stay ungated)
 tool("railway", { allow: ["status", "whoami"] });
 
-// Privileged reads: dmidecode only reads SMBIOS data, no state change despite needing root
-tool("pkexec", { allow: ["dmidecode"] });
+// Privileged reads: dmidecode (SMBIOS) and kernelstub -p (print boot
+// options) only read, no state change despite needing root. `pkexec bash`/
+// `pkexec cat <path>` stay ungated on purpose - privileged arbitrary
+// exec/read is the same class sudo is blocked for, not a permission tweak.
+tool("pkexec", { allow: ["dmidecode", "kernelstub -p"] });
+
+// Virtualization / system inspection (read-only status/info queries; the
+// state-changing virsh verbs - destroy/undefine/console/start/shutdown -
+// stay ungated)
+tool("virsh", {
+  allow: [
+    "list",
+    "dumpxml",
+    "domstate",
+    "capabilities",
+    "domcapabilities",
+    "nodeinfo",
+    "net-list",
+    "domiflist",
+    "domblklist",
+  ],
+});
+tool("qemu-img", { allow: ["info"] });
+
+// Nix (builds into the immutable store; no project mutation). `nix run`
+// executes an arbitrary flake output and `nix develop` (bare) drops into an
+// interactive shell - same class as npx/bash, so both stay ungated except
+// the non-interactive `develop --command` form actually used here.
+tool("nix", {
+  allow: [
+    "build",
+    "eval",
+    "flake check",
+    "flake show",
+    "flake metadata",
+    "flake archive",
+    "log",
+    "search",
+    "profile list",
+    "profile diff-closures",
+    "develop --command",
+    "flake init",
+    "flake new",
+    "profile install",
+  ],
+  ask: [
+    "flake update",
+    "flake lock",
+    "profile remove",
+    "profile upgrade",
+    "profile wipe-history",
+  ],
+});
+tool("nix-store", { allow: ["-q", "--query"] });
+
+// Cloud CLIs: only the read-only describe/list/get surface, never
+// create/apply/delete.
+tool("aws", { allow: ["sts get-caller-identity", "configure list", "s3 ls"] });
+tool("gcloud", { allow: ["config list", "projects list"] });
+
+// Static site generators / codegen (scoped to the project's own output dir)
+tool("hugo", { allow: ["build", "server", "list", "config", "env"], ask: ["deploy"] });
+tool("zola", { allow: ["build", "serve", "check"] });
+tool("typst", { allow: ["compile"] });
 
 // System diagnostics (read-only)
 allow("whoami", "uname", "hostname", "id", "groups", "lscpu", "free", "uptime", "nproc", "lsof");
@@ -377,7 +476,7 @@ tool("ip", {
 tool("apt", { allow: ["list", "search", "show", "policy"] });
 tool("dpkg", { allow: ["-l", "-L", "-s", "-S", "--list", "--listfiles"] });
 tool("brew", { allow: ["list", "info", "search", "outdated", "leaves", "deps", "--version"] });
-tool("snap", { allow: ["list", "info", "find"] });
+tool("snap", { allow: ["list", "info", "find", "install", "remove"] });
 
 // xevion (xevion.dev content CLI)
 // Authoring is iterative and runs against production by design (edits are atomic
@@ -449,6 +548,7 @@ allow(
   "claude mcp add",
   "tempo",
   "ffprobe",
+  "looking-glass-client",
   // Custom local tooling on external storage
   "/mnt/storage/unity/bin/unity",
   "/mnt/storage/unity/bin/pcommit",
@@ -458,16 +558,10 @@ allow(
 );
 
 // Package managers (ask, lifecycle scripts and lockfile changes)
-ask(
-  ...subs("npm", ["install", "update"]),
-  ...subs("pnpm", ["update", "store prune"]),
-  "cargo uninstall",
-  "cargo update",
-  "cargo install",
-  "snap install",
-  "snap remove",
-  "sudo apt",
-);
+// `sudo apt` can never actually run here - guard blocks all sudo outright,
+// and there's no TTY for a password prompt even if it didn't - but the ask
+// entry stays so nothing else accidentally shadows it later.
+ask("sudo apt");
 
 // Destructive file operations
 ask("rm", "rm -rf", "del");

@@ -11,6 +11,7 @@ pub mod approval;
 pub mod hook;
 pub mod nested;
 pub mod parse;
+pub mod rm_policy;
 pub mod rules;
 pub mod run;
 pub mod tap;

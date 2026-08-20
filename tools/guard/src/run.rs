@@ -242,7 +242,11 @@ fn resolve_fds(
                 slots[*from as usize] = Slot::Owned(dup);
             }
             Redir::OutErr { path, append } => {
-                let kind = if *append { FileKind::Append } else { FileKind::Write };
+                let kind = if *append {
+                    FileKind::Append
+                } else {
+                    FileKind::Write
+                };
                 let target = open_target(path, &kind)?;
                 let dup = target.as_fd().try_clone_to_owned()?;
                 slots[1] = Slot::Owned(target);
@@ -259,7 +263,11 @@ fn resolve_fds(
 fn open_target(path: &str, kind: &FileKind) -> io::Result<OwnedFd> {
     let file = match kind {
         FileKind::Read => File::open(path)?,
-        FileKind::Write => OpenOptions::new().write(true).create(true).truncate(true).open(path)?,
+        FileKind::Write => OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)?,
         FileKind::Append => OpenOptions::new().create(true).append(true).open(path)?,
     };
     Ok(OwnedFd::from(file))

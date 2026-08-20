@@ -9,7 +9,10 @@ fn pls(cmd: &str) -> Vec<PipelineInfo> {
 /// The single capturable pipeline in `cmd`, or panic.
 fn only_capturable(cmd: &str) -> PipelineInfo {
     let mut caps: Vec<PipelineInfo> = pls(cmd).into_iter().filter(|p| p.capturable()).collect();
-    assert!(caps.len() == 1, "expected exactly one capturable pipeline in {cmd:?}");
+    assert!(
+        caps.len() == 1,
+        "expected exactly one capturable pipeline in {cmd:?}"
+    );
     caps.pop().unwrap()
 }
 
@@ -79,7 +82,10 @@ fn reverse_dup_extracted() {
     // pipeline stays capturable, unlike the fd>2 forms above.
     let pl = only_capturable("ls 1>&2 | grep bar | tail");
     assert!(let Stage::Simple { redirs, .. } = &pl.stages[0]);
-    assert!(redirs.contains(&Redir::Dup { from: 1, to: 2 }), "got {redirs:?}");
+    assert!(
+        redirs.contains(&Redir::Dup { from: 1, to: 2 }),
+        "got {redirs:?}"
+    );
 }
 
 #[test]
@@ -126,7 +132,10 @@ fn redirect_dup_extracted() {
     // `2>&1` on the source is modeled as a Dup on the first stage.
     let pl = only_capturable("ls foo 2>&1 | grep bar | tail");
     assert!(let Stage::Simple { redirs, .. } = &pl.stages[0]);
-    assert!(redirs.contains(&Redir::Dup { from: 2, to: 1 }), "got {redirs:?}");
+    assert!(
+        redirs.contains(&Redir::Dup { from: 2, to: 1 }),
+        "got {redirs:?}"
+    );
 }
 
 #[test]
@@ -169,7 +178,13 @@ fn argv_after_unquoting(#[case] cmd: &str, #[case] stage_idx: usize, #[case] exp
 fn multiple_assignments_extracted() {
     let pl = only_capturable("A=1 B=2 ls | head");
     assert!(let Stage::Simple { assignments, .. } = &pl.stages[0]);
-    assert!(assignments == &[("A".to_string(), "1".to_string()), ("B".to_string(), "2".to_string())]);
+    assert!(
+        assignments
+            == &[
+                ("A".to_string(), "1".to_string()),
+                ("B".to_string(), "2".to_string())
+            ]
+    );
 }
 
 #[test]

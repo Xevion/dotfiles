@@ -12,6 +12,8 @@ use std::io::Read;
 struct HookInput {
     tool_name: String,
     tool_input: ToolInput,
+    #[serde(default)]
+    cwd: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -31,7 +33,10 @@ impl Rewrite {
     /// pipeline spans is preserved byte-for-byte.
     pub fn apply(command: &str, self_exe: &str) -> Rewrite {
         let Some(pls) = PipelineInfo::extract(command) else {
-            return Rewrite { command: command.to_string(), count: 0 };
+            return Rewrite {
+                command: command.to_string(),
+                count: 0,
+            };
         };
         let mut spans: Vec<(usize, usize, String)> = pls
             .iter()
@@ -47,7 +52,10 @@ impl Rewrite {
         for (s, e, repl) in &spans {
             out.replace_range(s..e, repl);
         }
-        Rewrite { command: out, count: spans.len() }
+        Rewrite {
+            command: out,
+            count: spans.len(),
+        }
     }
 }
 
@@ -76,7 +84,9 @@ struct Output {
 impl Output {
     /// Serialize to the PreToolUse hook JSON, or None when nothing to say.
     fn to_json(&self) -> Option<String> {
-        if !self.permission_allow && self.additional_context.is_empty() && self.updated_command.is_none()
+        if !self.permission_allow
+            && self.additional_context.is_empty()
+            && self.updated_command.is_none()
         {
             return None;
         }
@@ -86,7 +96,10 @@ impl Output {
             hook.insert("permissionDecision".into(), "allow".into());
         }
         if !self.additional_context.is_empty() {
-            hook.insert("additionalContext".into(), self.additional_context.join("\n\n").into());
+            hook.insert(
+                "additionalContext".into(),
+                self.additional_context.join("\n\n").into(),
+            );
         }
         if let Some(cmd) = &self.updated_command {
             hook.insert("updatedInput".into(), serde_json::json!({ "command": cmd }));
@@ -106,6 +119,7 @@ pub fn main() -> i32 {
     if input.tool_name != "Bash" {
         return 0;
     }
+    let cwd = input.cwd;
     let Some(command) = input.tool_input.command.filter(|c| !c.is_empty()) else {
         return 0;
     };
@@ -130,7 +144,8 @@ pub fn main() -> i32 {
 
     let mut out = Output::default();
     for i in issues.iter().filter(|i| i.verdict == Verdict::Warn) {
-        out.additional_context.push(format!("\u{2022} {}", i.message));
+        out.additional_context
+            .push(format!("\u{2022} {}", i.message));
     }
 
     // Rewrite capturable pipelines.
@@ -146,7 +161,7 @@ pub fn main() -> i32 {
 
     // Approval evaluates the original command; the guard-run wrapper adds no
     // approval surface, so approving the original is equivalent.
-    match Approval::load().decide(&command) {
+    match Approval::load(cwd).decide(&command) {
         Decision::Deny => {
             eprintln!("Command contains a denied sub-command.");
             return 2;

@@ -59,6 +59,20 @@ fn warns(cmd: &str) -> bool {
 #[case::rg_other_value_flag_takes_precedence("rg -fr pattern", false)]
 // `--` ends option parsing; a literal `-rn` after it is a positional arg.
 #[case::rg_replace_after_double_dash_ignored("rg pattern -- -rn", false)]
+// find / (or another dangerous root) with no -maxdepth: the escape hatch
+// (-maxdepth N) is cheap enough that this blocks rather than warns.
+#[case::find_root_no_maxdepth_blocks("find / -name '*.log'", true)]
+#[case::find_home_tilde_no_maxdepth_blocks("find ~ -type f", true)]
+#[case::find_root_with_maxdepth_ok("find / -maxdepth 1 -type d", false)]
+#[case::find_root_generous_maxdepth_ok("find / -maxdepth 20 -name '*.log'", false)]
+#[case::find_etc_scoped_with_maxdepth_ok("find /etc -maxdepth 1 -name '*.conf'", false)]
+// dev_null and head_tail stay Warn-only: confirm the legitimate idioms below
+// never escalate to Block (no override exists, so a false Block here would
+// make them inexpressible).
+#[case::dev_null_idempotent_rm_not_blocked("rm -f target 2>/dev/null", false)]
+#[case::dev_null_scoped_find_not_blocked("find / -maxdepth 3 -name '*.log' 2>/dev/null", false)]
+#[case::head_tail_topn_ranking_not_blocked("du -sh */ | sort -rh | head -10", false)]
+#[case::head_tail_stream_terminator_not_blocked("tail -f app.log | grep ERROR | head -1", false)]
 fn block_detection(#[case] cmd: &str, #[case] expect: bool) {
     assert!(blocks(cmd) == expect);
 }
@@ -67,10 +81,6 @@ fn block_detection(#[case] cmd: &str, #[case] expect: bool) {
 #[case::cat_single_file_warns("cat foo.txt", true)]
 #[case::cat_multi_file_ok("cat a b", false)]
 #[case::cat_piped_ok("cat foo | grep x", false)]
-#[case::find_root_no_maxdepth_warns("find / -name '*.log'", true)]
-#[case::find_home_tilde_no_maxdepth_warns("find ~ -type f", true)]
-#[case::find_root_with_maxdepth_ok("find / -maxdepth 1 -type d", false)]
-#[case::find_etc_scoped_with_maxdepth_ok("find /etc -maxdepth 1 -name '*.conf'", false)]
 #[case::find_unquoted_glob_warns("find . -name *.rs", true)]
 #[case::find_quoted_glob_ok("find . -name '*.rs'", false)]
 #[case::find_double_quoted_glob_ok("find . -iname \"*.LOG\"", false)]
@@ -93,6 +103,13 @@ fn block_detection(#[case] cmd: &str, #[case] expect: bool) {
 #[case::dev_null_warns("some_tool 2>/dev/null", true)]
 #[case::dev_null_feature_detection_ok_command("command -v foo 2>/dev/null", false)]
 #[case::dev_null_feature_detection_ok_type("type bar 2>/dev/null", false)]
+// dev_null stays Warn, not Block: `rm -f`/`kill` suppressing an expected,
+// meaningless error is a standard idempotent-cleanup idiom, not hidden
+// diagnosis - a hard block here would have no escape hatch.
+#[case::dev_null_idempotent_rm_still_only_warns("rm -f target 2>/dev/null", true)]
+// Scoped find (has -maxdepth) suppressing permission-denied noise from a
+// non-root system scan: the *correct* idiom, must not escalate to block.
+#[case::dev_null_scoped_find_still_only_warns("find / -maxdepth 3 -name '*.log' 2>/dev/null", true)]
 #[case::or_true_warns_literal("cargo test || true", true)]
 #[case::or_true_warns_colon("make check || :", true)]
 #[case::echo_status_warns_bare("echo $?", true)]
@@ -101,6 +118,15 @@ fn block_detection(#[case] cmd: &str, #[case] expect: bool) {
 #[case::pipe_to_tail_warns("cmd | tail -n 50", true)]
 #[case::head_standalone_ok("head -20 file.txt", false)]
 #[case::tail_follow_standalone_ok("tail -f app.log", false)]
+// head_tail stays Warn, not Block: these are the standard top-N ranking
+// idiom and a stream terminator for an otherwise-unbounded `tail -f`, not
+// "peeking" around the Bash tool's output - blocking would make them
+// inexpressible with no override.
+#[case::head_tail_topn_ranking_still_only_warns("du -sh */ | sort -rh | head -10", true)]
+#[case::head_tail_stream_terminator_still_only_warns(
+    "tail -f app.log | grep ERROR | head -1",
+    true
+)]
 fn warn_detection(#[case] cmd: &str, #[case] expect: bool) {
     assert!(warns(cmd) == expect);
 }

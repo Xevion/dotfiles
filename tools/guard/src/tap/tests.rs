@@ -117,6 +117,9 @@ fn spill_file_bounded_to_exactly_cap() {
     check!(cap.truncated); // flagged truncated
     assert!(let Some(path) = cap.path);
     let on_disk = std::fs::metadata(&path).unwrap().len();
-    check!(on_disk == SPILL_CAP, "spill file must be exactly the cap, got {on_disk}");
+    check!(
+        on_disk == SPILL_CAP,
+        "spill file must be exactly the cap, got {on_disk}"
+    );
     std::fs::remove_file(path).ok();
 }

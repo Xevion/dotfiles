@@ -54,8 +54,10 @@ impl Sink {
             hasher: blake3::Hasher::new(),
             mem: Vec::new(),
             spill: None,
-            pending_path: PathBuf::from(DIR)
-                .join(format!(".pending-{pid}-{}", PENDING_SEQ.fetch_add(1, Ordering::Relaxed))),
+            pending_path: PathBuf::from(DIR).join(format!(
+                ".pending-{pid}-{}",
+                PENDING_SEQ.fetch_add(1, Ordering::Relaxed)
+            )),
             bytes: 0,
             lines: 0,
             last_byte: b'\n',

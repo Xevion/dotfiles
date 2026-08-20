@@ -5,7 +5,9 @@
 //! auto-allows on `cargo test` alone.
 
 use crate::nested::{nested_payload, Nested};
-use crate::parse::{basename, parse_opt, FILTERS, TRANSPARENT};
+use crate::parse::{
+    basename, git_subcommand_index, parse_opt, resolves_on_path, skip_transparent, FILTERS,
+};
 use brush_parser::ast;
 use serde::Deserialize;
 use std::collections::BTreeSet;
@@ -40,10 +42,14 @@ pub struct Approval {
     allow: Vec<String>,
     deny: Vec<String>,
     ask: Vec<String>,
+    /// The Bash tool's working directory, for resolving relative `rm`
+    /// operands. Not otherwise used - permission prefixes are matched on
+    /// argv text alone.
+    cwd: Option<String>,
 }
 
 impl Approval {
-    pub fn load() -> Self {
+    pub fn load(cwd: Option<String>) -> Self {
         let mut allow = BTreeSet::new();
         let mut deny = BTreeSet::new();
         let mut ask = BTreeSet::new();
@@ -63,11 +69,14 @@ impl Approval {
             allow: allow.into_iter().collect(),
             deny: deny.into_iter().collect(),
             ask: ask.into_iter().collect(),
+            cwd,
         }
     }
 
     /// Decide approval for the original command. Passthrough leaves the normal
-    /// permission flow untouched.
+    /// permission flow untouched. Runs on every command, not just compound
+    /// ones - a bare `git -C dir status` or `PORT=1 cargo run` benefits from
+    /// the same per-subcommand normalization a `&&`/`|` chain already gets.
     pub fn decide(&self, command: &str) -> Decision {
         let cmds = collect_commands(command);
         if cmds.is_empty() {
@@ -76,7 +85,7 @@ impl Approval {
         if self.is_safe_xevion_content(&cmds) {
             return Decision::Allow;
         }
-        if !is_compound(command) || self.allow.is_empty() {
+        if self.allow.is_empty() {
             return Decision::Passthrough;
         }
         let mut all_allowed = true;
@@ -97,7 +106,11 @@ impl Approval {
     fn status(&self, argv: &[String]) -> Status {
         // Pipeline filters are read-only transforms; trust them so a wrapped
         // pipeline auto-allows on its source command alone.
-        if argv.first().map(|a| FILTERS.contains(&basename(a))).unwrap_or(false) {
+        if argv
+            .first()
+            .map(|a| FILTERS.contains(&basename(a)))
+            .unwrap_or(false)
+        {
             return Status::Allowed;
         }
         let cands = candidates(argv);
@@ -107,7 +120,23 @@ impl Approval {
         if cands.iter().any(|c| matches_any(c, &self.allow)) {
             return Status::Allowed;
         }
+        if self.is_safe_rm(argv) {
+            return Status::Allowed;
+        }
         Status::Unknown
+    }
+
+    /// `rm`, dynamically: safe to skip confirmation only when every operand
+    /// resolves to a path that is not git-tracked and sits under /tmp or a
+    /// recognized ephemeral build/cache directory. See `rm_policy` for the
+    /// policy itself; this just recognizes the command and hands off.
+    fn is_safe_rm(&self, argv: &[String]) -> bool {
+        let idx = skip_transparent(argv);
+        let base = &argv[idx.min(argv.len())..];
+        if basename(base.first().map(String::as_str).unwrap_or("")) != "rm" {
+            return false;
+        }
+        crate::rm_policy::is_safe(base, self.cwd.as_deref())
     }
 
     /// Safe `xevion projects content <verb>` body edits: single, non-compound,
@@ -129,7 +158,9 @@ impl Approval {
             return false;
         }
         let cands = candidates(&cmds[0]);
-        !cands.iter().any(|c| matches_any(c, &self.deny) || matches_any(c, &self.ask))
+        !cands
+            .iter()
+            .any(|c| matches_any(c, &self.deny) || matches_any(c, &self.ask))
     }
 }
 
@@ -332,27 +363,71 @@ fn simple_argv(s: &ast::SimpleCommand) -> Vec<String> {
 }
 
 fn strip_transparent(argv: &[String]) -> Vec<String> {
-    let mut i = 0;
-    while i < argv.len() && TRANSPARENT.contains(&basename(&argv[i])) {
-        i += 1;
-    }
+    let i = skip_transparent(argv).min(argv.len());
     argv[i..].to_vec()
 }
 
 /// Candidate strings to match against prefixes: the full argv joined, with and
-/// without trailing redirects, plus transparent-stripped variants.
+/// without trailing redirects, transparent-stripped variants, and (for the
+/// effective command) git global-flag normalization and path-to-basename
+/// resolution.
 fn candidates(argv: &[String]) -> Vec<String> {
     let mut cands = Vec::new();
     let full = argv.join(" ");
     push_unique(&mut cands, strip_redirects(&full));
     push_unique(&mut cands, full);
     let stripped = strip_transparent(argv);
-    if !stripped.is_empty() && stripped.len() < argv.len() {
-        let s = stripped.join(" ");
+    let effective: &[String] = if stripped.is_empty() { argv } else { &stripped };
+    if effective.len() < argv.len() {
+        let s = effective.join(" ");
         push_unique(&mut cands, strip_redirects(&s));
         push_unique(&mut cands, s);
     }
+    if let Some(g) = git_normalized(effective) {
+        push_unique(&mut cands, strip_redirects(&g));
+        push_unique(&mut cands, g);
+    }
+    if let Some(p) = path_normalized(effective) {
+        push_unique(&mut cands, strip_redirects(&p));
+        push_unique(&mut cands, p);
+    }
     cands
+}
+
+/// `git -C dir -c k=v status` -> `git status`: strips global options so a
+/// subcommand's allow rule matches regardless of what precedes it. `None`
+/// when this isn't git, or no global flags were actually present (nothing
+/// new to add over the plain candidate).
+fn git_normalized(argv: &[String]) -> Option<String> {
+    if basename(argv.first()?) != "git" {
+        return None;
+    }
+    let idx = git_subcommand_index(argv)?;
+    if idx <= 1 {
+        return None;
+    }
+    let mut parts = vec!["git".to_string()];
+    parts.extend(argv[idx..].iter().cloned());
+    Some(parts.join(" "))
+}
+
+/// A command invoked by absolute or relative path (`/usr/bin/git`,
+/// `./node_modules/.bin/eslint`) normalized to its basename, so it matches
+/// the same allow rule as a bare invocation - but only when that basename
+/// actually resolves on PATH, so an unrelated same-named file in the
+/// invocation's own directory can't borrow a real tool's approval.
+fn path_normalized(argv: &[String]) -> Option<String> {
+    let first = argv.first()?;
+    if !first.contains('/') {
+        return None;
+    }
+    let base = basename(first);
+    if base.is_empty() || !resolves_on_path(base) {
+        return None;
+    }
+    let mut parts = vec![base.to_string()];
+    parts.extend(argv[1..].iter().cloned());
+    Some(parts.join(" "))
 }
 
 fn push_unique(v: &mut Vec<String>, s: String) {
@@ -406,13 +481,6 @@ fn matches_prefix(cmd: &str, prefix: &str) -> bool {
     cmd == prefix
         || cmd.starts_with(&format!("{prefix} "))
         || cmd.starts_with(&format!("{prefix}/"))
-}
-
-fn is_compound(command: &str) -> bool {
-    command.contains(['|', '&', ';', '`'])
-        || command.contains("$(")
-        || command.contains("<(")
-        || command.contains(">(")
 }
 
 #[cfg(test)]

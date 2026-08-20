@@ -17,7 +17,10 @@ fn bash(pipeline: &str) -> (String, Option<i32>) {
         .arg(pipeline)
         .output()
         .expect("spawn bash");
-    (norm(&String::from_utf8_lossy(&out.stdout)), out.status.code())
+    (
+        norm(&String::from_utf8_lossy(&out.stdout)),
+        out.status.code(),
+    )
 }
 
 /// Run `pipeline` through `guard run`. The ambient `$SHELL` is left untouched:
@@ -134,7 +137,10 @@ fn capture_file_only_when_narrowed(#[case] pipeline: &str, #[case] expect_file: 
         .output()
         .expect("spawn guard");
     let raw = String::from_utf8_lossy(&out.stdout);
-    check!(raw.contains("full:") == expect_file, "footer for {pipeline:?}: {raw:?}");
+    check!(
+        raw.contains("full:") == expect_file,
+        "footer for {pipeline:?}: {raw:?}"
+    );
 }
 
 /// guard's footer surfaces a source failure a no-pipefail shell would swallow:
@@ -147,6 +153,9 @@ fn footer_reports_nonzero_source_exit() {
         .output()
         .expect("spawn guard");
     let raw = String::from_utf8_lossy(&out.stdout);
-    check!(raw.contains("sh: exit 5"), "footer should report source exit: {raw:?}");
+    check!(
+        raw.contains("sh: exit 5"),
+        "footer should report source exit: {raw:?}"
+    );
     check!(out.status.code() == Some(0));
 }
