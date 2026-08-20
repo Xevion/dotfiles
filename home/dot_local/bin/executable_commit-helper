@@ -506,27 +506,29 @@ async function stagedContext(maxLines: number): Promise<string> {
   
   const newFilesPreviews = await getNewFilesPreviews(5, 50);
   
-  // Build output
+  // Build output. Recent Commit Style is placed early (right after Status), not at the end —
+  // it must survive truncation even when the diff below it is large enough to get cut off by
+  // a caller that only reads a preview of this output.
   let output = '# Git Commit Context (Staged Changes)\n\n';
-  
+
   output += '## Status\n```\n' + status.trim() + '\n```\n\n';
-  
+
+  output += '## Recent Commit Style (match this convention, e.g. conventional-commit prefixes if present)\n```\n' + recentCommits.trim() + '\n```\n\n';
+
   output += '## Change Summary\n';
   output += `**Files:** ${stats.files} | **Additions:** ${stats.additions} | **Deletions:** ${stats.deletions}\n\n`;
-  
+
   output += '## Files Changed\n' + fileSummary + '\n\n';
-  
+
   output += '## File Types Modified\n```\n' + fileTypes + '\n```\n\n';
-  
+
   output += '## Staged Changes (Diff)\n';
   output += '```diff\n' + truncatedDiff.trim() + '\n```\n\n';
-  
+
   if (newFilesPreviews) {
     output += '## New Files Preview\n```\n' + newFilesPreviews + '\n```\n\n';
   }
-  
-  output += '## Recent Commit Style\n```\n' + recentCommits.trim() + '\n```\n';
-  
+
   // Final safety: ensure total output doesn't exceed safe limit
   const MAX_TOTAL_OUTPUT = 150000; // 150K chars, leaves 50K headroom
   if (output.length > MAX_TOTAL_OUTPUT) {

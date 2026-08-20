@@ -14,6 +14,11 @@ Based on the above staged changes, create a single git commit.
 
 ## Commit message style requirements
 
+**Match the project first.** Check the "Recent Commit Style" section in the context above before
+anything else below. If those commits use a convention (e.g. conventional-commit prefixes like
+`feat:`/`fix:`/`chore:`/`refactor:`), your message must use it too — that convention overrides
+the generic examples in this section wherever they'd otherwise disagree.
+
 **Default style - keep it minimal:**
 
 - **Single line** for most commits (under 72 chars)
