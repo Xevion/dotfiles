@@ -18,11 +18,13 @@ chezmoi/
 │   │   ├── nushell/               # Shared Nushell config partials
 │   │   └── scripts/               # Shared shell script partials
 │   ├── .managed/                  # Config files managed as symlink targets
+│   │   ├── btop/                  # btop resource monitor config
 │   │   ├── cursor/                # Cursor IDE settings
 │   │   ├── git/                   # Git delta config
 │   │   ├── intellij/              # JetBrains keymap files
 │   │   ├── lazygit/               # LazyGit config
 │   │   ├── mise/                  # Mise tool version config
+│   │   ├── obs-studio/            # OBS Studio global + profile settings
 │   │   ├── share/                 # Shared data files
 │   │   ├── vscode/                # VS Code settings (linux/windows variants)
 │   │   └── zed/                   # Zed editor settings (linux/windows variants)
@@ -130,7 +132,7 @@ Some config files need to be editable in-place without running `chezmoi apply` (
 
 Edits made by the application write through the symlink directly to the source file, so they're immediately tracked by git without needing `chezmoi re-add`.
 
-> **Note**: Glob does not search hidden directories. Use `ls -la home/.managed/` to list managed subdirectories. Known subdirs: `cursor`, `git`, `intellij`, `lazygit`, `mise`, `nvim`, `share`, `skills`, `spicetify`, `vscode`, `zed`.
+> **Note**: Glob does not search hidden directories. Use `ls -la home/.managed/` to list managed subdirectories. Known subdirs: `btop`, `cursor`, `git`, `intellij`, `lazygit`, `mise`, `nvim`, `obs-studio`, `share`, `skills`, `spicetify`, `vscode`, `zed`.
 
 ## Secret Management
 

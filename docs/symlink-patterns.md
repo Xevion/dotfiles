@@ -18,6 +18,9 @@ This repository uses four distinct symlink patterns for different use cases.
 ~/AppData/Roaming/Cursor/User/settings.json → .managed/cursor/settings.windows.json
 ~/.config/nvim → .managed/nvim (directory symlink)
 ~/.config/spicetify/config-xpui.ini → .managed/spicetify/config-xpui.ini
+~/.config/btop/btop.conf → .managed/btop/btop.conf
+~/.config/obs-studio/global.ini → .managed/obs-studio/global.ini
+~/.config/obs-studio/basic/profiles/Untitled/basic.ini → .managed/obs-studio/basic/profiles/Untitled/basic.ini
 ```
 
 **How it works**: 
