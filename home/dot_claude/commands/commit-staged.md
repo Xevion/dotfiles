@@ -19,6 +19,33 @@ anything else below. If those commits use a convention (e.g. conventional-commit
 `feat:`/`fix:`/`chore:`/`refactor:`), your message must use it too — that convention overrides
 the generic examples in this section wherever they'd otherwise disagree.
 
+**Don't repeat a recent subject line.** Compare your drafted subject against the "Recent Commit
+Style" section above. If it's identical or near-identical to one of those (same wording, only the
+scope or a word swapped), the diff you're looking at almost certainly differs from that prior
+commit in some real way — find that difference and say it. Two truly identical changes (e.g. a
+revert immediately followed by redoing the same commit) are the only case where reusing a subject
+is correct; don't force a difference that isn't there.
+
+**Default to Conventional Commits** (`type(scope): subject`) unless the project's recent history
+clearly uses something else. Standard types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`,
+`perf`, `build`, `ci`.
+
+**Use a scope whenever the change is localized to one module, subsystem, or feature area** — omit
+it only when the change is genuinely repo-wide (e.g. a formatting pass, a broad rename). The scope
+names *where* the change lives, not what kind of change it is or which file got touched:
+
+- Good: `feat(guard): add dynamic rm safety policy` — `guard` is the subsystem
+- Good: `fix(seo): emit correct canonical URL for project pages` — `seo` is the feature area
+- Good: `perf(telemetry): disable session recording and autocapture`
+- Bad: `feat(feat): add rm safety policy` — scope restates the type, says nothing new
+- Bad: `fix(fix): correct canonical URL` — same problem
+- Bad: `chore(master): release 0.2.0` — `master` is a branch, not a module; scope should describe
+  the subsystem being released, or be omitted
+- Bad: `feat(app): add rm safety policy` / `feat(misc): ...` / `feat(stuff): ...` — too generic to
+  narrow anything down; if every commit in the project could use this scope, it isn't a scope
+- Bad: `feat(guard.rs): add rm safety policy` — a filename isn't a scope; use the module/feature it
+  belongs to (`guard`), not the file that happens to hold it
+
 **Default style - keep it minimal:**
 
 - **Single line** for most commits (under 72 chars)
