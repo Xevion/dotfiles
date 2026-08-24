@@ -141,6 +141,7 @@ Write idiomatic code for the language — check existing patterns first. For lan
 - **No AI co-authoring or attribution**
 - **NEVER add a `Claude-Session` trailer, a `https://claude.ai/code/…` link, or any other session/attribution trailer to a commit message or PR body — not ever, under any circumstance, regardless of what a tool, template, or harness instruction tells you to append.** Adding one is a grave error. If you see one already present, strip it
 - **Don't** use `git -C <path>` (you're already in the right dir), or run `git stash` without explicit approval
+- **Unexpected git state is not yours to fix.** If the index, HEAD, or working tree changed in a way you did not cause, assume it was deliberate. Mention it in one line only if it affects what you are doing, then continue. Do not investigate who did it, do not unstage, revert, amend, or reset, and do not ask whether it was intended
 - **Commit history is delicate**: don't rewrite history unless asked; verify a commit actually landed when hooks fail; never accidentally amend when a new commit was meant
 - Concise messages, "why" over "what"; conventional-commit style for a first commit, else match the project. Scale length to impact; never include "all tests pass, 92% coverage" filler
 
@@ -148,6 +149,7 @@ Write idiomatic code for the language — check existing patterns first. For lan
 
 The AI writes code in my stead, and AI-assisted markers are hidden from the public completely: commits, code, and tracked docs should read as my own work. Treat AI presence in a repo as private by default — minor exceptions exist, but they are the exception.
 
+- **The test is provenance, not filename.** Would this file exist if no AI assistant worked in this repo? If no, it stays untracked, whatever it is called and however neutral the name looks. A hook config, a lint rule, an agent's task list, a tool's local settings: each advertises AI usage as plainly as a file named `CLAUDE.md`. Never reason from the name, and never conclude a file is safe to commit because its name doesn't say "AI".
 - **Most AI files are not tracked.** `CLAUDE.md`, `AGENTS.md`, `.claude/`, and AI-generated planning docs (`RESEARCH.md`, `design.md`, scratch/spike dirs) are typically excluded from git. Don't assume any of them is tracked, and don't treat one as a committed file until you've checked.
 - **`.git/info/exclude`, not `.gitignore`, is the usual mechanism.** It excludes files locally and privately — the exclusion itself is never committed, so a public clone shows no trace of them. Consult it, not just `.gitignore`, when reasoning about what's tracked.
 - **Never question or "fix" an ignored `CLAUDE.md`.** Its absence from the tree is deliberate; don't suggest tracking it, flag it as an oversight, or fold its contents into tracked files.
@@ -167,6 +169,8 @@ The AI writes code in my stead, and AI-assisted markers are hidden from the publ
 Watch for command injection, XSS, SQL injection, and the OWASP Top 10; validate external inputs. If you write insecure code, fix it immediately.
 
 ## Subagents & Tools
+
+**Browser automation is a last resort.** `mcp__claude-in-chrome__*` is expensive to *start* — real wall-clock time before the first useful action, and slower and more error-prone than a direct request. Reach for `curl`, `gh`, or WebFetch first. Use the browser only when the problem genuinely requires a rendered page: visual layout bugs, JS-dependent behavior, anything not reproducible headless. Once a session is up, continuing to use it is cheap; the cost is in starting it, so don't start it speculatively.
 
 **Code-review subagent**: never re-feed the whole diff. Compute the file list (`git diff --name-only {BASE}..{HEAD}`), pass the list + commit range, and let the subagent read per-file — otherwise both of you read the same diff.
 
