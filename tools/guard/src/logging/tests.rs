@@ -68,8 +68,13 @@ fn write_record_produces_a_valid_jsonl_line() {
     let project_dir = scratch_dir("project");
     let payload = sample_payload(project_dir.to_str().unwrap());
 
-    write_record(&home, &payload, &Outcome::from_exit_code(0), Duration::from_millis(42))
-        .expect("write record");
+    write_record(
+        &home,
+        &payload,
+        &Outcome::from_exit_code(0),
+        Duration::from_millis(42),
+    )
+    .expect("write record");
 
     let now = jiff::Zoned::now();
     let month = format!("{:04}-{:02}", now.year(), now.month());
@@ -100,10 +105,20 @@ fn write_record_appends_multiple_lines() {
     let project_dir = scratch_dir("project-append");
     let payload = sample_payload(project_dir.to_str().unwrap());
 
-    write_record(&home, &payload, &Outcome::from_exit_code(0), Duration::from_millis(1))
-        .expect("first write");
-    write_record(&home, &payload, &Outcome::block(Vec::new()), Duration::from_millis(2))
-        .expect("second write");
+    write_record(
+        &home,
+        &payload,
+        &Outcome::from_exit_code(0),
+        Duration::from_millis(1),
+    )
+    .expect("first write");
+    write_record(
+        &home,
+        &payload,
+        &Outcome::block(Vec::new()),
+        Duration::from_millis(2),
+    )
+    .expect("second write");
 
     let now = jiff::Zoned::now();
     let month = format!("{:04}-{:02}", now.year(), now.month());

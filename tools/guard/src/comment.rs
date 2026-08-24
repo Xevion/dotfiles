@@ -384,7 +384,12 @@ const MAX_EXAMPLES_PER_CATEGORY: usize = 5;
 const CATEGORICAL_ORDER: [Category; 3] = [Category::Banner, Category::BareLabel, Category::History];
 const NUDGE_ORDER: [Category; 2] = [Category::LongProse, Category::VerboseTrailing];
 
-fn append_category_section(out: &mut Vec<String>, file_path: &str, findings: &[Finding], category: Category) {
+fn append_category_section(
+    out: &mut Vec<String>,
+    file_path: &str,
+    findings: &[Finding],
+    category: Category,
+) {
     let matching: Vec<&Finding> = findings.iter().filter(|f| f.category == category).collect();
     if matching.is_empty() {
         return;
@@ -473,11 +478,17 @@ const EXCLUDED_MULTI_SEGMENT_DIRS: &[&str] = &["install/include"];
 /// or directory component, independent of whether its extension is even a
 /// recognized language.
 pub fn is_excluded_path(path: &Path) -> bool {
-    let file_name = path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
+    let file_name = path
+        .file_name()
+        .map(|n| n.to_string_lossy())
+        .unwrap_or_default();
     if EXCLUDED_SUFFIXES.iter().any(|s| file_name.ends_with(s)) {
         return true;
     }
-    if EXCLUDED_FILENAME_MARKERS.iter().any(|m| file_name.contains(m)) {
+    if EXCLUDED_FILENAME_MARKERS
+        .iter()
+        .any(|m| file_name.contains(m))
+    {
         return true;
     }
     has_excluded_dir_component(path)
@@ -493,7 +504,9 @@ fn has_excluded_dir_component(path: &Path) -> bool {
         .components()
         .map(|c| c.as_os_str().to_string_lossy().into_owned())
         .collect();
-    components.iter().any(|c| EXCLUDED_DIR_NAMES.contains(&c.as_str()))
+    components
+        .iter()
+        .any(|c| EXCLUDED_DIR_NAMES.contains(&c.as_str()))
         || components.windows(2).any(|pair| {
             let joined = format!("{}/{}", pair[0], pair[1]);
             EXCLUDED_MULTI_SEGMENT_DIRS.contains(&joined.as_str())

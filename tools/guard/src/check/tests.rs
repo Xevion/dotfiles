@@ -62,7 +62,12 @@ fn collect_files_prunes_storybook_static_output() {
     collect_files(&dir.root, &mut files);
     let names: Vec<String> = files
         .iter()
-        .map(|p| p.strip_prefix(&dir.root).unwrap().to_string_lossy().into_owned())
+        .map(|p| {
+            p.strip_prefix(&dir.root)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned()
+        })
         .collect();
 
     check!(names.contains(&"web/src/App.svelte".to_string()));
@@ -80,12 +85,86 @@ fn collect_files_prunes_skipped_directories() {
     collect_files(&dir.root, &mut files);
     let names: Vec<String> = files
         .iter()
-        .map(|p| p.strip_prefix(&dir.root).unwrap().to_string_lossy().into_owned())
+        .map(|p| {
+            p.strip_prefix(&dir.root)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned()
+        })
         .collect();
 
     check!(names.contains(&"src/main.rs".to_string()));
     check!(!names.iter().any(|n| n.starts_with("node_modules")));
     check!(!names.iter().any(|n| n.starts_with(".git")));
+}
+
+#[test]
+fn collect_files_skips_gitignored_files_but_keeps_tracked_ones() {
+    let dir = ScratchDir::new("gitignore");
+    dir.write(".git", "");
+    dir.write(".gitignore", "ignored.rs\n");
+    dir.write("ignored.rs", "fn f() {}\n");
+    dir.write("tracked.rs", "fn g() {}\n");
+
+    let mut files = Vec::new();
+    collect_files(&dir.root, &mut files);
+    let names: Vec<String> = files
+        .iter()
+        .map(|p| {
+            p.strip_prefix(&dir.root)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+
+    check!(names.contains(&"tracked.rs".to_string()));
+    check!(!names.contains(&"ignored.rs".to_string()));
+}
+
+#[test]
+fn collect_files_prunes_excluded_dir_names_even_when_tracked_by_git() {
+    let dir = ScratchDir::new("tracked-excluded");
+    dir.write(".git", "");
+    dir.write("migrations/001_init.sql", "-- init\n");
+    dir.write("src/main.rs", "fn f() {}\n");
+
+    let mut files = Vec::new();
+    collect_files(&dir.root, &mut files);
+    let names: Vec<String> = files
+        .iter()
+        .map(|p| {
+            p.strip_prefix(&dir.root)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+
+    check!(names.contains(&"src/main.rs".to_string()));
+    check!(!names.iter().any(|n| n.starts_with("migrations")));
+}
+
+#[test]
+fn collect_files_walks_a_directory_with_no_git_repo_at_all() {
+    let dir = ScratchDir::new("no-git");
+    dir.write("plain.rs", "fn f() {}\n");
+    dir.write("sub/nested.rs", "fn g() {}\n");
+
+    let mut files = Vec::new();
+    collect_files(&dir.root, &mut files);
+    let names: Vec<String> = files
+        .iter()
+        .map(|p| {
+            p.strip_prefix(&dir.root)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+
+    check!(names.contains(&"plain.rs".to_string()));
+    check!(names.contains(&"sub/nested.rs".to_string()));
 }
 
 #[test]
@@ -144,7 +223,8 @@ fn scan_file_untrusted_parse_is_counted_but_produces_no_rule_hits() {
 
 #[test]
 fn format_finding_includes_block_extent_and_preview_for_long_prose() {
-    let source = "fn pad1() {}\nfn pad2() {}\nfn pad3() {}\nfn pad4() {}\nfn pad5() {}\nfn pad6() {}\n\
+    let source =
+        "fn pad1() {}\nfn pad2() {}\nfn pad3() {}\nfn pad4() {}\nfn pad5() {}\nfn pad6() {}\n\
                   // line one\n// line two\n// line three\n// line four\nfn f() {}\n";
     let analysis = lang::analyze(Path::new("prose.rs"), source).expect("recognized extension");
     let report = comment::evaluate(&analysis);

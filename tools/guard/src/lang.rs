@@ -126,9 +126,12 @@ const CPP_ONLY_INCLUDES: &[&str] = &[
 fn strip_comments(source: &str) -> String {
     static BLOCK: OnceLock<Regex> = OnceLock::new();
     static LINE: OnceLock<Regex> = OnceLock::new();
-    let block = BLOCK.get_or_init(|| Regex::new(r"(?s)/\*.*?\*/").expect("valid block-comment pattern"));
-    let line = LINE.get_or_init(|| Regex::new(r"(?m)//[^\n]*").expect("valid line-comment pattern"));
-    line.replace_all(&block.replace_all(source, ""), "").into_owned()
+    let block =
+        BLOCK.get_or_init(|| Regex::new(r"(?s)/\*.*?\*/").expect("valid block-comment pattern"));
+    let line =
+        LINE.get_or_init(|| Regex::new(r"(?m)//[^\n]*").expect("valid line-comment pattern"));
+    line.replace_all(&block.replace_all(source, ""), "")
+        .into_owned()
 }
 
 fn cpp_marker_patterns() -> &'static [Regex] {
@@ -155,7 +158,9 @@ fn cpp_marker_patterns() -> &'static [Regex] {
 /// a marker mentioned only in prose does not count.
 fn looks_like_cpp(source: &str) -> bool {
     let code = strip_comments(source);
-    cpp_marker_patterns().iter().any(|pattern| pattern.is_match(&code))
+    cpp_marker_patterns()
+        .iter()
+        .any(|pattern| pattern.is_match(&code))
 }
 
 /// How much a parse can be trusted. Abstaining (`Untrusted`) is a correct

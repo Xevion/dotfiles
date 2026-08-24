@@ -37,6 +37,7 @@ tree-sitter-kotlin-ng = "1.1.0"
 tree-sitter-svelte-ng = "1.0.2"
 tree-sitter-sequel = "0.3.11"
 regex = "1.13.1"
+ignore = "0.4.30"
 
 [lints.clippy]
 disallowed_macros = "deny"

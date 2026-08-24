@@ -55,7 +55,10 @@ fn history_alternatives_stay_unnarrowed(#[case] line: &str) {
 
 #[test]
 fn ordinary_comment_does_not_fire() {
-    let analysis = analyze("rs", "// this explains a real, specific decision\nfn f() {}\n");
+    let analysis = analyze(
+        "rs",
+        "// this explains a real, specific decision\nfn f() {}\n",
+    );
     let report = evaluate(&analysis);
     check!(report.categorical.is_empty());
 }
@@ -92,7 +95,8 @@ fn python_encoding_declaration_does_not_fire() {
     check!(report.categorical.is_empty());
 }
 
-const PADDING: &str = "fn pad1() {}\nfn pad2() {}\nfn pad3() {}\nfn pad4() {}\nfn pad5() {}\nfn pad6() {}\n";
+const PADDING: &str =
+    "fn pad1() {}\nfn pad2() {}\nfn pad3() {}\nfn pad4() {}\nfn pad5() {}\nfn pad6() {}\n";
 
 #[test]
 fn long_prose_three_lines_does_not_fire() {
@@ -104,9 +108,8 @@ fn long_prose_three_lines_does_not_fire() {
 
 #[test]
 fn long_prose_four_lines_fires() {
-    let source = format!(
-        "{PADDING}// line one\n// line two\n// line three\n// line four\nfn f() {{}}\n"
-    );
+    let source =
+        format!("{PADDING}// line one\n// line two\n// line three\n// line four\nfn f() {{}}\n");
     let analysis = analyze("rs", &source);
     let report = evaluate(&analysis);
     check!(only_categories(&report.nudges) == vec![Category::LongProse]);
@@ -217,7 +220,9 @@ fn format_block_report_includes_nudges_after_categorical() {
     check!(!report.categorical.is_empty());
     check!(!report.nudges.is_empty());
     let text = format_block_report("src/main.rs", &report);
-    let banner_pos = text.find("Remove decorative dividers").expect("banner section present");
+    let banner_pos = text
+        .find("Remove decorative dividers")
+        .expect("banner section present");
     let prose_pos = text
         .find("Standalone comment block is unusually long")
         .expect("long-prose section present");

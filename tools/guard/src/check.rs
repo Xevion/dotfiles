@@ -1,10 +1,12 @@
 //! `guard check <path>`: a human-only, dry-run pass of both comment-lint
 //! rule tiers over a file or directory tree, for reviewing rule output
-//! across a real corpus before wiring the hook into a project. Never used
-//! on the hook path.
+//! across a real corpus before wiring the hook into a project. Skips
+//! gitignored files so totals reflect first-party code. Never used on the
+//! hook path.
 
 use crate::comment::{self, Category, Finding};
 use crate::lang::{self, CommentBlock, Language, ParseQuality};
+use ignore::WalkBuilder;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -31,13 +33,19 @@ pub fn main(root: &str) -> i32 {
     0
 }
 
-/// Whether a directory should be pruned during the walk: any hidden
-/// (dot-prefixed) directory, plus [`comment::EXCLUDED_DIR_NAMES`] - the same
-/// list the hook path uses to exclude generated/vendored files.
+/// Whether a directory should be pruned during the walk on top of gitignore
+/// filtering: any hidden (dot-prefixed) directory, plus
+/// [`comment::EXCLUDED_DIR_NAMES`] - the same list the hook path uses to
+/// exclude generated/vendored files, including ones that are legitimately
+/// tracked (`migrations`, `generated`) and so wouldn't be gitignored.
 fn should_skip_dir(name: &str) -> bool {
     name.starts_with('.') || comment::EXCLUDED_DIR_NAMES.contains(&name)
 }
 
+/// Walks `path`, honoring `.gitignore`/`.git/info/exclude`/global excludes
+/// per nested repo via [`ignore::WalkBuilder`], with [`should_skip_dir`]
+/// pruning applied on top. A path with no `.git` anywhere is walked in full,
+/// since gitignore rules only activate once a repo root is found.
 fn collect_files(path: &Path, out: &mut Vec<PathBuf>) {
     let Ok(meta) = std::fs::symlink_metadata(path) else {
         return;
@@ -49,21 +57,17 @@ fn collect_files(path: &Path, out: &mut Vec<PathBuf>) {
     if !meta.is_dir() {
         return;
     }
-    let Ok(entries) = std::fs::read_dir(path) else {
-        return;
-    };
-    for entry in entries.filter_map(Result::ok) {
-        let Ok(file_type) = entry.file_type() else {
-            continue;
-        };
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        if file_type.is_dir() {
-            if !should_skip_dir(&name) {
-                collect_files(&entry.path(), out);
-            }
-        } else if file_type.is_file() {
-            out.push(entry.path());
+    let walker = WalkBuilder::new(path)
+        .hidden(false)
+        .filter_entry(|entry| {
+            entry.depth() == 0
+                || !entry.file_type().is_some_and(|ft| ft.is_dir())
+                || !should_skip_dir(&entry.file_name().to_string_lossy())
+        })
+        .build();
+    for entry in walker.filter_map(Result::ok) {
+        if entry.file_type().is_some_and(|ft| ft.is_file()) {
+            out.push(entry.into_path());
         }
     }
 }
@@ -149,7 +153,10 @@ fn scan_file(path: &Path, totals: &mut Totals) {
     };
 
     totals.files_scanned += 1;
-    *totals.by_language.entry(language_name(analysis.language)).or_insert(0) += 1;
+    *totals
+        .by_language
+        .entry(language_name(analysis.language))
+        .or_insert(0) += 1;
     match analysis.quality {
         ParseQuality::Clean => totals.quality.clean += 1,
         ParseQuality::Degraded => totals.quality.degraded += 1,
@@ -226,9 +233,17 @@ fn format_finding(display: &str, finding: &Finding, blocks: &[CommentBlock]) -> 
 /// either way this flattens it to one trimmed string per source line.
 fn block_preview_lines(block: &CommentBlock) -> Vec<String> {
     if block.comments.len() == 1 {
-        block.comments[0].text.lines().map(|l| l.trim().to_string()).collect()
+        block.comments[0]
+            .text
+            .lines()
+            .map(|l| l.trim().to_string())
+            .collect()
     } else {
-        block.comments.iter().map(|c| c.text.trim().to_string()).collect()
+        block
+            .comments
+            .iter()
+            .map(|c| c.text.trim().to_string())
+            .collect()
     }
 }
 
