@@ -11,12 +11,16 @@
 //! See `DESIGN.md` for the full rationale.
 
 pub mod approval;
+pub mod check;
+pub mod comment;
 pub mod config;
 pub mod dispatch;
 pub mod git;
 pub mod hook;
+pub mod lang;
 pub mod logging;
 pub mod nested;
+pub mod outcome;
 pub mod parse;
 pub mod payload;
 pub mod post_edit;

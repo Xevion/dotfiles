@@ -2,6 +2,7 @@
 //! `~/.claude/hooks/logs/<project>/<YYYY-MM>.jsonl`. Every failure is
 //! swallowed - a broken log path must never affect the hook's exit code.
 
+use crate::outcome::Outcome;
 use crate::payload::Payload;
 use serde::Serialize;
 use std::fs::OpenOptions;
@@ -24,15 +25,13 @@ struct Record<'a> {
     duration_ms: u64,
 }
 
-const NO_RULES: [String; 0] = [];
-
-pub fn record(payload: &Payload, exit_code: i32, duration: Duration) {
-    let _ = try_record(payload, exit_code, duration);
+pub fn record(payload: &Payload, outcome: &Outcome, duration: Duration) {
+    let _ = try_record(payload, outcome, duration);
 }
 
-fn try_record(payload: &Payload, exit_code: i32, duration: Duration) -> std::io::Result<()> {
+fn try_record(payload: &Payload, outcome: &Outcome, duration: Duration) -> std::io::Result<()> {
     let home = std::env::var("HOME").map_err(|_| Error::other("HOME not set"))?;
-    write_record(Path::new(&home), payload, exit_code, duration)
+    write_record(Path::new(&home), payload, outcome, duration)
 }
 
 /// Write one record under `home/.claude/hooks/logs/...`. Split out from
@@ -41,7 +40,7 @@ fn try_record(payload: &Payload, exit_code: i32, duration: Duration) -> std::io:
 fn write_record(
     home: &Path,
     payload: &Payload,
-    exit_code: i32,
+    outcome: &Outcome,
     duration: Duration,
 ) -> std::io::Result<()> {
     let start_dir = payload
@@ -73,8 +72,8 @@ fn write_record(
         cwd: payload.cwd.as_deref(),
         project: &project,
         file: payload.tool_input.file_path.as_deref(),
-        decision: decision_label(exit_code),
-        rules: &NO_RULES,
+        decision: decision_for(outcome),
+        rules: &outcome.rules,
         duration_ms: u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
     };
     let mut line = serde_json::to_string(&record).map_err(Error::other)?;
@@ -82,6 +81,16 @@ fn write_record(
 
     let mut file = OpenOptions::new().create(true).append(true).open(&path)?;
     file.write_all(line.as_bytes())
+}
+
+/// `outcome.abstained` overrides the exit-code-derived label: an abstain
+/// exits 0 like an allow, but means "did not look", not "looked, allowed".
+fn decision_for(outcome: &Outcome) -> &'static str {
+    if outcome.abstained {
+        "abstain"
+    } else {
+        decision_label(outcome.exit_code)
+    }
 }
 
 fn decision_label(exit_code: i32) -> &'static str {

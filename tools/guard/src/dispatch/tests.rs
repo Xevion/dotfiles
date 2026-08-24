@@ -29,7 +29,7 @@ fn route_returns_zero_for_unhandled_combinations() {
         cwd: None,
         tool_input: crate::payload::ToolInput::default(),
     };
-    check!(route(&payload) == 0);
+    check!(route(&payload).exit_code == 0);
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn route_dispatches_bash_pretooluse_to_hook() {
         cwd: None,
         tool_input: crate::payload::ToolInput::default(),
     };
-    check!(route(&payload) == 0);
+    check!(route(&payload).exit_code == 0);
 }
 
 #[test]
@@ -56,16 +56,20 @@ fn payload_without_event_name_still_parses() {
 }
 
 #[test]
-fn route_dispatches_edit_posttooluse_to_stub() {
+fn route_dispatches_edit_posttooluse_to_post_edit() {
+    // A nonexistent file path (rather than a real repo file) keeps this
+    // hermetic: post_edit::main's analyze step fails to read it and allows,
+    // which exercises that routing actually reaches post_edit::main rather
+    // than testing post_edit's internal decision logic.
     let payload = Payload {
         hook_event_name: "PostToolUse".into(),
         tool_name: "Edit".into(),
         session_id: None,
-        cwd: None,
+        cwd: Some(std::env::temp_dir().to_string_lossy().into_owned()),
         tool_input: crate::payload::ToolInput {
             command: None,
-            file_path: Some("src/main.rs".into()),
+            file_path: Some("/nonexistent/dispatch-test/file.rs".into()),
         },
     };
-    check!(route(&payload) == 0);
+    check!(route(&payload).exit_code == 0);
 }

@@ -1,4 +1,5 @@
 use super::*;
+use crate::outcome::Outcome;
 use assert2::check;
 use rstest::*;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -67,7 +68,8 @@ fn write_record_produces_a_valid_jsonl_line() {
     let project_dir = scratch_dir("project");
     let payload = sample_payload(project_dir.to_str().unwrap());
 
-    write_record(&home, &payload, 0, Duration::from_millis(42)).expect("write record");
+    write_record(&home, &payload, &Outcome::from_exit_code(0), Duration::from_millis(42))
+        .expect("write record");
 
     let now = jiff::Zoned::now();
     let month = format!("{:04}-{:02}", now.year(), now.month());
@@ -98,8 +100,10 @@ fn write_record_appends_multiple_lines() {
     let project_dir = scratch_dir("project-append");
     let payload = sample_payload(project_dir.to_str().unwrap());
 
-    write_record(&home, &payload, 0, Duration::from_millis(1)).expect("first write");
-    write_record(&home, &payload, 2, Duration::from_millis(2)).expect("second write");
+    write_record(&home, &payload, &Outcome::from_exit_code(0), Duration::from_millis(1))
+        .expect("first write");
+    write_record(&home, &payload, &Outcome::block(Vec::new()), Duration::from_millis(2))
+        .expect("second write");
 
     let now = jiff::Zoned::now();
     let month = format!("{:04}-{:02}", now.year(), now.month());
@@ -110,6 +114,36 @@ fn write_record_appends_multiple_lines() {
         .join(format!("{month}.jsonl"));
     let contents = std::fs::read_to_string(&log_path).expect("read log file");
     check!(contents.lines().count() == 2);
+
+    let _ = std::fs::remove_dir_all(&home);
+    let _ = std::fs::remove_dir_all(&project_dir);
+}
+
+#[test]
+fn write_record_reflects_abstain_decision_and_rules() {
+    let home = scratch_dir("home-abstain");
+    let project_dir = scratch_dir("project-abstain");
+    let payload = sample_payload(project_dir.to_str().unwrap());
+    let outcome = Outcome {
+        exit_code: 0,
+        rules: vec!["comment-lint.banner".to_string()],
+        abstained: true,
+    };
+
+    write_record(&home, &payload, &outcome, Duration::from_millis(5)).expect("write record");
+
+    let now = jiff::Zoned::now();
+    let month = format!("{:04}-{:02}", now.year(), now.month());
+    let project = project_slug(&project_dir);
+    let log_path = home
+        .join(".claude/hooks/logs")
+        .join(&project)
+        .join(format!("{month}.jsonl"));
+    let contents = std::fs::read_to_string(&log_path).expect("read log file");
+    let value: serde_json::Value =
+        serde_json::from_str(contents.lines().next().expect("one line")).expect("valid json");
+    check!(value["decision"] == "abstain");
+    check!(value["rules"].as_array().unwrap().len() == 1);
 
     let _ = std::fs::remove_dir_all(&home);
     let _ = std::fs::remove_dir_all(&project_dir);

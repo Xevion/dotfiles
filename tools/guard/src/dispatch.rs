@@ -2,6 +2,7 @@
 //! once, routes it by event and tool, and logs the outcome. `guard hook` is
 //! an alias into this same path.
 
+use crate::outcome::Outcome;
 use crate::payload::Payload;
 use std::io::Read;
 use std::time::{Duration, Instant};
@@ -18,14 +19,14 @@ pub fn main() -> i32 {
                 hook_event_name: "<unparsed>".to_string(),
                 ..Payload::default()
             };
-            crate::logging::record(&unparsed, 0, Duration::ZERO);
+            crate::logging::record(&unparsed, &Outcome::allow(), Duration::ZERO);
             return 0;
         }
     };
     let started = Instant::now();
-    let code = route(&payload);
-    crate::logging::record(&payload, code, started.elapsed());
-    code
+    let outcome = route(&payload);
+    crate::logging::record(&payload, &outcome, started.elapsed());
+    outcome.exit_code
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -45,11 +46,11 @@ fn classify(event: &str, tool: &str) -> Handler {
     }
 }
 
-fn route(payload: &Payload) -> i32 {
+fn route(payload: &Payload) -> Outcome {
     match classify(&payload.hook_event_name, &payload.tool_name) {
-        Handler::PreToolUseBash => crate::hook::main(payload),
+        Handler::PreToolUseBash => Outcome::from_exit_code(crate::hook::main(payload)),
         Handler::PostToolUseEdit => crate::post_edit::main(payload),
-        Handler::None => 0,
+        Handler::None => Outcome::allow(),
     }
 }
 

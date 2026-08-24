@@ -40,7 +40,7 @@ const desired: Record<string, unknown> = {
           {
             type: "command",
             command: "~/.claude/hooks/guard hook",
-            timeout: 3000,
+            timeout: 3,
           },
         ],
       },
@@ -51,7 +51,9 @@ const desired: Record<string, unknown> = {
         hooks: [
           {
             type: "command",
-            command: "~/.claude/hooks/banner-comment-lint",
+            // Bare invocation exits 2 on an older binary, blocking every call.
+            command: "~/.claude/hooks/guard hook",
+            timeout: 5,
           },
         ],
       },
