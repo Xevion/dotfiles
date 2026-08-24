@@ -1,25 +1,11 @@
-//! `guard hook`: the PreToolUse side. Reads the hook JSON on stdin, runs
-//! discipline rules, rewrites capturable pipelines to `guard run '...'`, checks
-//! approval, and emits one JSON response.
+//! The PreToolUse side for `Bash`: runs discipline rules, rewrites capturable
+//! pipelines to `guard run '...'`, checks approval, and emits one JSON
+//! response. Receives its input already parsed by the dispatch layer.
 
 use crate::approval::{Approval, Decision};
 use crate::parse::PipelineInfo;
+use crate::payload::Payload;
 use crate::rules::{self, Verdict};
-use serde::Deserialize;
-use std::io::Read;
-
-#[derive(Deserialize)]
-struct HookInput {
-    tool_name: String,
-    tool_input: ToolInput,
-    #[serde(default)]
-    cwd: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct ToolInput {
-    command: Option<String>,
-}
 
 /// Result of splicing every capturable pipeline into a `guard run` call.
 pub struct Rewrite {
@@ -108,19 +94,12 @@ impl Output {
     }
 }
 
-pub fn main() -> i32 {
-    let mut buf = String::new();
-    if std::io::stdin().read_to_string(&mut buf).is_err() {
-        return 0;
-    }
-    let Ok(input) = serde_json::from_str::<HookInput>(&buf) else {
-        return 0;
-    };
+pub fn main(input: &Payload) -> i32 {
     if input.tool_name != "Bash" {
         return 0;
     }
-    let cwd = input.cwd;
-    let Some(command) = input.tool_input.command.filter(|c| !c.is_empty()) else {
+    let cwd = input.cwd.clone();
+    let Some(command) = input.tool_input.command.clone().filter(|c| !c.is_empty()) else {
         return 0;
     };
 
