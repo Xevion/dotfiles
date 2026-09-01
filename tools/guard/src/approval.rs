@@ -126,10 +126,10 @@ impl Approval {
         Status::Unknown
     }
 
-    /// `rm`, dynamically: safe to skip confirmation only when every operand
-    /// resolves to a path that is not git-tracked and sits under /tmp or a
-    /// recognized ephemeral build/cache directory. See `rm_policy` for the
-    /// policy itself; this just recognizes the command and hands off.
+    /// `rm`, dynamically: safe to skip confirmation unless an operand hits a
+    /// protected system root, the home directory itself, or credential
+    /// material. See `rm_policy` for the policy itself; this just recognizes
+    /// the command and hands off.
     fn is_safe_rm(&self, argv: &[String]) -> bool {
         let idx = skip_transparent(argv);
         let base = &argv[idx.min(argv.len())..];

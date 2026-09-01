@@ -1,45 +1,27 @@
-//! Dynamic auto-allow policy for `rm`: skip the confirmation prompt only when
-//! every operand is confidently disposable - not tracked by git, and sitting
-//! under `/tmp` or inside a recognized build/cache directory. Anything this
-//! can't classify with confidence falls through to the normal ask flow rather
-//! than guessing; a wrong "safe" call here deletes something for real.
+//! Dynamic auto-allow policy for `rm`: skip the confirmation prompt for
+//! almost every delete. A tracked file is recoverable via git and an
+//! untracked one is the caller's call to make, not ours to second-guess path
+//! by path - so the only things still worth an ask are deletes that can't be
+//! undone at all: wiping a top-level system directory, the home directory as
+//! a whole, or credential material (SSH/GPG keys, an encryption identity,
+//! `.git` itself). Anything this can't resolve to a concrete path falls
+//! through to the normal ask flow rather than guessing.
 
 use crate::parse::unquote;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-/// Path components that mark a directory as ephemeral build/cache output,
-/// safe to delete freely as long as nothing git-tracked lives inside it.
-const EPHEMERAL_DIRS: &[&str] = &[
-    "target",
-    "node_modules",
-    "dist",
-    "build",
-    "out",
-    ".next",
-    ".nuxt",
-    ".svelte-kit",
-    ".turbo",
-    ".nx",
-    ".vite",
-    ".parcel-cache",
-    "coverage",
-    ".cache",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    ".tox",
-    "__pycache__",
-    ".venv",
-    "venv",
-    ".wrangler",
-    ".gradle",
-    "zig-cache",
-    "zig-out",
-    ".dart_tool",
-    "tmp",
-    ".tmp",
+/// Exact-match system roots: deleting these wholesale breaks the machine,
+/// not just loses some files. Sub-paths inside them are ordinary projects -
+/// `/home/xevion/projects/foo` is fine, `/home` itself is not.
+const PROTECTED_ROOTS: &[&str] = &[
+    "/", "/home", "/usr", "/var", "/etc", "/mnt", "/root", "/bin", "/sbin", "/lib", "/lib64",
+    "/boot", "/dev", "/proc", "/sys", "/run", "/srv", "/opt",
 ];
+
+/// Path components that mark credential material worth an extra prompt
+/// regardless of location: deleting these can lock you out or destroy a
+/// signing/encryption identity or a repo's entire history with no way back.
+const CREDENTIAL_COMPONENTS: &[&str] = &[".ssh", ".gnupg", ".git"];
 
 /// Whether every operand of this `rm` invocation (`argv[0] == "rm"`) is safe
 /// to delete without confirmation.
@@ -78,9 +60,7 @@ fn rm_targets(argv: &[String]) -> Vec<String> {
 }
 
 fn is_safe_target(target: &str, cwd: &Path) -> bool {
-    let resolved = resolve(target, cwd);
-    let ephemeral = resolved.starts_with("/tmp") || has_ephemeral_component(&resolved);
-    ephemeral && !is_git_tracked(&resolved)
+    !is_protected(&resolve(target, cwd))
 }
 
 fn resolve(target: &str, cwd: &Path) -> PathBuf {
@@ -92,32 +72,47 @@ fn resolve(target: &str, cwd: &Path) -> PathBuf {
     }
 }
 
-fn has_ephemeral_component(p: &Path) -> bool {
-    p.components().any(|c| {
+fn is_protected(p: &Path) -> bool {
+    if is_protected_root(p) || is_home_dir(p) {
+        return true;
+    }
+    let has_credential_component = p.components().any(|c| {
         c.as_os_str()
             .to_str()
-            .is_some_and(|s| EPHEMERAL_DIRS.contains(&s))
-    })
+            .is_some_and(|s| CREDENTIAL_COMPONENTS.contains(&s))
+    });
+    if has_credential_component {
+        return true;
+    }
+    p.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(is_credential_filename)
 }
 
-/// Whether git knows about `path` at all: tracked itself, or (if a directory)
-/// containing any tracked file. No repo, or git unavailable, counts as "not
-/// tracked" - there is nothing to lose via git either way.
-fn is_git_tracked(path: &Path) -> bool {
-    let Some(dir) = path.parent() else {
+fn is_protected_root(p: &Path) -> bool {
+    let s = p.to_string_lossy();
+    let trimmed = s.trim_end_matches('/');
+    let trimmed = if trimmed.is_empty() { "/" } else { trimmed };
+    PROTECTED_ROOTS.contains(&trimmed)
+}
+
+fn is_home_dir(p: &Path) -> bool {
+    let Ok(home) = std::env::var("HOME") else {
         return false;
     };
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .arg("ls-files")
-        .arg("--")
-        .arg(path)
-        .output();
-    match out {
-        Ok(o) if o.status.success() => !o.stdout.is_empty(),
-        _ => false,
-    }
+    p.to_string_lossy().trim_end_matches('/') == home.trim_end_matches('/')
+}
+
+/// Filenames recognized as private key material even outside a
+/// `.ssh`/`.gnupg` directory - a stray `id_ed25519` copied to a project root
+/// is still a key, and this repo's bootstrapped age identity lands as a bare
+/// `key.txt` in the home directory.
+fn is_credential_filename(name: &str) -> bool {
+    const KEY_PREFIXES: &[&str] = &["id_rsa", "id_ed25519", "id_ecdsa", "id_dsa"];
+    const KEY_SUFFIXES: &[&str] = &[".pem", ".pfx", ".p12"];
+    KEY_PREFIXES.iter().any(|p| name.starts_with(p))
+        || KEY_SUFFIXES.iter().any(|s| name.ends_with(s))
+        || name == "key.txt"
 }
 
 #[cfg(test)]
