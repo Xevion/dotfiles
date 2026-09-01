@@ -76,7 +76,7 @@ Use `package.json` `overrides` (npm/bun) or `resolutions` (yarn/pnpm) to pin tra
 Use `deny.toml` for license compliance, advisory scanning, and source restrictions. Baseline configuration:
 - `graph.all-features = true` — audit with all features enabled to catch conditional deps
 - `licenses.confidence-threshold = 0.8` — reasonable SPDX detection threshold
-- `advisories.yanked = "deny"` — fail on yanked crates
+- `advisories.yanked = "warn"` — surface yanked crates without failing. `deny` looks prudent but gates CI on a fact about crates.io that no commit controls: a transitive crate yanked upstream turns every subsequent push red until someone bumps a lockfile they had no reason to touch. Observed on Xevion/byte-me, red for weeks on a yanked `spin` with no security content. Yanking is a publishing signal, not an advisory
 - `sources.unknown-registry = "deny"`, `sources.unknown-git = "deny"` — restrict to crates.io
 - `bans.multiple-versions = "warn"` — flag duplicate transitive versions without hard-failing
 
@@ -91,6 +91,8 @@ Pin CI-sensitive tools (especially Go linters like `golangci-lint`) to exact ver
 - Adding deps for trivial functions
 - Blocking major version upgrades without documenting the reason
 - **Bare Renovate config (`{ "dependencyDashboard": true }`)**: produces noisy per-package PRs without release-age guards, ecosystem grouping, or SHA-pinned GitHub Actions. A bare config is worse than no Renovate because it creates false confidence in dependency management. Use the baseline config documented above
+- **Advisory scans as a plain merge gate**: an audit is a function of the lockfile *and* the wall-clock date. The database moves daily and the lockfile does not, so a bare `cargo audit` / `npm audit` / `govulncheck` step fails commits that changed nothing, and every branch inherits whatever the base branch already carried. Red stops meaning anything and dependency PRs become unreadable. Diff the advisory set against the merge base instead, and gate only on what a change introduces. Observed across the fleet: Xevion/dynamic-preauth failed 15 of 15 runs on 9 advisories, none introduced by any commit
+- **Gating on signals the scanner cannot rank**: only `vulnerability`-class findings with a known fix are worth failing a build. `unmaintained`, `unsound` and `yanked` carry no severity and often no remedy, so gating on them produces permanent red. Report them; do not block on them
 
 ## Open Questions
 

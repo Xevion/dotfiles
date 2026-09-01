@@ -55,6 +55,9 @@ gcloud = "latest"
 "pipx:ya-frida-mcp" = "latest"
 "pipx:yt-dlp" = { version = "latest", extras = ["default", "secretstorage"] }
 "npm:@xevion/tempo" = "latest"
+gitleaks = "latest"
+trufflehog = "latest"
+kubectl = "latest"
 
 # Git-sourced Python CLIs stay on uv; mise's pipx backend resolves these as GitHub
 # release slugs and 404s. Reinstall with:
