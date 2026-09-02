@@ -132,7 +132,7 @@ Some config files need to be editable in-place without running `chezmoi apply` (
 
 Edits made by the application write through the symlink directly to the source file, so they're immediately tracked by git without needing `chezmoi re-add`.
 
-> **Note**: Glob does not search hidden directories. Use `ls -la home/.managed/` to list managed subdirectories. Known subdirs: `btop`, `cursor`, `git`, `intellij`, `lazygit`, `mise`, `nvim`, `obs-studio`, `share`, `skills`, `spicetify`, `vscode`, `zed`.
+> **Note**: Glob does not search hidden directories. Use `ls -la home/.managed/` to list managed subdirectories. Known subdirs: `btop`, `cline`, `cursor`, `git`, `intellij`, `lazygit`, `mise`, `nvim`, `obs-studio`, `share`, `skills`, `spicetify`, `vscode`, `zed`.
 
 ## Secret Management
 
@@ -213,8 +213,21 @@ home/dot_config/opencode/
 ├── opencode.jsonc.tmpl     # OpenCode settings; calls meta/permissions.ts via `output` for its permission map
 └── command/                # Symlinks → ../../../dot_claude/commands/*.md
 
+home/dot_cline/
+├── rules/
+│   └── common.md.tmpl      # Cline: includes common-rules (global rules for all workspaces)
+└── data/settings/
+    └── symlink_global-settings.json.tmpl  # Symlink to .managed/cline/global-settings.json
+
+home/dot_config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/
+└── symlink_cline_mcp_settings.json.tmpl  # Cline VS Code extension MCP config
+
+home/.managed/cline/
+├── global-settings.json    # Cline user preferences (telemetry, plan/act mode, tools)
+└── mcp_settings.json       # Cline MCP server definitions (VS Code extension)
+
 home/.chezmoitemplates/
-├── common-rules.md.tmpl    # Shared rules (used by Claude + OpenCode)
+├── common-rules.md.tmpl    # Shared rules (used by Claude + OpenCode + Cline)
 └── common-rules-minimal.md.tmpl  # Reduced ruleset (used by Gemini)
 
 meta/permissions.ts         # Single source of truth for tool permissions: Bash allow/ask/deny

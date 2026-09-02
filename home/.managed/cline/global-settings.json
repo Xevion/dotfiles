@@ -1,0 +1,16 @@
+{
+  "autoUpdateEnabled": true,
+  "telemetryOptOut": false,
+  "compactionStrategy": "agentic",
+  "compactionEnabled": true,
+  "planActMode": "act",
+  "toolAutoApprove": false,
+  "disabledTools": [
+    "editor"
+  ],
+  "tools": {
+    "web_search": {
+      "enabled": true
+    }
+  }
+}

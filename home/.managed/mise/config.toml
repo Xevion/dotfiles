@@ -58,6 +58,7 @@ gcloud = "latest"
 gitleaks = "latest"
 trufflehog = "latest"
 kubectl = "latest"
+"npm:cline" = "latest"
 
 # Git-sourced Python CLIs stay on uv; mise's pipx backend resolves these as GitHub
 # release slugs and 404s. Reinstall with:

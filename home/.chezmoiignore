@@ -60,6 +60,18 @@ claude-settings.json
 .gemini/antigravity/knowledge
 .gemini/antigravity/playground
 
+# Cline runtime state (managed: rules/, data/settings/global-settings.json)
+.cline/cli-node-extra-ca-certs.pem
+.cline/cron
+.cline/tasks
+.cline/data/cache
+.cline/data/db
+.cline/data/locks
+.cline/data/logs
+.cline/data/sessions
+.cline/data/settings/cli-notices.json
+.cline/data/settings/providers.json
+
 # Fish runtime state (managed: config.fish, fish_plugins, conf.d/*, functions/*)
 # Fisher plugin manager and its installed plugin files
 .config/fish/completions
