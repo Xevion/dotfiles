@@ -1,0 +1,79 @@
+{{ if and (eq .chezmoi.os "linux") (not .wsl) -}}
+#!/bin/bash
+# Builds upstream earlyoom and systembus-notify into /usr/local/bin, then writes
+# the argument list and a systemd drop-in that repoints ExecStart at the newer
+# binary. The distro package stays installed and untouched: its unit supplies the
+# sandboxing (DynamicUser, ProtectSystem, MemoryMax) that the drop-in extends, so
+# removing the package would delete the unit this depends on.
+#
+# The packaged 1.6.2 selects victims purely by oom_score, which on a large-RAM
+# desktop is nearly constant across processes (~14 points between a 40 MB and a
+# 1 GB process) while --prefer adds a flat 300. That inverts the ordering and
+# kills tiny processes that free nothing, so a single pressure spike escalates
+# into dozens of kills. --sort-by-rss, added in 1.7, ranks by real memory instead.
+set -euo pipefail
+
+VERSION="v1.9.0"
+BIN="/usr/local/bin/earlyoom"
+NOTIFY_BIN="/usr/local/bin/systembus-notify"
+DROPIN_DIR="/etc/systemd/system/earlyoom.service.d"
+
+# Both must be below their threshold before earlyoom acts. --ignore is a hard
+# exclusion for anything whose death costs the session; --avoid only subtracts
+# weight. --prefer adds 3 GiB of virtual RSS under --sort-by-rss, which keeps
+# build jobs ahead of the browser while still picking the largest one first.
+ARGS="-m 5 -s 5 -r 3600 -n --sort-by-rss"
+ARGS="$ARGS --ignore '^(systemd|systemd-.+|init|Xorg|Xwayland|gnome-shell|gdm3|gdm-.+|sshd|dbus|dbus-broker.*)\$'"
+ARGS="$ARGS --avoid '^(pipewire|pipewire-pulse|wireplumber|gnome-session-.|gnome-keyring-d|xdg-.+|NetworkManager|gvfsd.*|ssh-agent|gpg-agent|kitty|fish)\$'"
+ARGS="$ARGS --prefer '^(rustc|cc1plus|cc1|lto1|collect2|ld|java|node|esbuild|webpack|python3?)\$'"
+
+if ! command -v gcc >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then
+  echo "[earlyoom] gcc or git missing, skipping (existing setup kept)"
+  exit 0
+fi
+
+# cargo is deliberately absent from --prefer: the driver process is a few MB and
+# killing it orphans the rustc children that actually hold the memory.
+if [[ "$($BIN -v 2>&1 || true)" != *"$VERSION"* ]]; then
+  echo "[earlyoom] building earlyoom $VERSION"
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  git clone --depth 1 --branch "$VERSION" -q https://github.com/rfjakob/earlyoom.git "$tmp/earlyoom"
+  make -C "$tmp/earlyoom" -s earlyoom
+  sudo install -Dm755 "$tmp/earlyoom/earlyoom" "$BIN"
+fi
+
+# earlyoom runs unprivileged under DynamicUser and cannot reach the session bus,
+# so -n emits on the system bus and this relay forwards it to libnotify.
+if [[ ! -x "$NOTIFY_BIN" ]]; then
+  if pkg-config --exists libsystemd 2>/dev/null; then
+    echo "[earlyoom] building systembus-notify"
+    tmpn="$(mktemp -d)"
+    trap 'rm -rf "$tmpn"' EXIT
+    git clone --depth 1 -q https://github.com/rfjakob/systembus-notify.git "$tmpn/sbn"
+    make -C "$tmpn/sbn" -s
+    sudo install -Dm755 "$tmpn/sbn/systembus-notify" "$NOTIFY_BIN"
+  else
+    echo "[earlyoom] libsystemd-dev missing, skipping notification relay"
+    echo "[earlyoom]   sudo apt install libsystemd-dev, then re-run chezmoi apply"
+  fi
+fi
+
+echo "[earlyoom] writing /etc/default/earlyoom and drop-in"
+printf 'EARLYOOM_ARGS="%s"\n' "$ARGS" | sudo tee /etc/default/earlyoom >/dev/null
+
+# -p cannot raise priority from inside the unit, so set it on the unit instead.
+sudo install -d "$DROPIN_DIR"
+sudo tee "$DROPIN_DIR/override.conf" >/dev/null <<EOF
+[Service]
+ExecStart=
+ExecStart=$BIN \$EARLYOOM_ARGS
+OOMScoreAdjust=-100
+Nice=-20
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart earlyoom
+systemctl --user enable --now systembus-notify.service || true
+echo "[earlyoom] active: $($BIN -v 2>&1)"
+{{ end -}}

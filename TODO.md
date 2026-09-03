@@ -202,6 +202,13 @@
 - [ ] Add vim/neovim basic config
 - [ ] Add SSH config template
 - [x] Add GPG configuration
+- [x] Add earlyoom configuration (upstream v1.9.0 built to `/usr/local/bin`, `--sort-by-rss`, systembus-notify relay for desktop notifications)
+- [ ] Replace earlyoom with a Rust service in `~/projects`. Requirements, in priority order:
+  - [ ] Config file, never argv — earlyoom takes all config as command-line flags, so its `--prefer`/`--avoid`/`--ignore` regexes sit in `/proc/<pid>/cmdline` and every `pgrep -f java` matches the daemon. Not fixable upstream: build tools are transient shell children, so the policy cannot move to systemd unit properties the way `--ignore` partly can via `OOMScoreAdjust=-1000`
+  - [ ] PSI triggers — `poll()` on `/proc/pressure/memory` instead of polling `MemAvailable`, which measures stall time rather than estimating headroom
+  - [ ] Split monitor and notifier over a pre-connected socket, so the kill path never allocates, forks, or blocks on a thrashing notification daemon
+  - [ ] Post-kill cooldown — wait for reclaim before re-evaluating. earlyoom has none, which is why one spike on 2026-09-01 escalated into 45 signals across 25 processes in 8 seconds
+  - [ ] Warn before killing, not only after; the useful notification fires while there is still headroom to render it
 
 ### 11. Package Management Strategy
 

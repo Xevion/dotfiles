@@ -1,0 +1,12 @@
+[Unit]
+Description=Relay system-bus notifications into the desktop session
+Documentation=https://github.com/rfjakob/systembus-notify
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/local/bin/systembus-notify
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
