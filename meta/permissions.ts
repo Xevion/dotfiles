@@ -564,7 +564,7 @@ allow(
 ask("sudo apt");
 
 // Destructive file operations
-ask("rm", "rm -rf", "del");
+// ask("rm", "rm -rf", "del");
 
 // Deploy commands
 ask(
@@ -634,6 +634,19 @@ const claudeExtras = {
     // Allow the file tools to operate there without prompting.
     "Read(/tmp/**)",
     "Edit(/tmp/**)",
+    // Claude Code's own session/job/debug scratch data, not project content -
+    // treat it like /tmp rather than prompting per-file.
+    "Read(~/.claude/projects/**)",
+    "Edit(~/.claude/projects/**)",
+    "Read(~/.claude/jobs/**)",
+    "Edit(~/.claude/jobs/**)",
+    "Read(~/.claude/debug/**)",
+    "Edit(~/.claude/debug/**)",
+    // Read-only: these can mirror real project content (pastes, plans), so
+    // no blanket Edit.
+    "Read(~/.claude/paste-cache/**)",
+    "Read(~/.claude/image-cache/**)",
+    "Read(~/.claude/plans/**)",
     // Dependency source/cache directories - read the actual source of installed
     // packages (registries, module caches, extracted stores) without prompting.
     "Read(~/.cargo/registry/**)", // crates.io source + index

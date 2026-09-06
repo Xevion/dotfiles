@@ -110,7 +110,7 @@ Keep each Bash call simple. The Bash tool already returns a command's output —
 
 Write idiomatic code for the language — check existing patterns first. For languages not listed, consult the project's CLAUDE.md, `docs/` guides, and the design corpus.
 
-- **Rust**: direct imports when heavily used (`use glam::U16Vec2;`); iterators/combinators over loops; `&[T]` over `&Vec<T>`; `#[inline]` on hot paths
+- **Rust**: direct imports when heavily used (`use glam::U16Vec2;`); iterators/combinators over loops; `&[T]` over `&Vec<T>`; `#[inline]` on hot paths. New crates and workspaces default to `edition = "2024"` — never scaffold or downgrade to `edition = "2021"`.
 - **TypeScript**: absolute imports (`@/…`) when the pattern exists; functional patterns over loops
 - **Go**: wrap errors with context (`fmt.Errorf("…: %w", err)`); table-driven `t.Run` subtests; accept interfaces, return structs; short receiver names
 - **Kotlin**: data classes, sealed hierarchies; scope functions (`let`/`apply`/`use`); `sequence`/`flow` for lazy iteration; extension functions
