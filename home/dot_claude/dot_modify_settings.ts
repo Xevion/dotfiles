@@ -25,6 +25,7 @@ const permissions = JSON.parse(permProc.stdout.toString());
 
 // Desired state — keys chezmoi manages. Anything not here is left as-is.
 const desired: Record<string, unknown> = {
+  cleanupPeriodDays: 999, // effectively disable transcript auto-deletion (~2.7yr)
   includeCoAuthoredBy: false, // legacy fallback for pre-attribution Claude Code
   attribution: {
     commit: "",
