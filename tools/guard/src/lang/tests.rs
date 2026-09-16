@@ -202,6 +202,31 @@ fn svelte_script_comment_offsets_shift_into_outer_coordinates() {
 }
 
 #[test]
+fn svelte_markup_comments_are_extracted_and_ordered_with_script_comments() {
+    let source =
+        "<!-- markup note -->\n<div>hi</div>\n<script>\n  // inner comment\n  let x = 1;\n</script>\n";
+    let tree = parse(Language::Svelte, source);
+    let comments = extract_comments(Language::Svelte, &tree, source);
+    assert!(comments.len() == 2);
+    check!(comments[0].text == "<!-- markup note -->");
+    check!(comments[0].start_line == 0);
+    check!(comments[0].kind == CommentKind::Plain);
+    check!(comments[1].text == "// inner comment");
+    check!(comments[1].start_line == 3);
+}
+
+#[rstest]
+#[case::inner_line("//! module header")]
+#[case::bang_block("/*! module header */")]
+fn doxygen_bang_markers_classify_as_doc(#[case] text: &str) {
+    let source = format!("{text}\nint x;\n");
+    let tree = parse(Language::C, &source);
+    let comments = extract_comments(Language::C, &tree, &source);
+    assert!(comments.len() == 1);
+    check!(comments[0].kind == CommentKind::Doc);
+}
+
+#[test]
 fn svelte_script_doc_comment_still_classifies_via_prefix() {
     let source = "<script>\n/**\n * doc\n */\nfunction f() {}\n</script>\n";
     let tree = parse(Language::Svelte, source);

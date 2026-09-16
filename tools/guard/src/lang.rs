@@ -306,9 +306,14 @@ pub struct CommentBlock {
     pub comments: Vec<Comment>,
 }
 
+/// `//!` and `/*!` are Doxygen's other two doc markers, and Rust's inner-doc
+/// form; without them a `//!` file header reads as an ordinary comment and
+/// loses the doc exemptions.
 fn is_doc_by_prefix(text: &str) -> bool {
     let trimmed = text.trim_start();
-    trimmed.starts_with("/**") || trimmed.starts_with("///")
+    ["/**", "///", "//!", "/*!"]
+        .iter()
+        .any(|marker| trimmed.starts_with(marker))
 }
 
 fn is_rust_doc(node: Node) -> bool {
@@ -545,20 +550,29 @@ fn extract_embedded_script(source: &str, raw: Node, out: &mut Vec<Comment>) {
 
 fn extract_svelte(tree: &Tree, source: &str) -> Vec<Comment> {
     let mut out = Vec::new();
-    collect_script_elements(tree.root_node(), source, &mut out);
+    collect_svelte_comments(tree.root_node(), source, &mut out);
+    // Embedded-script comments are shifted into outer coordinates as each
+    // script element is reached, so the two sources can interleave.
+    out.sort_by_key(|c| c.byte_range.start);
     out
 }
 
-fn collect_script_elements(node: Node, source: &str, out: &mut Vec<Comment>) {
+fn collect_svelte_comments(node: Node, source: &str, out: &mut Vec<Comment>) {
     if node.kind() == "script_element" {
         if let Some(raw) = raw_text_child(node) {
             extract_embedded_script(source, raw, out);
         }
         return;
     }
+    // Markup `<!-- -->` comments belong to the outer tree; only the script
+    // body gets re-parsed, so they would otherwise never be seen.
+    if node.kind() == "comment" {
+        out.push(make_comment(node, source, CommentKind::Plain));
+        return;
+    }
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_script_elements(child, source, out);
+        collect_svelte_comments(child, source, out);
     }
 }
 
