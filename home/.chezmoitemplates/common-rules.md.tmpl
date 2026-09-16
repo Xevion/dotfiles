@@ -143,7 +143,8 @@ Write idiomatic code for the language — check existing patterns first. For lan
 - **Don't** use `git -C <path>` (you're already in the right dir), or run `git stash` without explicit approval
 - **Unexpected git state is not yours to fix.** If the index, HEAD, or working tree changed in a way you did not cause, assume it was deliberate. Mention it in one line only if it affects what you are doing, then continue. Do not investigate who did it, do not unstage, revert, amend, or reset, and do not ask whether it was intended
 - **Commit history is delicate**: don't rewrite history unless asked; verify a commit actually landed when hooks fail; never accidentally amend when a new commit was meant
-- Concise messages, "why" over "what"; conventional-commit style for a first commit, else match the project. Scale length to impact; never include "all tests pass, 92% coverage" filler
+- **Commit messages are short by default.** A subject line is usually the whole message: "why" over "what", conventional-commit style for a first commit, else match the project
+- **A body has to be earned by substance, not by diff size.** 4,000 files moved with no behavior change is still a one-liner, and so is a 10-line fix. Write one only for work that is genuinely substantial or changes how something fundamentally works, and even then keep it to a few lines of *why*. A walkthrough of what changed, benchmark numbers, rationale for each sub-change, and "all tests pass, 92% coverage" filler do not belong in a commit message. That detail goes in the issue tracker, or nowhere
 
 ## AI Artifacts Stay Private
 
