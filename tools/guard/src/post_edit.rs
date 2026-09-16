@@ -3,7 +3,7 @@
 
 use crate::comment::{self, Report};
 use crate::config::Config;
-use crate::lang::Analysis;
+use crate::lang::{Analysis, ParseQuality};
 use crate::outcome::Outcome;
 use crate::payload::Payload;
 use std::path::Path;
@@ -25,10 +25,9 @@ pub fn main(payload: &Payload) -> Outcome {
     let Some(analysis) = analyze(payload) else {
         return Outcome::allow();
     };
-    let Some(report) = comment::evaluate_trusted(&analysis) else {
-        return Outcome::abstain();
-    };
-    respond(file_path, &report)
+    let report = comment::evaluate_trusted(&analysis);
+    let nudges_skipped = analysis.quality == ParseQuality::Untrusted;
+    respond(file_path, &report, nudges_skipped)
 }
 
 /// `file_path` relative to its enclosing repo root, for matching against
@@ -51,7 +50,7 @@ fn analyze(payload: &Payload) -> Option<Analysis> {
     comment::analyze_file(Path::new(file_path))
 }
 
-fn respond(file_path: &str, report: &Report) -> Outcome {
+fn respond(file_path: &str, report: &Report, nudges_skipped: bool) -> Outcome {
     if !report.categorical.is_empty() {
         eprintln!("{}", comment::format_block_report(file_path, report));
         return Outcome::block(rule_ids(report));
@@ -68,6 +67,11 @@ fn respond(file_path: &str, report: &Report) -> Outcome {
             })
         );
         return Outcome::nudge(rule_ids(report));
+    }
+    // The categorical tier still ran; only the structural one was skipped.
+    // Recording that keeps "could not look" distinct from "found nothing".
+    if nudges_skipped {
+        return Outcome::abstain();
     }
     Outcome::allow()
 }

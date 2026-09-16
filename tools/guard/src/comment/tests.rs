@@ -69,6 +69,57 @@ fn history_does_not_fire_on_present_tense(#[case] line: &str) {
     check!(report.categorical.is_empty());
 }
 
+/// A terse doc comment summarizes the item below it; only a plain comment can
+/// be a bare section label.
+#[rstest]
+#[case::outer_doc("/// Config")]
+#[case::inner_doc("//! Config")]
+fn bare_label_exempts_doc_comments(#[case] line: &str) {
+    let source = format!("{line}\nfn f() {{}}\n");
+    let analysis = analyze("rs", &source);
+    let report = evaluate(&analysis);
+    check!(report.categorical.is_empty());
+}
+
+#[rstest]
+#[case::outer("let x = 1; ///< one two three four five six seven eight nine ten")]
+#[case::inner("let x = 1; //!< one two three four five six seven eight nine ten")]
+#[case::block("let x = 1; /**< one two three four five six seven eight nine ten */")]
+#[case::bang_block("let x = 1; /*!< one two three four five six seven eight nine ten */")]
+fn doxygen_trailing_marker_is_not_counted_as_a_word(#[case] line: &str) {
+    let source = format!("fn f() {{\n    {line}\n}}\n");
+    let analysis = analyze("rs", &source);
+    let report = evaluate(&analysis);
+    check!(report.nudges.is_empty());
+}
+
+#[test]
+fn doxygen_trailing_marker_still_fires_past_the_budget() {
+    let analysis = analyze(
+        "rs",
+        "fn f() {\n    let x = 1; ///< one two three four five six seven eight nine ten eleven\n}\n",
+    );
+    let report = evaluate(&analysis);
+    check!(only_categories(&report.nudges) == vec![Category::VerboseTrailing]);
+}
+
+/// Directive length is set by the tool, not the author, so a word budget
+/// cannot apply to it.
+#[rstest]
+#[case::nolint("let x = 1; //nolint:gosec // credentials come from the vault, never a literal")]
+#[case::noqa("x = 1  # noqa: BLE001 - the broad catch here is deliberate and load bearing")]
+fn verbose_trailing_exempts_tool_directives(#[case] line: &str) {
+    let ext = if line.starts_with('x') { "py" } else { "rs" };
+    let source = if ext == "py" {
+        format!("def f():\n    {line}\n")
+    } else {
+        format!("fn f() {{\n    {line}\n}}\n")
+    };
+    let analysis = analyze(ext, &source);
+    let report = evaluate(&analysis);
+    check!(report.nudges.is_empty());
+}
+
 #[test]
 fn ordinary_comment_does_not_fire() {
     let analysis = analyze(
@@ -166,23 +217,39 @@ fn trailing_comment_at_eleven_words_fires() {
     check!(only_categories(&report.nudges) == vec![Category::VerboseTrailing]);
 }
 
+/// Comments survive error recovery as lexer extras, so a broken parse still
+/// yields usable comment text; only placement and block grouping are lost.
 #[test]
-fn evaluate_trusted_abstains_on_untrusted_parse() {
-    let source =
+fn untrusted_parse_keeps_categorical_rules_and_drops_nudges() {
+    let garbage =
         "@#$%^&*(((((]]]]}}}}}{{{{{{{{ )))) nonsense !!! ??? garbage tokens here".repeat(20);
+    let source = format!("// ==========================\n{garbage}");
     let analysis = analyze("rs", &source);
     check!(analysis.quality == lang::ParseQuality::Untrusted);
-    check!(evaluate_trusted(&analysis).is_none());
+    let report = evaluate_trusted(&analysis);
+    check!(only_categories(&report.categorical) == vec![Category::Banner]);
+    check!(report.nudges.is_empty());
 }
 
 #[test]
 fn evaluate_trusted_runs_normally_on_clean_parse() {
     let analysis = analyze("rs", "// Handlers\nfn f() {}\n");
-    let report = evaluate_trusted(&analysis).expect("clean parse is trusted");
+    let report = evaluate_trusted(&analysis);
     check!(!report.categorical.is_empty());
 }
 
 #[rstest]
+#[case::vcpkg("fizz/vcpkg/ports/zlib/portfile.cmake", true)]
+#[case::vcpkg_installed("fizz/vcpkg_installed/x64-linux/include/a.h", true)]
+#[case::cmake_deps("proj/_deps/fmt-src/src/format.cc", true)]
+#[case::cmake_build_dir("proj/cmake-build-debug/generated.c", true)]
+#[case::emsdk("pacman/emsdk/upstream/lib.c", true)]
+#[case::gradle_cache("maestro/.gradle/caches/Thing.java", true)]
+#[case::dot_venv("proj/.venv/lib/site.py", true)]
+#[case::pytest_cache("proj/.pytest_cache/v/thing.py", true)]
+#[case::terraform("infra/.terraform/modules/vpc/main.tf", true)]
+#[case::pods("ios/Pods/Alamofire/Source/Alamofire.swift", true)]
+#[case::deps_substring_not_excluded("src/_depsolver/resolve.rs", false)]
 #[case::readme("README.md", true)]
 #[case::lockfile("Cargo.lock", true)]
 #[case::svg("logo.svg", true)]

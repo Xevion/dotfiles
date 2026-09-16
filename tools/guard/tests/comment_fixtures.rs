@@ -188,12 +188,17 @@ fn check_fixture(path: &Path, fixture: &ParsedFixture, analysis: Analysis) -> Op
                     analysis.quality
                 ));
             }
-            comment::evaluate_trusted(&analysis).map(|_| {
-                format!(
-                    "{}: expected evaluate_trusted() to abstain, but it returned findings",
-                    path.display()
-                )
-            })
+            // Categorical rules still run on an untrusted parse; only the
+            // structural nudge tier is dropped.
+            let report = comment::evaluate_trusted(&analysis);
+            if !report.nudges.is_empty() {
+                return Some(format!(
+                    "{}: nudges must not run on an untrusted parse, got {} of them",
+                    path.display(),
+                    report.nudges.len()
+                ));
+            }
+            diff_report(path, fixture, &analysis)
         }
         FixtureMode::Degraded => {
             if analysis.quality != ParseQuality::Degraded {
@@ -221,12 +226,7 @@ fn check_fixture(path: &Path, fixture: &ParsedFixture, analysis: Analysis) -> Op
 }
 
 fn diff_report(path: &Path, fixture: &ParsedFixture, analysis: &Analysis) -> Option<String> {
-    let Some(report) = comment::evaluate_trusted(analysis) else {
-        return Some(format!(
-            "{}: evaluate_trusted() returned None unexpectedly",
-            path.display()
-        ));
-    };
+    let report = comment::evaluate_trusted(analysis);
 
     let mut actual: Vec<Expectation> = report
         .categorical

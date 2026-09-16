@@ -164,13 +164,7 @@ fn scan_file(path: &Path, totals: &mut Totals) {
     }
 
     let display = path.display().to_string();
-    let Some(report) = comment::evaluate_trusted(&analysis) else {
-        println!(
-            "{display}  lang={} quality=untrusted abstained",
-            language_name(analysis.language)
-        );
-        return;
-    };
+    let report = comment::evaluate_trusted(&analysis);
 
     println!(
         "{display}  lang={} quality={} categorical={} nudges={}",

@@ -89,15 +89,18 @@ pub fn evaluate(analysis: &Analysis) -> Report {
     }
 }
 
-/// [`evaluate`], but honoring parse trust: `None` means "abstained" (the
-/// parse was too broken to draw conclusions from), distinct from
-/// `Some(Report::default())` meaning "looked and found nothing".
-pub fn evaluate_trusted(analysis: &Analysis) -> Option<Report> {
+/// [`evaluate`], but honoring parse trust. The categorical rules read comment
+/// text directly and stay valid on a broken parse, since comments are lexer
+/// extras that survive error recovery. The nudge tier needs accurate placement
+/// and block grouping, so it is dropped when the parse is untrusted.
+pub fn evaluate_trusted(analysis: &Analysis) -> Report {
     if analysis.quality == ParseQuality::Untrusted {
-        None
-    } else {
-        Some(evaluate(analysis))
+        return Report {
+            categorical: categorical_findings(&analysis.comments),
+            nudges: Vec::new(),
+        };
     }
+    evaluate(analysis)
 }
 
 fn banner_patterns() -> &'static [Regex] {
@@ -141,8 +144,8 @@ fn history_pattern() -> &'static Regex {
             r"|changed)\s+(?:back\s+)?(?:away\s+)?from\b",
             r"|\breplaced\s+(?:by|with)\b",
             r"|\bremoved\s+in\s+favou?r\s+of\b",
-            // A subject is what separates a confession from a description:
-            // "we used to retry" against "used to indicate a soft delete".
+            // A subject separates a confession from a description: a bare
+            // "used to ..." opener is usually purpose, not history.
             r"|\b(?:we|this|these|those|it|they|that)\s+(?:used\s+to|previously)\b",
             r"|\b(?:was|were|(?:has|have|had)\s+been)\s+(?:rewritten|refactored|replaced",
             r"|renamed|moved|migrated|ported|removed|extracted|split|merged|converted",
@@ -303,9 +306,12 @@ fn categorical_findings(comments: &[Comment]) -> Vec<Finding> {
     }
 
     for comment in comments {
+        // A one-word doc comment is a terse summary of the item it documents,
+        // not a section label over unrelated code.
+        let labels_apply = comment.kind != CommentKind::Doc;
         for (offset, line_text) in comment.text.split('\n').enumerate() {
             let line = comment.start_line + offset;
-            if is_bare_label_line(line_text) {
+            if labels_apply && is_bare_label_line(line_text) {
                 if seen.insert(line) {
                     findings.push(Finding {
                         line,
@@ -356,10 +362,25 @@ fn long_prose_findings(blocks: &[CommentBlock]) -> Vec<Finding> {
         .collect()
 }
 
+/// Trailing comments that instruct a tool rather than explain code. Their
+/// length is dictated by the directive, so a word budget does not apply.
+fn directive_pattern() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(concat!(
+            r"(?i)^\s*(?://[/!]?|#|/\*\*?)\s*",
+            r"(?:nolint\b|noqa\b|type:\s*ignore\b|eslint-disable|ts-(?:ignore|expect-error)",
+            r"|prettier-ignore|pylint:\s*disable|svelte-ignore|codespell:ignore|fmt:\s*(?:on|off))",
+        ))
+        .expect("valid directive pattern")
+    })
+}
+
 fn verbose_trailing_findings(comments: &[Comment]) -> Vec<Finding> {
     comments
         .iter()
         .filter(|c| c.placement == Placement::Trailing)
+        .filter(|c| !directive_pattern().is_match(c.text.trim()))
         .filter_map(|c| {
             let word_count = strip_markers(&c.text).split_whitespace().count();
             (word_count > VERBOSE_TRAILING_MAX_WORDS).then(|| Finding {
@@ -376,8 +397,12 @@ fn representative_line(text: &str) -> String {
 }
 
 /// Comment-syntax markers stripped before counting words, longest first so
-/// e.g. `///` isn't left with a stray `/` after a `//` match.
-const COMMENT_PREFIXES: [&str; 9] = ["///", "//!", "//", "/**", "/*", "<!--", "#!", "#", "--"];
+/// e.g. `///` isn't left with a stray `/` after a `//` match. The `<` forms
+/// are Doxygen trailing-doc markers; without them the residual `<` or `!<`
+/// counts as a word and inflates every per-field C++ annotation.
+const COMMENT_PREFIXES: [&str; 14] = [
+    "///<", "//!<", "/**<", "/*!<", "///", "//!", "/**", "/*!", "//", "/*", "<!--", "#!", "#", "--",
+];
 
 fn strip_markers(text: &str) -> &str {
     let mut s = text.trim();
@@ -467,6 +492,14 @@ const EXCLUDED_FILENAME_MARKERS: &[&str] = &[".min.", ".gen.", ".generated."];
 /// excluded from comment-lint wherever they appear as a path component,
 /// including on the hook path. This is the single shared source of truth
 /// for both.
+///
+/// Only names that are generated or vendored in essentially every project
+/// belong here. A tree that is only vendored in one repo (a decompiler dump,
+/// a bundled asset directory) goes in that project's own `comment-lint.ignore`
+/// globs, because a name generic enough to collide is a name that would
+/// silently stop linting someone's real source. A patched dependency checked
+/// in under `vendor/` is authored code, and re-enabling it that way is the
+/// intended escape hatch.
 pub const EXCLUDED_DIR_NAMES: &[&str] = &[
     "node_modules",
     "migrations",
@@ -486,6 +519,21 @@ pub const EXCLUDED_DIR_NAMES: &[&str] = &[
     "site-packages",
     "third_party",
     "external",
+    "vcpkg",
+    "vcpkg_installed",
+    "_deps",
+    "cmake-build-debug",
+    "cmake-build-release",
+    "emsdk",
+    ".gradle",
+    ".venv",
+    ".tox",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".terraform",
+    "bower_components",
+    "Pods",
 ];
 
 /// Two-segment directory paths excluded even though neither segment alone
