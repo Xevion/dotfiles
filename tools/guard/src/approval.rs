@@ -53,7 +53,7 @@ impl Approval {
         let mut allow = BTreeSet::new();
         let mut deny = BTreeSet::new();
         let mut ask = BTreeSet::new();
-        for file in settings_files() {
+        for file in settings_files(cwd.as_deref()) {
             let Ok(text) = std::fs::read_to_string(&file) else {
                 continue;
             };
@@ -192,16 +192,20 @@ fn extract_bash_prefix(pattern: &str) -> Option<String> {
     (!trimmed.is_empty()).then(|| trimmed.to_string())
 }
 
-fn settings_files() -> Vec<std::path::PathBuf> {
+/// Settings to merge, nearest last. Repo discovery runs in-process against the
+/// payload's cwd: the `git rev-parse` subprocess this replaced was about a
+/// third of the hook's entire runtime, and resolved against the hook process's
+/// own directory rather than the one the command runs in.
+fn settings_files(cwd: Option<&str>) -> Vec<std::path::PathBuf> {
     let mut files = Vec::new();
     if let Ok(home) = std::env::var("HOME") {
         files.push(format!("{home}/.claude/settings.json").into());
         files.push(format!("{home}/.claude/settings.local.json").into());
     }
-    match git_root() {
-        Some(root) => {
-            files.push(format!("{root}/.claude/settings.json").into());
-            files.push(format!("{root}/.claude/settings.local.json").into());
+    match crate::git::find_repo(std::path::Path::new(cwd.unwrap_or("."))) {
+        Some(repo) => {
+            files.push(repo.root.join(".claude/settings.json"));
+            files.push(repo.root.join(".claude/settings.local.json"));
         }
         None => {
             files.push(".claude/settings.json".into());
@@ -209,17 +213,6 @@ fn settings_files() -> Vec<std::path::PathBuf> {
         }
     }
     files
-}
-
-fn git_root() -> Option<String> {
-    let out = std::process::Command::new("git")
-        .args(["rev-parse", "--show-toplevel"])
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
 /// Every simple command's argv in the tree, recursing into nested wrappers
