@@ -131,11 +131,30 @@ fn bare_label_line_pattern() -> &'static Regex {
 fn history_pattern() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        Regex::new(
-            r"(?i)^\s*(?://[/!]?|#|/\*\*?|\*)\s*(?:Refactored|Previously|Migrated|Was formerly|\
-              Changed from|Replaced|Old approach|Removed|Used to|Originally|This (?:function|\
-              method|class|module) was)",
-        )
+        // Built with concat! rather than a `\`-continued raw string: raw
+        // strings keep the backslash, which silently kills the alternative
+        // that follows it.
+        Regex::new(concat!(
+            "(?i)",
+            // A from-construction is historical wherever it appears.
+            r"\b(?:migrated|refactored|ported|moved|renamed|extracted|converted|switched",
+            r"|changed)\s+(?:back\s+)?(?:away\s+)?from\b",
+            r"|\breplaced\s+(?:by|with)\b",
+            r"|\bremoved\s+in\s+favou?r\s+of\b",
+            // A subject is what separates a confession from a description:
+            // "we used to retry" against "used to indicate a soft delete".
+            r"|\b(?:we|this|these|those|it|they|that)\s+(?:used\s+to|previously)\b",
+            r"|\b(?:was|were|(?:has|have|had)\s+been)\s+(?:rewritten|refactored|replaced",
+            r"|renamed|moved|migrated|ported|removed|extracted|split|merged|converted",
+            r"|deprecated|dropped)\b",
+            r"|\bwas\s+formerly\b",
+            r"|\bold\s+approach\b",
+            r"|^\s*(?:(?://[/!]?|#|/\*\*?|\*)\s*)?(?:previously|originally|formerly)\b",
+            // A determiner separates a past action from a participial
+            // adjective: "Removed the cache layer" against "Removed entries are".
+            r"|^\s*(?:(?://[/!]?|#|/\*\*?|\*)\s*)?(?:removed|replaced|deleted|dropped)",
+            r"\s+(?:the|a|an|this|that|these|those|our|all)\b",
+        ))
         .expect("valid history pattern")
     })
 }

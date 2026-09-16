@@ -44,13 +44,29 @@ fn history_comment_fires() {
 
 #[rstest]
 #[case::refactored("// Refactored from the old client")]
-#[case::used_to("// Used to retry three times")]
+#[case::used_to("// We used to retry three times")]
 #[case::removed("// Removed the cache layer")]
+#[case::this_was("// This was rewritten during the v2 migration")]
+#[case::changed_from("// Changed from a BTreeMap to a Vec")]
 fn history_alternatives_stay_unnarrowed(#[case] line: &str) {
     let source = format!("{line}\nfn f() {{}}\n");
     let analysis = analyze("rs", &source);
     let report = evaluate(&analysis);
     check!(only_categories(&report.categorical) == vec![Category::History]);
+}
+
+/// Present-tense prose that merely opens with a change-shaped verb. Each of
+/// these blocked the edit before the rule required a subject or a determiner.
+#[rstest]
+#[case::removed_adjective("// Removed entries are tombstoned here, not deleted")]
+#[case::used_to_purpose("// Used to indicate soft-deleted rows, not a timestamp")]
+#[case::replaced_adjective("// Replaced characters are escaped before this point")]
+#[case::was_not_a_change("// This was chosen because lookup stays O(1)")]
+fn history_does_not_fire_on_present_tense(#[case] line: &str) {
+    let source = format!("{line}\nfn f() {{}}\n");
+    let analysis = analyze("rs", &source);
+    let report = evaluate(&analysis);
+    check!(report.categorical.is_empty());
 }
 
 #[test]
