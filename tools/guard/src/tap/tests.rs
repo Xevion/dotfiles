@@ -123,3 +123,37 @@ fn spill_file_bounded_to_exactly_cap() {
     );
     std::fs::remove_file(path).ok();
 }
+
+/// A TTL of zero makes every existing file expired, which is what lets the
+/// sweep be tested without backdating mtimes.
+#[test]
+fn reap_dir_deletes_expired_files_and_keeps_its_stamp() {
+    let dir = std::env::temp_dir().join(format!("guard-reap-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let spill = dir.join("abcdef.log");
+    std::fs::write(&spill, b"stale").unwrap();
+
+    reap_dir(&dir, Duration::ZERO, Duration::ZERO);
+
+    check!(!spill.exists(), "expired spill file should be gone");
+    check!(dir.join(REAP_STAMP).exists(), "stamp should be written");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn reap_dir_skips_the_sweep_until_the_interval_elapses() {
+    let dir = std::env::temp_dir().join(format!("guard-reap-skip-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join(REAP_STAMP), b"").unwrap();
+    let spill = dir.join("abcdef.log");
+    std::fs::write(&spill, b"fresh").unwrap();
+
+    // Stamp is newer than the interval, so nothing is swept despite a zero TTL.
+    reap_dir(&dir, Duration::ZERO, Duration::from_secs(3600));
+
+    check!(
+        spill.exists(),
+        "sweep must not run before the interval elapses"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}

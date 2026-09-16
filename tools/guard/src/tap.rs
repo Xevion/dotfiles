@@ -6,12 +6,68 @@
 
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 const MEM_CAP: usize = 256 * 1024;
 const SPILL_CAP: u64 = 64 * 1024 * 1024;
 const DIR: &str = "/tmp/claude-guard";
+
+/// A spill file is only useful while its footer is still on screen or its
+/// session is still being read back, so anything older than this is deleted.
+const SPILL_TTL: Duration = Duration::from_secs(3 * 24 * 60 * 60);
+
+/// The sweep runs at most this often. A stamp file's mtime is the shared
+/// clock, so concurrent hooks converge on one sweep without coordinating.
+const REAP_INTERVAL: Duration = Duration::from_secs(60 * 60);
+
+const REAP_STAMP: &str = ".last-reap";
+
+/// Create the spill directory, sweeping expired files when one is due.
+/// Returns false when the directory is unusable.
+fn ensure_dir() -> bool {
+    if fs::create_dir_all(DIR).is_err() {
+        return false;
+    }
+    reap_if_due();
+    true
+}
+
+fn expired(meta: &fs::Metadata, ttl: Duration) -> bool {
+    meta.modified()
+        .ok()
+        .and_then(|m| m.elapsed().ok())
+        .is_some_and(|age| age > ttl)
+}
+
+fn reap_if_due() {
+    reap_dir(Path::new(DIR), SPILL_TTL, REAP_INTERVAL);
+}
+
+fn reap_dir(dir: &Path, ttl: Duration, interval: Duration) {
+    let stamp = dir.join(REAP_STAMP);
+    if fs::metadata(&stamp).is_ok_and(|meta| !expired(&meta, interval)) {
+        return;
+    }
+    // Stamp before sweeping: a racing process then sees a fresh stamp and
+    // skips, rather than walking the directory a second time.
+    if fs::write(&stamp, b"").is_err() {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path == stamp {
+            continue;
+        }
+        if entry.metadata().is_ok_and(|m| expired(&m, ttl)) {
+            let _ = fs::remove_file(&path);
+        }
+    }
+}
 
 /// Distinguishes pending files of concurrent Sinks that share a pid — notably
 /// the parallel test runner, where every thread reports the same process id.
@@ -99,7 +155,7 @@ impl Sink {
     }
 
     fn begin_spill(&mut self) {
-        if fs::create_dir_all(DIR).is_err() {
+        if !ensure_dir() {
             self.broken = true;
             return;
         }
@@ -169,7 +225,7 @@ impl Sink {
     }
 
     fn commit_mem(&mut self) -> Option<PathBuf> {
-        if fs::create_dir_all(DIR).is_err() {
+        if !ensure_dir() {
             return None;
         }
         if fs::write(&self.pending_path, &self.mem).is_err() {
