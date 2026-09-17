@@ -166,43 +166,33 @@ Execute in order:
 
 Report results with URLs after each step.
 
-## Step 5: Write CLAUDE.md Section
+## Step 5: Record the Project in CLAUDE.md
 
-Write a concise Linear integration section directly into the project's CLAUDE.md. **Do NOT present it as text for the user to paste — use the Edit tool to add it to the file immediately.**
+Add only the facts no skill can infer: which Linear project this repo maps to, and its domain
+labels. Everything else — the team, the issue prefix, the status lifecycle, how to file an issue —
+already lives in `linear-workflow` and `linear-issue`, and restating it here is what produced nine
+near-identical blocks across the tree. Use Edit to write it directly; don't hand the user text to
+paste.
 
 ### Finding the target file
 
-1. Check if a `CLAUDE.md` exists in the current working directory
-2. If yes, append the section to it (find an appropriate location — after existing content, or before a specific section if logical)
-3. If no `CLAUDE.md` exists, ask the user where to put it using the Question tool
+1. If a `CLAUDE.md` exists in the working directory, append near related project metadata
+2. If none exists, ask where to put it
 
 ### Section template
 
 ```markdown
-## Linear Issue Tracking
+## Linear
 
-[Project name] tracks work in [Linear](https://linear.app/xevion-personal/) under the **[Project name]** project.
-
-- **Team:** `Xevion's Personal`
-- **Project:** `[Project name]` — filter by this when querying issues
-- **Issue prefix:** `XEV-` (team-level — all projects under this team share it)
-
-### Labels
-
-**Domain:** [list domain labels relevant to this project]
-**Type:** Bug, Feature, Improvement[, Refactoring if relevant]
-
-### Working with Issues
-
-Use the `linear-issue` skill for creating issues, or reference issues directly (e.g., "work on XEV-###").
-
-**Always move issues to "In Progress" before writing code. Do NOT mark "Done" until confirmed.**
+Tracked under the **[Project name]** project. Domain labels: [list].
 ```
 
-**Key principles for this section:**
-- Keep it concise — reference the `linear-issue` skill for detailed workflows instead of duplicating instructions
-- Include project-specific details (domain labels, project name) that the skill can't auto-detect
-- Don't include full MCP call syntax — the skill handles that
+Add a line beyond those two only when this project genuinely diverges from the standard workflow —
+a milestone scheme specific to it, or a labeling rule that contradicts the default. A project that
+follows the normal conventions needs nothing more than the two lines above.
+
+Do not restate: the team name, the `XEV-` prefix, the transition rules, "move to In Progress before
+writing code", "don't mark Done until confirmed", or which MCP tools to call.
 
 ## Label Color Guidelines
 

@@ -212,6 +212,10 @@ home/dot_config/opencode/
 ├── opencode.jsonc.tmpl     # OpenCode settings; calls meta/permissions.ts via `output` for its permission map
 └── command/                # Symlinks → ../../../dot_claude/commands/*.md
 
+home/dot_codex/
+├── AGENTS.md.tmpl          # Codex: includes common-rules
+└── modify_private_config.toml.tmpl  # Codex config; MCP servers from meta/mcp-servers.ts
+
 home/dot_cline/
 ├── rules/
 │   └── common.md.tmpl      # Cline: includes common-rules (global rules for all workspaces)
@@ -226,7 +230,7 @@ home/.managed/cline/
 └── mcp_settings.json       # Cline MCP server definitions (VS Code extension)
 
 home/.chezmoitemplates/
-├── common-rules.md.tmpl    # Shared rules (used by Claude + OpenCode + Cline)
+├── common-rules.md.tmpl    # Shared rules (used by Claude + OpenCode + Codex + Cline)
 └── common-rules-minimal.md.tmpl  # Reduced ruleset (used by Gemini)
 
 meta/permissions.ts         # Single source of truth for tool permissions: Bash allow/ask/deny

@@ -1,61 +1,59 @@
 ## Subagent Selection
 
-The `explore` agent is **disabled**. Use these three purpose-built agents instead. Each has a narrow scope — pick the right one.
+The `explore` agent is denied outright. Beyond that, `~/.claude/agents/` holds a couple dozen
+definitions; the three below are the general-purpose ones, and the rest are language- or
+task-specific (`rust-*`, `ts-*`, `jvm-*`, `code-reviewer`, `security-reviewer`, `architect`).
 
 ### Do it directly (no subagent) when:
 
-- You need to read files → use parallel Read calls (scales fine to 10+)
-- You need to find files/symbols → use Glob or Grep
-- You need a quick API lookup → use context7 directly
-- The task is mechanical (read, search, fetch) with no reasoning required → just do it
+- You need to read files → parallel Read calls, which scale fine past ten
+- You need to find files or symbols → Glob or Grep
+- You need a quick API lookup → context7 directly
+- The task is mechanical (read, search, fetch) with no reasoning required
 
-**If the task doesn't require reasoning across files, do it directly — regardless of how many tool calls it takes.** Subagents exist for tasks that need judgment, not for bulk fetching.
+**Delegate for judgment, not for fetching.** If the task needs no reasoning across files, do it
+yourself however many tool calls it takes. And never hand a subagent content you already have —
+see the reuse rule in Subagents & Tools below. Pass paths, ranges, and URLs; let it fetch.
 
-**NEVER use a subagent to read files.** This is the single most wasteful anti-pattern. When you dispatch a subagent to "read these files and tell me what's in them," you pay for the file contents TWICE — once when the subagent reads them, and again when it serializes them back to you. You also pay the subagent's system prompt overhead, tool-call latency, and context-switching cost. All to do something that a single parallel batch of Read tool calls accomplishes instantly with zero overhead.
+The one shape that works for bulk material is `summarizer`, and only because you pass it
+identifiers rather than content.
 
-There is NO scenario where dispatching a subagent to relay file contents is justified:
-- "I need to read 5 files" → 5 parallel Read calls. Done.
-- "I need to read 15 files" → 15 parallel Read calls. Still faster and cheaper than a subagent.
-- "I need to read files and summarize them" → Read them yourself, summarize yourself. You ARE the language model.
-- "I need to gather context from multiple files" → Read them in parallel. You have the tool. Use it.
+### find — locate things
 
-If you catch yourself writing a subagent prompt that includes phrases like "read the contents of," "return the contents," "tell me what's in," or "gather the content from" — STOP. You are about to waste tokens. Use Read directly.
+2-5 related items across the codebase. Returns paths and `file:line` snippets, no analysis.
+Batch about five per dispatch; one item you do yourself. It locates and does not read — if you
+already know the paths, Read them.
 
-### Find (Haiku 4.5) — Locate things
+### investigate — answer questions about code
 
-Dispatch when you need to locate **2-5 related items** across the codebase. Files, symbols, patterns, configurations. Returns paths and localized context — no analysis.
+How code works, execution paths, proving or disproving a hypothesis. 1-3 related questions per
+dispatch. Read-only, never proposes implementations. Sharpen the question first: "does
+`validateToken()` run before `createSession()`?" beats "explore the auth system". If the question
+is only "where is X?", use `find`.
 
-- **Batch ~5 items per dispatch.** 10 items = 2 dispatches. 1 item = do it yourself.
-- Returns structured lists with `file:line` references and snippets
-- Cannot reason or analyze — if you need "why" or "how", use Investigate
-- **Find locates, it does not read.** Never ask Find to return full file contents. If you already know the paths, use parallel Read calls directly
+### research — explore outside the codebase
 
-### Investigate (Opus 4.6) — Answer questions about code
+Library docs, community patterns, dependency evaluation, comparing alternatives. Not for a single
+API lookup, which context7 answers directly. If the answer is in local code, use `investigate`.
 
-Dispatch when you need to **understand how code works**, trace execution paths, or prove/disprove a hypothesis. Handles 1-3 related questions per dispatch.
+### Choosing a model
 
-- **Sharpen prompts before dispatching** — Opus tokens are expensive. "Explore the auth system" wastes tokens. "Does `validateToken()` run before `createSession()` in the login flow?" doesn't.
-- Returns conclusion-first answers with `file:line` citations
-- Read-only — never suggests implementations
-- If the question is just "where is X?", use Find instead
-
-### Research (Sonnet 4.6) — Explore external resources
-
-Dispatch when the answer is **outside the codebase** — library docs, community patterns, dependency evaluation, alternative approaches.
-
-- Use for genuine exploration: evaluating options, understanding breaking changes, comparing libraries
-- Don't dispatch for a single API lookup — use context7 directly
-- Returns summaries with source URLs, code examples, and trade-off analysis
-- If the answer is in the local code, use Investigate instead
+The definitions carry a sensible default (`find` on haiku, `investigate` and `research` on sonnet),
+but the `model` parameter overrides it per dispatch. Pick by the stakes and scope of the work
+rather than by the agent: routine or well-scoped work stays on the default, and a large,
+high-consequence, or genuinely ambiguous problem earns opus. Cost tracks the choice, so don't
+reach for the larger model on mechanical work.
 
 ### Caller Responsibilities
 
-When dispatching any of these agents:
-
-1. **Write a specific prompt.** Vague prompts produce vague results. Include what you're looking for and why.
-2. **Don't ask for files.** These agents return their findings as response text. They never write documents or reports to disk.
-3. **Split large tasks.** If a task would require reading 20+ files, dispatch multiple agents in parallel with focused scopes rather than one overloaded agent.
-4. **Don't over-split.** If 3 related questions share context, one Investigate dispatch with all 3 is better than 3 separate dispatches.
+1. **Write a specific prompt.** Include what you're looking for and why. Vague prompts produce
+   vague results.
+2. **Don't ask for files.** These three return findings as response text and never write to disk.
+   Agents doing bulk classification with a synthesis step are the exception, and you say so
+   explicitly in the prompt.
+3. **Split large tasks.** Past roughly twenty files, run several focused agents in parallel rather
+   than one overloaded one.
+4. **Don't over-split.** Three related questions sharing context belong in one dispatch.
 
 ---
 

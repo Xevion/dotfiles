@@ -11,6 +11,26 @@ Manage the lifecycle of Linear issues during active work sessions. This skill ha
 
 **This skill does NOT create issues** — use `linear-issue` for that. This skill manages issues that already exist.
 
+## The Tool Surface
+
+Get these names right; guessing them is a recurring source of failed calls.
+
+- **Writes are `save_issue` and `save_comment`.** Both create when `id` is omitted and update when
+  it is present. There is no `update_issue`, no `create_issue`, no `create_comment`, and no
+  `add_comment` — those names do not exist and calls to them fail.
+- **`save_issue` takes a `patch` array of anchored string edits.** That is the right way to tick a
+  checkbox or amend one section of a long description, instead of resending the whole body and
+  risking clobbering it.
+- **Reads:** `get_issue` for one issue's full description, `list_issues` for a filtered set,
+  `list_comments` only when you actually need the discussion.
+- **Always filter `list_issues` by project and set an explicit `limit`.** The workspace is a single
+  team hosting many unrelated projects, and the default returns 50 drawn from all of them. The list
+  response already carries title, status, labels and priority, so don't follow it with `get_issue`
+  per row.
+- **Labels are workspace-global.** There is no per-project label scoping, so projects share one
+  pool by design. Some labels are team-scoped and will not appear in a workspace-level label
+  listing.
+
 ## Activation
 
 ### Semi-automatic
@@ -73,15 +93,17 @@ When an issue ID is mentioned with implied action:
 |------|--------------|
 | Backlog | Todo, Cancelled |
 | Todo | In Progress, Backlog, Cancelled |
-| In Progress | Done, Todo (deprioritize), Cancelled |
+| In Progress | In Review, Done, Todo (deprioritize), Cancelled |
+| In Review | Done, In Progress (changes needed), Cancelled |
 | Done | In Progress (reopen) |
 | Cancelled | Backlog (reopen) |
+| Duplicate | Backlog (reopen if it turns out not to be one) |
 
 #### Gate Checks (Lightweight)
 
 Before marking Done, draft a brief summary comment from conversation context and include it in the transition confirmation. Don't interrogate the user with separate questions about what caused the bug, what was descoped, etc. — extract that from the session context yourself.
 
-**Before marking Done:** Draft a comment summarizing what was done (and what wasn't, if applicable). Present the comment alongside the status change in one confirmation step.
+**Before marking Done:** Draft a closing comment and present it alongside the status change in one confirmation step. The closing comment is worth writing — there are no PRs here, so it is the only thing that caps an issue off rather than leaving it to go silently green. Say what shipped, where it diverged from the description, and what was deferred or split out. Then check it against the durability test below before posting: if every sentence would be true of any change that went fine, the comment is noise and should be a single line instead.
 
 **Before marking In Progress:** Assign to "me" if unassigned. If assigned to someone else, warn before reassigning.
 
@@ -121,6 +143,24 @@ Keep it simple. If the user wants amendments, they'll say what to change.
 - **Mention skipped work.** If something was intentionally skipped or descoped during the session, say so explicitly.
 - **Simple markdown.** Bullet lists for multiple items, backticks for code references, bold for emphasis. No headers for short comments.
 - **Match the issue's language.** If the issue is technical, the comment should be technical. Don't dilute with generic language.
+- **Scale the comment to the work.** A two-hour fix gets a couple of sentences. A three-week thread with four course corrections earns real detail. Length should track what actually happened, not the effort of writing it up.
+
+#### What a Comment May Never Contain
+
+These rot faster than anyone will read them, and a stale record is worse than none.
+
+- **No commit references, and no claims about commit state.** Not `Landed in 77b4422`, not "committed as abc123", not "left uncommitted". Commits here get reworded, amended, and bundled, so the SHA you name moves or disappears; and "uncommitted" is false within minutes. If the change needs locating later, name the code, not the commit.
+- **No suite or pipeline results.** No "1000 nextest passed", no "`just check` 13/13", no "782 passed / 0 failed", no CI run IDs, no "9 stages green". These describe one execution on one machine at one moment. The single exception is when the numbers *are* the subject of the issue.
+- **No session detail.** No dates, no recording or transcript paths, no file timestamps, no "in this session".
+- **The durability test:** if a sentence would be equally true of any change that went fine, cut it. That one test catches all of the above without needing the list.
+
+#### Documentation Boundary
+
+Linear tracks decisions and the work, not the project's technical corpus. An issue carries the
+mechanism, the evidence, and the alternatives rejected — enough that reopening it cold makes
+sense. It does not carry the full investigation, reference material, or anything that belongs in
+`docs/`. When a comment starts to read like documentation, the documentation belongs in the repo
+and the comment belongs as a pointer to it.
 
 #### When to Suggest Comments
 

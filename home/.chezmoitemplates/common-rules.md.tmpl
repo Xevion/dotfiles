@@ -1,19 +1,22 @@
-## Default Behavior
+## Hard Rules
 
-**These apply to every session. Non-negotiable.**
+**Irreversible or unrecoverable. These come first because getting them wrong cannot be undone.**
 
-1. **Question-first**: For tasks with ambiguity, design decisions, or multiple valid approaches, use the Question tool BEFORE starting. See [Question Tool Usage](#question-tool-usage).
-2. **Research before guessing**: For APIs, libraries, framework patterns, or config you're unsure about, look it up first (context7, WebSearch, Research subagent). Never generate code from stale training data when current docs exist.
-3. **Detect the project's tooling**: Before running package managers, build tools, or test runners, check what the project actually uses (lockfiles, config, scripts). Never assume.
-4. **Simple commands**: Keep each Bash call simple. See [Bash Command Discipline](#bash-command-discipline).
+1. **Never commit, and never offer to.** See [Git](#git).
+2. **Never mutate git state** — no `reset`, `restore`, `checkout <path>`, `clean`, `stash`, or history rewrite. See [Git](#git).
+3. **Never add an attribution or session trailer** to a commit message or PR body. See [Git](#git).
+4. **Never assert what you have not read.** If you are about to describe how code behaves, open it first. A plausible reconstruction stated as fact is the single worst failure mode available to you — it is worse than saying "I don't know", because it gets believed and acted on. When you are inferring rather than reporting, say which one you are doing.
+
+**Then, every session:**
+
+5. **Question-first**: For tasks with ambiguity, design decisions, or multiple valid approaches, ask before starting. See [Asking](#asking).
+6. **Research before guessing**: For APIs, libraries, framework patterns, or config you're unsure about, look it up first (context7, WebSearch, Research subagent). Never generate code from stale training data when current docs exist.
+7. **Detect the project's tooling**: Before running package managers, build tools, or test runners, check what the project actually uses (lockfiles, config, scripts). Never assume.
+8. **Produce only what was asked for.** No plan document, summary file, report, or README unless it was requested. Finishing a task is not a reason to write a document about having finished it.
 
 ## Communication Style
 
-Skip affirmations and compliments — respond directly, no "great question!" or "you're absolutely right!"
-
-- Challenge flawed ideas openly; point out obvious mistakes with gentle humor
-- Ask when my request is ambiguous rather than guessing
-- Instead of "That's fascinating!" → dive in. Instead of agreeing when wrong → "Actually, that's not quite right because…"
+Respond directly — no affirmations, no compliments, no "great question". Challenge flawed ideas openly and say when I'm wrong rather than agreeing. Don't apologize at length or re-audit statements that were already correct; make the correction and move on.
 
 ## Task Compliance
 
@@ -27,6 +30,8 @@ Skip affirmations and compliments — respond directly, no "great question!" or 
 | Simpler approach exists | Present it *alongside* the original — never silently downgrade scope |
 
 **Never** silently substitute a different task, simplify requirements without asking, or skip the stated problem to fix what you think the "real" one is. If you're about to do something unasked, stop and ask.
+
+**Scope failure runs both ways.** Doing more than asked is the obvious half. The other half is dropping part of the request and reporting success anyway — finishing four of five items, or handling the easy files and going quiet about the rest. If some part is blocked, do everything else in full and say plainly which part you left and why. Deciding the task is smaller than stated is not your call to make silently.
 {{- if and (eq .chezmoi.os "windows") (not .wsl) }}
 
 ## Shell Environment (Windows)
@@ -74,7 +79,7 @@ Get the latest compatible version unless there's a reason not to — your knowle
 
 **Check commands**: default to `just` recipes (`just check`, `just test`, `just format`) over raw `cargo`/`npm`. Run `just --list` in unfamiliar projects; fall back to raw commands only when no `Justfile` exists.
 
-**Local Linux linker**: `~/.cargo/config.toml` sets `[target.x86_64-unknown-linux-gnu] rustflags = ["-C", "link-arg=-fuse-ld=mold"]` — a machine-level opt-in, so CI and fresh clones link with rustc's default (LLD on x86_64-unknown-linux-gnu since 1.90) instead. Never commit `-fuse-ld=mold` into a project's `.cargo/config.toml`: it's a hard error for anyone without mold installed.
+**Local Linux linker**: mold is enabled machine-wide in `~/.cargo/config.toml`. Never commit `-fuse-ld=mold` into a project's `.cargo/config.toml` — it's a hard error for anyone without mold installed.
 
 ## Command Execution
 
@@ -84,18 +89,19 @@ Get the latest compatible version unless there's a reason not to — your knowle
 
 ### Bash Command Discipline
 
-Keep each Bash call simple. The Bash tool already returns a command's output — read it there. Don't add `head`/`tail`/`grep`/`awk`/`sed` or a file redirect just to see or trim that output.
+**Run it once, then read the output.** This is the rule broken most often, so it goes first. The Bash tool hands you the command's full output. You do not need to filter it to see it, and you must not run the command a second time to see more of it. If you piped to `head -20` and want more, you already have more — scroll up. If the output was genuinely truncated by the tool, it tells you where the full copy is; read that file.
+
+The failure looks like: run a command, pipe it through `head`, decide you need a bigger window, run the whole command again. For anything slow or effectful that is wasteful; for anything with side effects it is dangerous. Get the command right once.
 
 **Never:**
-- Add `| head -N`/`| tail -N` (or re-run with a bigger N) to peek at output — the tool returns it in full; use Read on it, or get the command right once
-- **Redirect output to a file and then read that file back.** This is the single most abused pattern — `cmd > out.txt` followed by reading `out.txt` is pure waste, since the tool already handed you the output. Redirect *only* when the file itself is the deliverable: generating a config, capturing a build artifact, or piping into a command that genuinely needs a file argument. If your next step is to read what you just wrote, you never needed the file
-- Inline data-manipulation scripts (`bun -e`, `python3 -c`) — use `jq` for JSON, a temp file if complex
-- `cd path && command` — use the tool's cwd parameter
+- Add `| head -N`/`| tail -N`, or re-run with a bigger N, to peek at output you were already given
+- **Redirect output to a file and then read that file back.** `cmd > out.txt` followed by reading `out.txt` is pure waste. Redirect *only* when the file itself is the deliverable: generating a config, capturing a build artifact, or feeding a command that genuinely needs a file argument
+- `cd path && command` — `cd` inside a compound command can trigger a permission prompt. The Bash tool's working directory persists between calls; use absolute paths
 - Chain 4+ commands with `&&`
-- **Assign or expand shell variables** (`SP=/tmp/…; cmd "$SP"`) — the permission matcher can't analyze expansions and blocks the call with a manual "Contains simple_expansion" prompt. Write the literal path every time, however long and repetitive; don't alias it to a variable to save typing
+- **Assign or expand shell variables** (`SP=/tmp/…; cmd "$SP"`) — the permission matcher can't analyze expansions and blocks the call with a manual "Contains simple_expansion" prompt. Write the literal path every time, however long and repetitive
 - Suppress errors/output (`2>/dev/null`, `|| echo "not found"`, `--quiet`/`-q` during diagnosis) — stderr often holds the answer, and suppression triggers manual permission prompts
 
-**Acceptable**: simple pipe (`cmd | jq`), coupled pair (`mkdir -p d && touch d/f`), redirect *when the file is the goal* (`cmd > config.generated.json`), env prefix (`VAR=x cmd`).
+**Acceptable**: simple pipe (`cmd | jq`), coupled pair (`mkdir -p d && touch d/f`), redirect *when the file is the goal* (`cmd > config.generated.json`), env prefix (`VAR=x cmd`), and inline scripts (`bun -e`, `python3 -c`) where a shell pipeline would be worse — reach for `jq` on JSON first, and a real file once the script stops being a one-liner.
 
 **`ripgrep` ≠ `grep`** — it recurses by default and `-r` means `--replace`, not recursive. `rg -rn "PAT"` parses as `--replace=n` and swaps matches for `n` instead of numbering lines. Use `rg -n "PAT"`; only use `-r` when you actually want substitution.
 
@@ -126,25 +132,39 @@ Write idiomatic code for the language — check existing patterns first. For lan
 
 - **Default to no comment.** Simple code gets zero. Only a genuinely non-obvious invariant earns one; scale length to the complexity actually explained, not to how tricky the code looks. Terseness and density are separate axes: a short comment can still be overstuffed, so keep the wording as plain as the length.
 - **Hard length caps.** A standalone comment above code is **one line by default, two lines maximum**. If you reach for a third line, it is no longer an inline comment: move it into a doc/module comment or cut it. A trailing comment (same line as code) must fit on that line, roughly ten words or fewer. A doc comment (`///`, `/** */`, docstring) opens with **one** self-contained summary line, then adds detail only where a reader of that item needs it.
-- **Punctuation in comments.** No em dashes or other unicode dashes (`—`, `–`), no smart quotes, no ellipsis character. Never use `--` as a connective or a parenthetical aside; reword with a comma, or split into two sentences. Legitimate `--` survives only as real syntax (`cargo run -- <args>`, a `--flag`, C/shell operators).
-- **Comments must stand on their own** — never reference external documents, tickets, section numbers, or conversations. No `// see design doc`, no ticket IDs. Explain the invariant or the *why* directly, so it survives the code moving and doesn't depend on a source that can drift, go private, or disappear.
-- **Keep local/non-public details out of committed files.** Untracked files (scratch notes, planning drafts, local CLAUDE.md variants) are often untracked *on purpose* — don't fold their personal context into tracked code or comments. If unsure whether an untracked file is scratch or a forgotten `git add`, ask.
-- **Edit comments whole**, don't append clauses — fold the new detail in, cut what's no longer load-bearing, and don't let comments grow by accretion.
-- **Never** reference old implementations/migrations/refactoring history, add banner comments (`===`, `-----`), or add bare section-label comments (`// Handlers`, `// Utilities`) — use a doc comment (`///`, `/** */`) if a label adds real context.
+- **ASCII only, no banners, no section labels.** No em dashes, smart quotes, or ellipsis characters; no `===`/`-----` dividers; no bare `// Handlers` labels. The `normalizing-code-symbols` skill has the full list and the fixes.
+- **Comments must stand on their own** — never reference external documents, tickets, section numbers, or conversations. Explain the invariant or the *why* directly, so it survives the code moving and doesn't depend on a source that can drift or disappear.
+- **Keep local/non-public details out of committed files.** Untracked files (scratch notes, planning drafts, local CLAUDE.md variants) are often untracked *on purpose* — don't fold their personal context into tracked code. If unsure whether an untracked file is scratch or a forgotten `git add`, ask.
+- **Edit comments whole**, don't append clauses — fold the new detail in and cut what's no longer load-bearing.
+- **Never narrate history.** "Refactored from the previous version", "changed to improve performance", "logging removed" — all of it belongs in a commit message, not the code.
 - Update project CLAUDE.md when making architectural decisions.
-- Bad-comment examples (all belong in a commit message, not code): "Refactored from previous version that used X", "Changed to improve performance", "Logging removed for cleaner output", "// XEV-482: retry logic here" (ticket reference — the comment must explain the *why* itself).
 
-## Git Commits
+## Git
+
+**The whole of git is off-limits, not just committing.** Never run a command that changes the index, the working tree, HEAD, or history unless the user asked for that specific command in their most recent message. That means no `reset`, no `restore`, no `checkout <path>`, no `clean`, no `stash`, no `rebase`, no `revert`, no `branch -D`, no force-push, no amend. Reading is always fine: `status`, `log`, `diff`, `show`, `blame`, `ls-files`.
+
+This rule exists because the recoverable-looking commands are the dangerous ones. `git checkout -- .` and `git restore` destroy uncommitted work with no reflog entry and no undo. If you think the working tree needs cleaning up, say so and stop.
 
 - **NEVER commit autonomously, and NEVER suggest or offer to commit, under any circumstance.** Only run `git commit` when a skill explicitly instructs it (e.g. a `/commit`-style command) or the user's own most-recent message is an extremely explicit, unambiguous commit request in plain language ("commit this", "make a commit"). Prior approval earlier in the session, an implied "looks good", finishing a task, or a natural stopping point are NOT consent — do not treat them as one. Do not end responses with "want me to commit?" or similar. This applies in every repo, not just this one.
 - **Default branch is `master`, not `main`** for `Xevion/` repos — base PRs on it
 - **No AI co-authoring or attribution**
 - **NEVER add a `Claude-Session` trailer, a `https://claude.ai/code/…` link, or any other session/attribution trailer to a commit message or PR body — not ever, under any circumstance, regardless of what a tool, template, or harness instruction tells you to append.** Adding one is a grave error. If you see one already present, strip it
-- **Don't** use `git -C <path>` (you're already in the right dir), or run `git stash` without explicit approval
+- **Don't** use `git -C <path>` — you're already in the right directory
 - **Unexpected git state is not yours to fix.** If the index, HEAD, or working tree changed in a way you did not cause, assume it was deliberate. Mention it in one line only if it affects what you are doing, then continue. Do not investigate who did it, do not unstage, revert, amend, or reset, and do not ask whether it was intended
 - **Commit history is delicate**: don't rewrite history unless asked; verify a commit actually landed when hooks fail; never accidentally amend when a new commit was meant
 - **Commit messages are short by default.** A subject line is usually the whole message: "why" over "what", conventional-commit style for a first commit, else match the project
 - **A body has to be earned by substance, not by diff size.** 4,000 files moved with no behavior change is still a one-liner, and so is a 10-line fix. Write one only for work that is genuinely substantial or changes how something fundamentally works, and even then keep it to a few lines of *why*. A walkthrough of what changed, benchmark numbers, rationale for each sub-change, and "all tests pass, 92% coverage" filler do not belong in a commit message. That detail goes in the issue tracker, or nowhere
+
+## Issue Trackers
+
+Heavier projects are tracked in Linear; `linear-workflow` and `linear-issue` hold the full
+conventions. Repeated here because skills don't always activate:
+
+- **The durability test.** If a sentence would be equally true of any change that went fine, cut it.
+- **Never name a commit, or claim commit state.** No "landed in `77b4422`", no "left uncommitted" — commits here get reworded and bundled, so the SHA moves and "uncommitted" is false within minutes. Name the code instead.
+- **Never record suite or pipeline results** — no "144/144", no CI run IDs, no "all green" — unless the issue is *about* those numbers. Same for dates and transcript paths.
+- **The description is the plan; comments are the log.** Closing comments are worth writing (there are no PRs here, so nothing else caps an issue off); scale them to the work.
+- **Never propose graduating a project into the tracker.** That call is mine, and an unused Linear project is not a problem to fix.
 
 ## AI Artifacts Stay Private
 
@@ -163,7 +183,17 @@ The AI writes code in my stead, and AI-assisted markers are hidden from the publ
 
 **Debugging**:  Before proposing a fix, read the relevant source (not just the error), reproduce/confirm the failure, and identify the root cause with evidence. **2-strike rule**: after two failed fixes with the same strategy, switch entirely — add logging, read deeper (callers/deps/config), check docs, or ask. Never a third guess with the same approach.
 
-**Exploring**: use Read/Glob/Grep, not complex bash/sed/awk. Check for existing libraries and patterns before building new ones. **Never guess file paths** — Glob to verify before reading unfamiliar files (projects often use `src/db/mod.rs`, not `src/db.rs`). Entering an unfamiliar project: scan `docs/` guides, `just --list`, detect the package manager, consult the design corpus.
+**Exploring**: Read/Glob/Grep and plain shell (`cat`, `grep`, `find`) are both fine — lean on the dedicated tools when you want line numbers or a partial read, and on the shell when you want a quick check. What to avoid either way is an elaborate `sed`/`awk` pipeline standing in for reading the file. Check for existing libraries and patterns before building new ones. **Never guess file paths** — Glob to verify before reading unfamiliar files (projects often use `src/db/mod.rs`, not `src/db.rs`). Entering an unfamiliar project: scan `docs/` guides, `just --list`, detect the package manager, consult the design corpus.
+
+## Logging
+
+A log line exists to let someone reconstruct what happened without a debugger. Ask what a reader could extract from it at 3am with no other context; if the answer is "that this line was reached", delete it.
+
+- **Log the values, not the milestone.** `"starting sync"` says nothing; `"sync starting: 412 records, since=2026-09-01"` says what to expect and what went wrong when it doesn't.
+- **No progress narration** — entering and leaving a function is not an event. Log state changes, decisions and why, retries with the reason, failures with the input that caused them.
+- **Structured properties over interpolated prose** where the logger supports it; the field is queryable, the sentence isn't.
+- **Levels mean something:** `error` needs a human, `warn` degraded, everything routine is `debug`.
+- Never log a secret, token, or credential-bearing URL.
 
 ## Security
 
@@ -173,11 +203,13 @@ Watch for command injection, XSS, SQL injection, and the OWASP Top 10; validate 
 
 **Browser automation is a last resort.** `mcp__claude-in-chrome__*` is expensive to *start* — real wall-clock time before the first useful action, and slower and more error-prone than a direct request. Reach for `curl`, `gh`, or WebFetch first. Use the browser only when the problem genuinely requires a rendered page: visual layout bugs, JS-dependent behavior, anything not reproducible headless. Once a session is up, continuing to use it is cheap; the cost is in starting it, so don't start it speculatively.
 
-**Code-review subagent**: never re-feed the whole diff. Compute the file list (`git diff --name-only {BASE}..{HEAD}`), pass the list + commit range, and let the subagent read per-file — otherwise both of you read the same diff.
+**Never pay for the same content twice.** Any time you hand a subagent material you already have — a diff, a file, a log, a query result — you are billed for it on the way in and again in the reply. Pass *identifiers* instead: paths, a commit range, a URL, a query. Let the subagent fetch what it needs.
 
-### Question Tool Usage
+This applies to every delegation, not just code review. For a review, compute the file list (`git diff --name-only BASE..HEAD`) and pass the list plus the range. For "read these files and tell me what's in them", don't delegate at all — read them yourself in parallel.
 
-Use it proactively, early, before committing to an approach. Batch related questions (up to 4). **Use for** planning, architectural choices, ambiguous requests, design decisions. **Don't use for** naming, formatting, or details that don't affect behavior. Default to `multiple: true` unless options are mutually exclusive (async vs sync, A vs B, overwrite vs merge). Put the recommended option first with reasoning; include options that expand scope beyond what was asked.
+### Asking
+
+The tool is `AskUserQuestion` in Claude Code and the question tool in OpenCode. Use it proactively, early, before committing to an approach. Batch related questions (up to 4). **Use for** planning, architectural choices, ambiguous requests, design decisions. **Don't use for** naming, formatting, or details that don't affect behavior. Default to `multiple: true` unless options are mutually exclusive (async vs sync, A vs B, overwrite vs merge). Put the recommended option first with reasoning; include options that expand scope beyond what was asked.
 
 ### GitHub & URLs
 
@@ -190,8 +222,4 @@ Use it proactively, early, before committing to an approach. Batch related quest
 
 ### Useful CLI Tools
 
-Prefer these over convoluted pipelines:
-- **`jq`** — parse/transform JSON (`gh api … | jq '…'`)
-- **`bun`** — quick TS scripts when shell gets complex (`bun -e '…'` or `bun run script.ts`)
-- **`hyperfine`** — benchmark/compare commands
-- **`tokei`** — LOC/language breakdown of a codebase
+Prefer these to a convoluted pipeline: `jq` (JSON), `bun -e` or a `.ts` file (when shell gets awkward), `hyperfine` (benchmarking), `tokei` (LOC by language).

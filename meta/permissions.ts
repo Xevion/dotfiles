@@ -7,6 +7,8 @@
 type Level = "allow" | "ask" | "deny";
 type Entry = { pattern: string; level: Level };
 
+const home = process.env.HOME ?? "";
+
 const entries: Entry[] = [];
 
 // Builder helpers
@@ -80,6 +82,13 @@ allow(
     "dotnet",
     "mise",
     "fish",
+    "kitty",
+    "vivaldi",
+    "jshell",
+    "typst",
+    "cmake",
+    "mpv",
+    "ghidra",
   ),
   "go version", // go uses "go version" not "go --version"
 );
@@ -130,6 +139,10 @@ allow(
     "run",
   ]),
   "gofmt",
+  "goimports",
+  "rustfmt",
+  "nasm",
+  "vkd3d-compiler",
   "gofumpt",
   "gopls",
   "golangci-lint",
@@ -153,7 +166,13 @@ allow(
 
 // Python
 allow(
-  ...subs("uv", ["sync", "run", "pip list", "pip show", "pip install", "venv", "tool", "add", "build", "init"]),
+  ...subs("uv", [
+    "sync", "run", "venv", "tool", "add", "remove", "build", "init", "lock",
+    "export", "tree", "format", "check", "version", "workspace",
+    "pip list", "pip show", "pip install", "pip freeze", "pip tree",
+    "python list", "python find", "python install",
+    "cache dir", "cache size",
+  ]),
   "python3",
   "python",
   ".venv/bin/python",
@@ -168,7 +187,28 @@ tool("pyenv", { allow: ["install", "versions", "version", "global", "local", "wh
 tool("pipenv", { allow: ["run", "sync", "install", "lock"] });
 
 // Build tools
-allow("just", "./gradlew", "make run", "make build");
+allow("just", "./gradlew");
+
+// Compilers: the only write in an ordinary invocation is the `-o` target (or
+// ./a.out), the same mechanism the allowed `cargo build` / `go build` carry.
+allow("rustc", "gcc", "clang", "clang-21", "cc");
+
+// `make`/`cmake` run repo-authored recipes, the trust assumption `just` and
+// ./gradlew already carry. Targets are listed rather than the bare tool:
+// `cmake -E rm -rRf` is a plain recursive delete. Flag-first forms (`make -j4`,
+// `make -C dir`) are omitted because the flag precedes the target, so allowing
+// one would allow every target after it; `-n` is fine since a dry run is inert.
+allow(...subs("make", ["run", "build", "test", "check", "all", "debug", "release", "help", "-n"]));
+tool("cmake", {
+  allow: ["-B", "-S", "-L", "--build", "--preset", "--list-presets", "-E capabilities", "-E environment"],
+});
+
+// Script runtimes: these run caller-supplied code, so the real decision is
+// about the code. They are allowed anyway because scripting through them is
+// routine here, matching the existing python/bun entries. `bash`, `sh`, `perl`
+// and `ruby` stay absent: they are not scripted in here, and `perl -pi -e` /
+// `ruby -i -pe` rewrite files in place.
+allow("node", "deno");
 
 // Git
 tool("git", {
@@ -201,11 +241,15 @@ tool("git", {
     "clean --dry-run",
     "stash list",
     "stash show",
-    "checkout",
     "switch",
     "clone",
   ],
   ask: [
+    // `checkout -- <path>` and `checkout .` destroy uncommitted work with no
+    // reflog entry, the same class as `restore`. Branch switching has `switch`.
+    "checkout",
+    "reset",
+    "revert",
     "pull",
     "merge",
     "rebase",
@@ -285,7 +329,12 @@ tool("docker", {
 // `timeout`/`flock` are absent on purpose: guard's TRANSPARENT list
 // evaluates the wrapped command against these rules instead of bypassing.
 
-// General CLI (always safe)
+// General CLI (always safe).
+// `xargs` and `env` are deliberately absent: both take a command as their
+// argument, so a bare allow on either prefix-matches any command at all and
+// silently overrides the rest of this table. The guard hook strips them and
+// judges the wrapped command instead.
+
 allow(
   "ls",
   "tree",
@@ -317,7 +366,6 @@ allow(
   "sort",
   "uniq",
   "echo",
-  "xargs",
   "du",
   "df",
   "jar",
@@ -325,8 +373,23 @@ allow(
   "stat",
   "file",
   "exit",
-  "env",
   "printenv",
+  "shuf",
+  "tr",
+  "comm",
+  "printf",
+  "date",
+  "brotli",
+  "unrar",
+  "innoextract",
+  "aria2c",
+  "pgrep",
+  "blkid",
+  "vainfo",
+  "avahi-browse",
+  "frida-ps",
+  "inferno-collapse-guess",
+  "virt-xml-validate",
   "pwd",
   "which",
   "hyperfine",
@@ -377,11 +440,27 @@ allow("psql", "sqlite3", "sqlc", "tygo", "mysql", "duckdb");
 tool("redis-cli", { allow: ["GET", "KEYS", "TTL", "TYPE", "INFO", "PING", "DBSIZE"] });
 
 // Binary inspection (read-only unless -w is passed to patch)
-allow("nm", "objdump", "ldd", "ilspycmd", "rabin2", "r2", "radare2");
-ask("r2 -w", "radare2 -w");
+allow(
+  "nm", "objdump", "ldd", "ilspycmd", "rabin2", "r2", "radare2",
+  "readelf", "strings", "hexdump", "addr2line",
+  "x86_64-w64-mingw32-addr2line", "minidump-stackwalk",
+  // pev suite: every option is an output format or an offset selector
+  "peldd", "pescan", "pestr", "pepack", "pehash", "pedis", "readpe",
+  // rizin suite, matching the r2 entries above
+  "rizin", "rz-bin", "rasm2", "rahash2", "rafind2", "ragg2",
+  // wasm: dumps to stdout, or a named -o / --out-dir for the two builders
+  "wasm-objdump", "wasm2wat", "wasm-decompile", "wasm-opt", "wasm-bindgen",
+);
+ask("r2 -w", "radare2 -w", "rizin -w");
+// `-a`/`-x`/`-X` write every embedded resource into the cwd as files.
+tool("peres", { allow: ["-i", "-l", "-s", "-v", "--info", "--list", "--statistics", "--file-version"] });
+// Listing is the default, but `-x -o PATH` writes extracted resources.
+tool("wrestool", { allow: ["-l", "--list"] });
+
+// Documents / media (read metadata, or derive a new file; never edit the input)
+allow("pdftotext", "pdftoppm", "pdfinfo", "transmission-show", "minizinc");
 
 // Disk usage
-allow("dust");
 tool("dua", { allow: ["aggregate"] }); // `dua interactive` has an in-TUI delete key
 
 // Process management
@@ -458,7 +537,8 @@ tool("gcloud", { allow: ["config list", "projects list"] });
 // Static site generators / codegen (scoped to the project's own output dir)
 tool("hugo", { allow: ["build", "server", "list", "config", "env"], ask: ["deploy"] });
 tool("zola", { allow: ["build", "serve", "check"] });
-tool("typst", { allow: ["compile"] });
+// `eval` runs arbitrary Typst, `watch` blocks, `update` replaces the binary.
+tool("typst", { allow: ["compile", "fonts", "info"] });
 
 // System diagnostics (read-only)
 allow("whoami", "uname", "hostname", "id", "groups", "lscpu", "free", "uptime", "nproc", "lsof");
@@ -468,6 +548,15 @@ allow("whoami", "uname", "hostname", "id", "groups", "lscpu", "free", "uptime", 
 // are allowed here rather than the bare tool (avoids "ip addr:*" wildcarding
 // into "ip addr add ...").
 allow("ping", "traceroute", "tracepath", "dig", "nslookup", "host", "ss");
+// `--show` reports; bare `swapon` and `-a` activate swap devices.
+tool("swapon", { allow: ["--show", "-s"] });
+// `-w` writes a kernel parameter and `-p` loads a file of them. A bare
+// `sysctl <key>` read is indistinguishable by prefix from `sysctl -w`, so only
+// the fully-qualified read forms are listed.
+tool("sysctl", { allow: ["-a", "-n"] });
+// `remove` unpairs a device and `script <file>` runs a command file.
+tool("bluetoothctl", { allow: ["list", "show", "devices", "info", "version"] });
+
 tool("ip", {
   allow: ["addr show", "route show", "route get", "link show", "-s link", "neigh show", "rule show"],
 });
@@ -552,9 +641,13 @@ allow(
   // Custom local tooling on external storage
   "/mnt/storage/unity/bin/unity",
   "/mnt/storage/unity/bin/pcommit",
-  // Personal tools deployed by this dotfiles repo or ~/.local/bin
+  // Personal tools deployed by this dotfiles repo or ~/.local/bin.
+  // Bash rules match the command text literally, so tools invoked by absolute
+  // path need that form listed too - the tilde alone never matches.
   "~/.claude/hooks/guard",
+  `${home}/.claude/hooks/guard`,
   "~/.local/bin/protonhax",
+  `${home}/.local/bin/protonhax`,
 );
 
 // Package managers (ask, lifecycle scripts and lockfile changes)
@@ -562,9 +655,6 @@ allow(
 // and there's no TTY for a password prompt even if it didn't - but the ask
 // entry stays so nothing else accidentally shadows it later.
 ask("sudo apt");
-
-// Destructive file operations
-// ask("rm", "rm -rf", "del");
 
 // Deploy commands
 ask(
@@ -575,11 +665,10 @@ ask(
   "npm run deploy",
   "bun run deploy",
   "Move-Item",
-  "ssh",
-  "scp",
 );
 
 // Cargo dangerous
+ask("uv publish"); // PyPI refuses re-upload of a version once it exists
 ask("cargo yank", "cargo uninstall --all"); // recoverable (un-yank, reinstall), but affects a public registry / local toolchain
 deny("cargo clean"); // not unsafe, just wastes time re-compiling; never run per standing instruction
 
@@ -588,7 +677,7 @@ ask("wrangler secret delete"); // recoverable by re-setting the secret
 deny("wrangler delete"); // deletes a live Worker, no undo
 
 // Windows destructive
-ask("rmdir /s", "rd /s", "Remove-Item -Recurse -Force", "del /s"); // Windows equivalents of `rm -rf`, which is already ask
+ask("rmdir /s", "rd /s", "Remove-Item -Recurse -Force", "del /s"); // recursive force-delete, no undo
 
 // ripgrep footgun: `-r`/`--replace` is substitution, not "recursive"
 // (ported `grep -rn` silently rewrites matches instead of printing line numbers)
@@ -626,14 +715,13 @@ const claudeExtras = {
     "Grep",
     "WebSearch",
     "WebFetch",
-    "Skill(superpowers:*)",
     "Skill(brainstorming)",
     "Skill(interview)",
     // /tmp is scratch space, the guard hook saves captured command output
     // under /tmp/claude-guard, and /tmp is generally throwaway.
     // Allow the file tools to operate there without prompting.
-    "Read(/tmp/**)",
-    "Edit(/tmp/**)",
+    "Read(//tmp/**)",
+    "Edit(//tmp/**)",
     // Claude Code's own session/job/debug scratch data, not project content -
     // treat it like /tmp rather than prompting per-file.
     "Read(~/.claude/projects/**)",

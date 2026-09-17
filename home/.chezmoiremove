@@ -41,3 +41,6 @@
 .claude/hooks/bash-discipline
 .claude/hooks/approve-compound-bash.sh
 .claude/hooks/banner-comment-lint.py
+
+# recall retired: the CLI is broken and the session DB went stale; project kept locally
+.claude/skills/recall/SKILL.md
