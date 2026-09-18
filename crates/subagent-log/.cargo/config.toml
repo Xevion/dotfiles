@@ -1,0 +1,3 @@
+# Same table key as ~/.cargo/config.toml so this merges with the mold flag.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=native"]

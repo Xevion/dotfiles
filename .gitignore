@@ -1,3 +1,4 @@
 node_modules/
 .claude/plans/
 __pycache__
+crates/*/target/

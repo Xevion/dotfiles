@@ -1,0 +1,37 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# Builds Rust CLI tools under crates/ (outside .chezmoiroot; only the
+# compiled binary deploys). Re-runs on any source or build-config change.
+# hash: {{ output "sh" "-c" (print "find " (joinPath .chezmoi.sourceDir ".." "crates") " -type f \\( -name '*.rs' -o -name 'Cargo.toml' -o -path '*/.cargo/config.toml' \\) | sort | xargs cat 2>/dev/null | sha256sum || true") }}
+set -euo pipefail
+
+REPO="{{ .chezmoi.sourceDir }}/.."
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "[compile-cargo] cargo not found, skipping (existing binaries kept)"
+  exit 0
+fi
+
+# <crate dir under crates/>:<deploy path>
+BINARIES=(
+  "subagent-log:{{ .chezmoi.homeDir }}/.local/bin/subagent-log"
+)
+
+for entry in "${BINARIES[@]}"; do
+  name="${entry%%:*}"
+  out="${entry#*:}"
+  crate="$REPO/crates/$name"
+
+  if [[ ! -d "$crate" ]]; then
+    echo "[compile-cargo] $crate not found, skipping $name"
+    continue
+  fi
+
+  echo "[compile-cargo] Building $name (release)"
+  # cd, not --manifest-path: cargo's config discovery walks up from cwd.
+  (cd "$crate" && cargo build --release --quiet)
+  mkdir -p "$(dirname "$out")"
+  install -Dm755 "$crate/target/release/$name" "$out"
+  echo "[compile-cargo] Installed $name -> $out"
+done
+{{ end -}}

@@ -1,0 +1,8 @@
+disallowed-macros = [
+    { path = "std::assert", reason = "use assert2::assert!" },
+    { path = "std::assert_eq", reason = "use assert2::check! or assert2::assert!" },
+    { path = "std::assert_ne", reason = "use assert2::check! or assert2::assert!" },
+    { path = "std::debug_assert", reason = "use assert2::assert!" },
+    { path = "std::debug_assert_eq", reason = "use assert2::check! or assert2::assert!" },
+    { path = "std::debug_assert_ne", reason = "use assert2::check! or assert2::assert!" },
+]

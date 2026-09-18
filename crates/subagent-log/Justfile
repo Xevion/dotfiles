@@ -1,0 +1,13 @@
+alias c := check
+
+default: check
+
+check:
+    cargo fmt
+    cargo clippy --all-targets -- -D warnings
+
+test *args:
+    cargo nextest run {{args}}
+
+run *args:
+    cargo run --release -- {{args}}
