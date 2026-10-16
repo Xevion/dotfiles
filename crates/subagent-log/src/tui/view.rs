@@ -5,13 +5,13 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize as _};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
 
-use super::{App, Mode};
+use super::wrap::WrapIndex;
+use super::{App, Mode, PreviewKind, ScanState, WrapCache};
 use crate::index::Run;
 use crate::index::state::RunState;
 use crate::paths::ShortenExt as _;
-use crate::report::Report;
 use crate::time_fmt::TimestampExt as _;
 
 const BADGE_WIDTH: usize = 6;
@@ -61,10 +61,13 @@ impl App {
                 .map_or_else(|| dir.display().to_string(), |i| self.display_path(i)),
             super::Filter::AllProjects => "all projects".to_string(),
         };
+        let runs = self.visible.len();
         let text = if self.loading {
-            format!(" subagent-log: {scope} (scanning\u{2026})")
+            format!(" subagent-log: {scope} (scanning\u{2026} {runs} runs so far)")
+        } else if self.scan != ScanState::Idle {
+            format!(" subagent-log: {scope} ({runs} runs, refreshing\u{2026})")
         } else {
-            format!(" subagent-log: {scope} ({} runs)", self.visible.len())
+            format!(" subagent-log: {scope} ({runs} runs)")
         };
         frame.render_widget(Line::from(text).bold(), area);
     }
@@ -83,13 +86,14 @@ impl App {
                     ""
                 };
                 format!(
-                    "enter: fullscreen  \u{2191}/\u{2193}: move  pgup/pgdn: scroll preview  a: jump to project  A: {all_label}{parent_hint}  q: quit"
+                    "enter: fullscreen  \u{2191}/\u{2193}: move  pgup/pgdn: scroll preview  t: {}  a: jump to project  A: {all_label}{parent_hint}  q: quit",
+                    self.preview_kind.toggled().label()
                 )
             }
-            Mode::Viewing => {
-                "enter/esc/q: back to split  \u{2191}/\u{2193}: scroll  pgup/pgdn: page  home/end: top/bottom"
-                    .to_string()
-            }
+            Mode::Viewing => format!(
+                "enter/esc/q: back to split  \u{2191}/\u{2193}: scroll  pgup/pgdn: page  home/end: top/bottom  t: {}",
+                self.preview_kind.toggled().label()
+            ),
             Mode::ProjectJump => "enter: select  esc: cancel".to_string(),
         };
         frame.render_widget(Line::from(hint).dim(), area);
@@ -101,9 +105,26 @@ impl App {
             .map(|id| self.family_ids(id))
             .unwrap_or_default();
 
+        // Only the rows on screen are formatted: the list can hold
+        // thousands of runs and is redrawn on every scan batch.
+        let height = usize::from(area.height);
+        let selected = self.list_state.selected();
+        let mut offset = self
+            .list_offset
+            .get()
+            .min(self.visible.len().saturating_sub(height));
+        if let Some(sel) = selected {
+            if sel < offset {
+                offset = sel;
+            } else if height > 0 && sel >= offset + height {
+                offset = sel + 1 - height;
+            }
+        }
+        self.list_offset.set(offset);
+
         let now = SystemTime::now();
-        let items: Vec<ListItem> = self
-            .visible
+        let end = (offset + height).min(self.visible.len());
+        let items: Vec<ListItem> = self.visible[offset..end]
             .iter()
             .map(|&i| {
                 let run = &self.all_runs[i];
@@ -117,7 +138,7 @@ impl App {
             .block(Block::default().borders(Borders::NONE))
             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
-        let mut state = self.list_state;
+        let mut state = ListState::default().with_selected(selected.map(|sel| sel - offset));
         frame.render_stateful_widget(list, area, &mut state);
     }
 
@@ -138,46 +159,64 @@ impl App {
     }
 
     fn render_preview(&self, frame: &mut Frame, area: Rect) {
-        let block =
-            Block::default()
-                .borders(Borders::ALL)
-                .title(self.preview.as_ref().map_or_else(
-                    || " (nothing selected) ".to_string(),
-                    |p| format!(" {} ", p.title),
-                ));
-
-        let Some(preview) = &self.preview else {
-            frame.render_widget(block, area);
-            return;
-        };
+        let title = self.preview.as_ref().map_or_else(
+            || {
+                if self.requested.is_some() {
+                    " loading\u{2026} ".to_string()
+                } else {
+                    " (nothing selected) ".to_string()
+                }
+            },
+            |p| format!(" {} ", p.title),
+        );
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(title)
+            .title_top(Line::from(format!(" {} ", self.preview_kind.label())).right_aligned());
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        let body = match &preview.report {
-            Report::Clean(markdown) => tui_markdown::from_str(markdown),
-            Report::SendMessage(message) => {
-                let mut t = Text::from(
-                    Line::from("ended on a SendMessage call, not closing text:")
-                        .italic()
-                        .dim(),
-                );
-                t.lines.push(Line::from(""));
-                t.extend(tui_markdown::from_str(message));
-                t
-            }
-            Report::Inconclusive { last_seen } => Text::from(vec![
-                Line::from("inconclusive: did not close normally")
-                    .red()
-                    .bold(),
-                Line::from(""),
-                Line::from(last_seen.clone()).dim(),
-            ]),
+        let Some(preview) = &self.preview else {
+            return;
+        };
+        if inner.width == 0 || inner.height == 0 {
+            return;
+        }
+        let text = match self.preview_kind {
+            PreviewKind::Report => &preview.report,
+            PreviewKind::Transcript => &preview.transcript,
         };
 
-        let paragraph = Paragraph::new(body)
+        let mut cache = self.wrap_cache.borrow_mut();
+        let stale = cache
+            .as_ref()
+            .is_none_or(|c| c.revision != self.preview_revision || c.width != inner.width);
+        if stale {
+            *cache = Some(WrapCache {
+                revision: self.preview_revision,
+                width: inner.width,
+                index: WrapIndex::build(&text.lines, inner.width),
+            });
+        }
+        let Some(WrapCache { index, .. }) = cache.as_ref() else {
+            return;
+        };
+
+        let height = usize::from(inner.height);
+        let max_scroll = index.total_rows().saturating_sub(height);
+        self.max_scroll.set(max_scroll);
+        let (first, skip) = index.locate(self.scroll.min(max_scroll));
+
+        // Hand the paragraph only the lines that can reach the screen.
+        let mut end = first;
+        while end < index.line_count() && index.rows_between(first, end) < skip + height {
+            end += 1;
+        }
+        let window = Text::from(text.lines[first..end].to_vec());
+        let paragraph = Paragraph::new(window)
             .wrap(Wrap { trim: false })
-            .scroll((self.scroll, 0));
+            .scroll((u16::try_from(skip).unwrap_or(u16::MAX), 0));
         frame.render_widget(paragraph, inner);
     }
 
@@ -217,7 +256,7 @@ impl App {
 }
 
 fn list_row(run: &Run, path: &str, now: SystemTime, linked: bool) -> ListItem<'static> {
-    let (badge, color) = match run.state {
+    let (badge, color) = match run.state(now) {
         RunState::Done => ("done", Color::Green),
         RunState::Active => ("active", Color::Cyan),
         RunState::Stalled => ("stall", Color::Yellow),

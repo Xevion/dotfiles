@@ -1,14 +1,16 @@
 //! Finished/unfinished classification. No live task registry exists on disk
 //! to confirm this, so it's a heuristic: whether the last turn ended with
-//! text, and how long ago the file was touched.
+//! text or a handback, and how long ago the file was touched.
 
 use std::time::{Duration, SystemTime};
 
+use crate::event::Closure;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunState {
-    /// Last-observed turn closed with text, and stayed closed for at least
-    /// `SETTLE_THRESHOLD`: a real, if not necessarily successful, report
-    /// exists and nothing new has landed since.
+    /// Last-observed turn closed with text or a handback, and stayed closed
+    /// for at least `SETTLE_THRESHOLD`: a real, if not necessarily
+    /// successful, report exists and nothing new has landed since.
     Done,
     /// Touched very recently, either mid tool-call or a just-closed turn
     /// still inside its settle window: probably still running.
@@ -29,9 +31,9 @@ pub const SETTLE_THRESHOLD: Duration = Duration::from_secs(15);
 
 impl RunState {
     #[must_use]
-    pub fn classify(last_turn_closed: bool, mtime: SystemTime, now: SystemTime) -> Self {
+    pub fn classify(closure: Closure, mtime: SystemTime, now: SystemTime) -> Self {
         let elapsed = now.duration_since(mtime).unwrap_or(Duration::ZERO);
-        if last_turn_closed {
+        if closure.is_closed() {
             return if elapsed < SETTLE_THRESHOLD {
                 Self::Active
             } else {
@@ -59,14 +61,21 @@ mod tests {
     }
 
     #[rstest]
-    #[case(0, RunState::Active)]
-    #[case(14, RunState::Active)]
-    #[case(15, RunState::Done)]
-    #[case(1_000_000, RunState::Done)]
-    fn closed_turn_settles_into_done(#[case] elapsed_secs: u64, #[case] expected: RunState) {
+    #[case(Closure::Text, 0, RunState::Active)]
+    #[case(Closure::Text, 14, RunState::Active)]
+    #[case(Closure::Text, 15, RunState::Done)]
+    #[case(Closure::Text, 1_000_000, RunState::Done)]
+    #[case(Closure::HandedBack, 14, RunState::Active)]
+    #[case(Closure::HandedBack, 15, RunState::Done)]
+    #[case(Closure::HandedBack, 1_000_000, RunState::Done)]
+    fn closed_turn_settles_into_done(
+        #[case] closure: Closure,
+        #[case] elapsed_secs: u64,
+        #[case] expected: RunState,
+    ) {
         let now = at(1_000_000);
         let mtime = now - Duration::from_secs(elapsed_secs);
-        check!(RunState::classify(true, mtime, now) == expected);
+        check!(RunState::classify(closure, mtime, now) == expected);
     }
 
     #[rstest]
@@ -79,6 +88,6 @@ mod tests {
     fn open_turn_buckets_by_age(#[case] elapsed_secs: u64, #[case] expected: RunState) {
         let now = at(1_000_000);
         let mtime = now - Duration::from_secs(elapsed_secs);
-        check!(RunState::classify(false, mtime, now) == expected);
+        check!(RunState::classify(Closure::Open, mtime, now) == expected);
     }
 }

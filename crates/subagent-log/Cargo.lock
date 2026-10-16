@@ -1886,6 +1886,7 @@ dependencies = [
  "clap",
  "crossbeam-channel",
  "crossterm",
+ "memchr",
  "notify",
  "notify-debouncer-full",
  "owo-colors",

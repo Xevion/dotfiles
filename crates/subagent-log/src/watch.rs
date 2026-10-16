@@ -1,5 +1,7 @@
 //! One recursive watch on `~/.claude/projects/`: inotify cost is
-//! per-directory, so this beats one watch per `subagents/` dir.
+//! per-directory, so this beats one watch per `subagents/` dir. Only changes
+//! under a `subagents/` directory are reported: the main session transcripts
+//! beside them are written constantly and never change the run list.
 
 use std::path::Path;
 use std::time::Duration;
@@ -36,6 +38,9 @@ impl Watch {
         matches!(
             event.kind,
             EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
-        )
+        ) && event.paths.iter().any(|p| {
+            p.components()
+                .any(|c| c.as_os_str() == std::ffi::OsStr::new("subagents"))
+        })
     }
 }

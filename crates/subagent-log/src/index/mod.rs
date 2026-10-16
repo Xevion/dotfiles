@@ -1,16 +1,18 @@
 pub mod matching;
+pub mod scan;
 pub mod state;
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::SystemTime;
 
-use crossbeam_channel::Receiver;
 use rayon::prelude::*;
 use serde::Deserialize;
 
-use crate::event;
+use crate::event::Closure;
+use scan::{FileScan, ScanCache, Track};
 use state::RunState;
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -40,7 +42,10 @@ pub struct Run {
     pub project_dir: PathBuf,
     pub meta: AgentMeta,
     pub mtime: SystemTime,
-    pub state: RunState,
+    pub closure: Closure,
+    /// The run's own first recorded cwd. Per-run, not per-session: the
+    /// session-wide list can point at a stale project path after a rename.
+    pub own_cwd: Option<PathBuf>,
     /// Shared across every run in the same session. `Arc`, not `Rc`: built
     /// on rayon worker threads and sent across a channel.
     pub session_cwds: Arc<Vec<PathBuf>>,
@@ -52,99 +57,145 @@ impl Run {
         Self::session_matches(&self.session_cwds, cwd, generic_roots)
     }
 
-    /// Blocks until every session is scanned. Thin wrapper over
-    /// [`Self::index_streaming`], restoring mtime-descending order.
+    /// Derived on read, not stored: a run settles from active to done as
+    /// time passes, with nothing on disk changing.
     #[must_use]
-    pub fn index(claude_projects_root: &Path) -> Vec<Self> {
-        let mut runs: Vec<Self> = Self::index_streaming(claude_projects_root)
+    pub fn state(&self, now: SystemTime) -> RunState {
+        RunState::classify(self.closure, self.mtime, now)
+    }
+}
+
+/// Scans transcripts under `~/.claude/projects`, remembering what it has
+/// read so repeated scans only touch what changed.
+#[derive(Default)]
+pub struct Indexer {
+    cache: ScanCache,
+    /// Written once when an agent is spawned, so read once.
+    metas: Mutex<HashMap<PathBuf, AgentMeta>>,
+}
+
+impl Indexer {
+    /// Calls `on_batch` with one session's runs as soon as that session is
+    /// scanned, newest sessions first, and returns once everything has been.
+    /// Batches arrive from worker threads, in no guaranteed order.
+    pub fn scan(&self, claude_projects_root: &Path, on_batch: impl Fn(Vec<Run>) + Sync) {
+        // `par_bridge` pulls items in iteration order, so the newest sessions
+        // start first and the earliest batches are the most relevant ones.
+        SessionEntry::discover(claude_projects_root)
             .into_iter()
-            .flatten()
-            .collect();
+            .par_bridge()
+            .for_each(|session| {
+                let runs = self.scan_session(&session);
+                if !runs.is_empty() {
+                    on_batch(runs);
+                }
+            });
+    }
+
+    /// Blocks until every session is scanned; newest run first.
+    #[must_use]
+    pub fn collect(&self, claude_projects_root: &Path) -> Vec<Run> {
+        let runs = Mutex::new(Vec::new());
+        self.scan(claude_projects_root, |batch| {
+            runs.lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .extend(batch);
+        });
+        let mut runs = runs.into_inner().unwrap_or_else(PoisonError::into_inner);
         runs.sort_by_key(|r| std::cmp::Reverse(r.mtime));
         runs
     }
 
-    /// Pushes one `Vec<Run>` batch per session as it finishes scanning,
-    /// rather than blocking on the whole corpus. Batches are not
-    /// mtime-sorted; iterate or poll `try_recv` until the channel closes.
-    #[must_use]
-    pub fn index_streaming(claude_projects_root: &Path) -> Receiver<Vec<Self>> {
-        let sessions = SessionEntry::discover(claude_projects_root);
-        let (tx, rx) = crossbeam_channel::unbounded();
-        let now = SystemTime::now();
-
-        rayon::spawn(move || {
-            sessions.into_par_iter().for_each(|session| {
-                let runs = Self::scan_session(&session, now);
-                if !runs.is_empty() {
-                    let _ = tx.send(runs);
-                }
-            });
-        });
-
-        rx
+    /// Unreadable or half-written files give defaults and are retried.
+    fn meta(&self, path: &Path) -> AgentMeta {
+        let lock = || self.metas.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(meta) = lock().get(path) {
+            return meta.clone();
+        }
+        let Some(meta) = AgentMeta::read(path) else {
+            return AgentMeta::default();
+        };
+        lock().insert(path.to_path_buf(), meta.clone());
+        meta
     }
 
-    fn scan_session(session: &SessionEntry, now: SystemTime) -> Vec<Self> {
-        let main_scan = session.main_transcript.as_deref().map(Scan::of);
-        let scans: Vec<Scan> = session
-            .agent_paths
-            .par_iter()
-            .map(|p| Scan::of(p))
-            .collect();
+    fn scan_session(&self, session: &SessionEntry) -> Vec<Run> {
+        // The main transcript is often the largest file, so it runs
+        // alongside the agent transcripts rather than ahead of them.
+        let (main, scans): (Option<Arc<FileScan>>, Vec<Arc<FileScan>>) = rayon::join(
+            || {
+                session
+                    .main_transcript
+                    .as_deref()
+                    .map(|p| self.cache.scan(p, Track::CwdsOnly))
+            },
+            || {
+                session
+                    .agents
+                    .par_iter()
+                    .map(|agent| self.cache.scan(&agent.path, Track::CwdsAndTurns))
+                    .collect()
+            },
+        );
 
-        let mut session_cwds = Vec::new();
-        if let Some(s) = &main_scan {
-            session_cwds.extend(s.cwds.iter().cloned());
-        }
-        for s in &scans {
-            session_cwds.extend(s.cwds.iter().cloned());
-        }
+        let mut session_cwds: Vec<PathBuf> = main
+            .iter()
+            .chain(&scans)
+            .flat_map(|s| s.cwds.iter().cloned())
+            .collect();
         session_cwds.sort();
         session_cwds.dedup();
         let session_cwds = Arc::new(session_cwds);
 
         session
-            .agent_paths
+            .agents
             .iter()
             .zip(&scans)
-            .filter_map(|(path, s)| {
-                let agent_id = Self::agent_id_from_path(path)?;
+            .map(|(agent, scan)| {
                 let meta_path = session
                     .subagents_dir
-                    .join(format!("agent-{agent_id}.meta.json"));
-                let meta = AgentMeta::read(&meta_path).unwrap_or_default();
-                let mtime = fs::metadata(path)
-                    .and_then(|m| m.modified())
-                    .unwrap_or(SystemTime::UNIX_EPOCH);
-                let state = RunState::classify(s.last_turn_closed, mtime, now);
-                Some(Self {
-                    agent_id,
-                    path: path.clone(),
+                    .join(format!("agent-{}.meta.json", agent.agent_id));
+                Run {
+                    agent_id: agent.agent_id.clone(),
+                    path: agent.path.clone(),
                     project_dir: session.project_dir.clone(),
-                    meta,
-                    mtime,
-                    state,
+                    meta: self.meta(&meta_path),
+                    mtime: agent.mtime,
+                    closure: scan.closure,
+                    own_cwd: scan.cwds.first().cloned(),
                     session_cwds: Arc::clone(&session_cwds),
-                })
+                }
             })
             .collect()
     }
+}
 
-    fn agent_id_from_path(path: &Path) -> Option<String> {
-        let name = path.file_stem()?.to_str()?;
-        name.strip_prefix("agent-").map(str::to_string)
-    }
+/// The most recently written subagent transcript, found without reading any
+/// transcript contents.
+#[must_use]
+pub fn newest_transcript(claude_projects_root: &Path) -> Option<PathBuf> {
+    SessionEntry::discover(claude_projects_root)
+        .into_iter()
+        .flat_map(|s| s.agents)
+        .max_by_key(|a| a.mtime)
+        .map(|a| a.path)
+}
+
+struct AgentFile {
+    path: PathBuf,
+    agent_id: String,
+    mtime: SystemTime,
 }
 
 struct SessionEntry {
     project_dir: PathBuf,
     subagents_dir: PathBuf,
     main_transcript: Option<PathBuf>,
-    agent_paths: Vec<PathBuf>,
+    agents: Vec<AgentFile>,
 }
 
 impl SessionEntry {
+    /// Directory listing and `stat` only, newest session first.
     fn discover(claude_projects_root: &Path) -> Vec<Self> {
         let mut sessions = Vec::new();
         let Ok(project_dirs) = fs::read_dir(claude_projects_root) else {
@@ -164,13 +215,12 @@ impl SessionEntry {
                 if !is_dir(&session_entry) {
                     continue;
                 }
-                let session_dir = session_entry.path();
-                let subagents_dir = session_dir.join("subagents");
-                if !subagents_dir.is_dir() {
+                let subagents_dir = session_entry.path().join("subagents");
+                let agents = Self::agent_files(&subagents_dir);
+                if agents.is_empty() {
                     continue;
                 }
                 let session_id = session_entry.file_name().to_string_lossy().into_owned();
-                let agent_paths = Self::agent_transcript_paths(&subagents_dir);
                 let main_transcript = project_dir.join(format!("{session_id}.jsonl"));
                 let main_transcript = main_transcript.is_file().then_some(main_transcript);
 
@@ -178,27 +228,38 @@ impl SessionEntry {
                     project_dir: project_dir.clone(),
                     subagents_dir,
                     main_transcript,
-                    agent_paths,
+                    agents,
                 });
             }
         }
 
+        sessions.sort_by_key(|s| std::cmp::Reverse(s.agents.iter().map(|a| a.mtime).max()));
         sessions
     }
 
-    fn agent_transcript_paths(subagents_dir: &Path) -> Vec<PathBuf> {
+    fn agent_files(subagents_dir: &Path) -> Vec<AgentFile> {
         let Ok(entries) = fs::read_dir(subagents_dir) else {
             return Vec::new();
         };
         entries
             .flatten()
-            .map(|e| e.path())
-            .filter(|p| {
-                p.file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with("agent-"))
-                    && p.extension()
-                        .is_some_and(|ext| ext.eq_ignore_ascii_case("jsonl"))
+            .filter_map(|entry| {
+                let path = entry.path();
+                let agent_id = path
+                    .file_name()?
+                    .to_str()?
+                    .strip_prefix("agent-")?
+                    .strip_suffix(".jsonl")?
+                    .to_string();
+                let mtime = entry
+                    .metadata()
+                    .and_then(|m| m.modified())
+                    .unwrap_or(SystemTime::UNIX_EPOCH);
+                Some(AgentFile {
+                    path,
+                    agent_id,
+                    mtime,
+                })
             })
             .collect()
     }
@@ -208,38 +269,96 @@ fn is_dir(entry: &fs::DirEntry) -> bool {
     entry.file_type().is_ok_and(|t| t.is_dir())
 }
 
-struct Scan {
-    cwds: Vec<PathBuf>,
-    last_turn_closed: bool,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert2::check;
+    use std::io::Write as _;
 
-impl Scan {
-    fn of(path: &Path) -> Self {
-        let mut cwds = Vec::new();
-        let mut last_turn_closed = false;
+    struct Corpus {
+        root: tempfile::TempDir,
+    }
 
-        let Ok(raw) = fs::read_to_string(path) else {
-            return Self {
-                cwds,
-                last_turn_closed,
-            };
-        };
-
-        for line in raw.lines() {
-            if line.is_empty() {
-                continue;
-            }
-            if let Some(cwd) = event::extract_cwd(line) {
-                cwds.push(PathBuf::from(cwd));
-            }
-            if let Some(message) = event::parse_assistant(line) {
-                last_turn_closed = message.closed_with_text();
+    impl Corpus {
+        fn new() -> Self {
+            Self {
+                root: tempfile::tempdir().unwrap(),
             }
         }
 
-        Self {
-            cwds,
-            last_turn_closed,
+        fn agent(&self, project: &str, session: &str, agent: &str, lines: &[&str]) -> PathBuf {
+            let subagents = self
+                .root
+                .path()
+                .join(project)
+                .join(session)
+                .join("subagents");
+            fs::create_dir_all(&subagents).unwrap();
+            let path = subagents.join(format!("agent-{agent}.jsonl"));
+            let mut f = fs::File::create(&path).unwrap();
+            for line in lines {
+                writeln!(f, "{line}").unwrap();
+            }
+            fs::write(
+                subagents.join(format!("agent-{agent}.meta.json")),
+                r#"{"agentType":"general-purpose","description":"a task"}"#,
+            )
+            .unwrap();
+            path
         }
+    }
+
+    const PROMPT: &str = r#"{"type":"user","cwd":"/work/a","message":{"content":"go"}}"#;
+    const HANDBACK: &str = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"h","name":"SubagentHandback","input":{"message":"r"}}]}}"#;
+    const WORKING: &str = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t","name":"Bash","input":{}}]}}"#;
+
+    #[test]
+    fn collect_finds_runs_with_meta_and_closure() {
+        let corpus = Corpus::new();
+        corpus.agent("proj", "s1", "aaa", &[PROMPT, HANDBACK]);
+        corpus.agent("proj", "s1", "bbb", &[PROMPT, WORKING]);
+
+        let runs = Indexer::default().collect(corpus.root.path());
+        check!(runs.len() == 2);
+
+        let done = runs.iter().find(|r| r.agent_id == "aaa").unwrap();
+        check!(done.closure == Closure::HandedBack);
+        check!(done.meta.description == "a task");
+        check!(done.own_cwd == Some(PathBuf::from("/work/a")));
+
+        let open = runs.iter().find(|r| r.agent_id == "bbb").unwrap();
+        check!(open.closure == Closure::Open);
+    }
+
+    #[test]
+    fn scan_streams_one_batch_per_session() {
+        let corpus = Corpus::new();
+        corpus.agent("proj", "s1", "aaa", &[PROMPT]);
+        corpus.agent("proj", "s2", "bbb", &[PROMPT]);
+        corpus.agent("other", "s3", "ccc", &[PROMPT]);
+
+        let batches = Mutex::new(Vec::new());
+        Indexer::default().scan(corpus.root.path(), |batch| {
+            batches.lock().unwrap().push(batch.len());
+        });
+        check!(batches.into_inner().unwrap() == [1, 1, 1]);
+    }
+
+    #[test]
+    fn newest_transcript_ignores_contents() {
+        let corpus = Corpus::new();
+        let older = corpus.agent("proj", "s1", "old", &[PROMPT]);
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        let newer = corpus.agent("proj", "s2", "new", &[PROMPT]);
+
+        check!(newest_transcript(corpus.root.path()) == Some(newer));
+        check!(older.exists());
+    }
+
+    #[test]
+    fn sessions_without_subagents_are_skipped() {
+        let corpus = Corpus::new();
+        fs::create_dir_all(corpus.root.path().join("proj").join("s1")).unwrap();
+        check!(Indexer::default().collect(corpus.root.path()).is_empty());
     }
 }

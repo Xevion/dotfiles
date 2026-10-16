@@ -3,8 +3,8 @@ mod error;
 mod event;
 mod index;
 mod paths;
-mod report;
 mod time_fmt;
+mod transcript;
 mod tui;
 mod watch;
 
@@ -16,10 +16,10 @@ use std::time::SystemTime;
 use clap::Parser as _;
 
 use cli::{Cli, Command};
-use index::Run;
+use index::{Indexer, Run};
 use paths::ShortenExt as _;
-use report::Report;
 use time_fmt::TimestampExt as _;
+use transcript::Transcript;
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -65,16 +65,14 @@ fn cmd_list(claude_projects_root: &Path, home: &Path, cwd: &Path, all: bool) {
 }
 
 fn cmd_latest(claude_projects_root: &Path) -> ExitCode {
-    let runs = Run::index(claude_projects_root);
-    let Some(run) = runs.first() else {
+    let Some(path) = index::newest_transcript(claude_projects_root) else {
         eprintln!(
             "subagent-log: no subagent runs found under {}",
             claude_projects_root.display()
         );
         return ExitCode::FAILURE;
     };
-    print_report(run);
-    ExitCode::SUCCESS
+    print_report(&path)
 }
 
 fn cmd_show(
@@ -100,22 +98,27 @@ fn cmd_show(
         eprintln!("subagent-log: no run matching '{query}'");
         return ExitCode::FAILURE;
     };
-    print_report(run);
-    ExitCode::SUCCESS
+    print_report(&run.path)
 }
 
-fn print_report(run: &Run) {
-    match Report::extract(&run.path) {
-        Report::Clean(text) | Report::SendMessage(text) => println!("{text}"),
-        Report::Inconclusive { last_seen } => {
-            println!("(inconclusive: this transcript did not close normally)");
-            println!("{last_seen}");
+fn print_report(transcript_path: &Path) -> ExitCode {
+    match Transcript::load(transcript_path) {
+        Ok(transcript) => {
+            println!("{}", transcript.report());
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!(
+                "subagent-log: could not read {}: {e}",
+                transcript_path.display()
+            );
+            ExitCode::FAILURE
         }
     }
 }
 
 fn current_runs(claude_projects_root: &Path, home: &Path, cwd: &Path, all: bool) -> Vec<Run> {
-    let runs = Run::index(claude_projects_root);
+    let runs = Indexer::default().collect(claude_projects_root);
     if all {
         return runs;
     }
@@ -127,13 +130,17 @@ fn current_runs(claude_projects_root: &Path, home: &Path, cwd: &Path, all: bool)
 
 fn format_line(run: &Run, home: &Path, now: SystemTime) -> String {
     let when = run.mtime.relative(now);
-    let path = run.session_cwds.first().map_or_else(
-        || run.project_dir.display().to_string(),
-        |p| p.shorten(home),
-    );
+    let path = run
+        .own_cwd
+        .as_deref()
+        .or_else(|| run.session_cwds.first().map(PathBuf::as_path))
+        .map_or_else(
+            || run.project_dir.display().to_string(),
+            |p| p.shorten(home),
+        );
     format!(
         "{when:<9} {:<7} {agent_id}  {path}  {agent_type}: {description}",
-        format!("{:?}", run.state),
+        format!("{:?}", run.state(now)),
         agent_id = run.agent_id,
         agent_type = run.meta.agent_type,
         description = run.meta.description,
