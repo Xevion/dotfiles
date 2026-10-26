@@ -2,7 +2,7 @@
 #!/bin/bash
 # Builds Rust CLI tools under crates/ (outside .chezmoiroot; only the
 # compiled binary deploys). Re-runs on any source or build-config change.
-# hash: {{ output "sh" "-c" (print "find " (joinPath .chezmoi.sourceDir ".." "crates") " -type f \\( -name '*.rs' -o -name 'Cargo.toml' -o -path '*/.cargo/config.toml' \\) | sort | xargs cat 2>/dev/null | sha256sum || true") }}
+# hash: {{ output "sh" "-c" (print "find " (joinPath .chezmoi.sourceDir ".." "crates") " -name target -prune -o -type f \\( -name '*.rs' -o -name 'Cargo.toml' -o -name 'Cargo.lock' -o -path '*/.cargo/config.toml' \\) -print | sort | xargs cat 2>/dev/null | sha256sum || true") }}
 set -euo pipefail
 
 REPO="{{ .chezmoi.sourceDir }}/.."
