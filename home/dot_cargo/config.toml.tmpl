@@ -10,3 +10,15 @@ rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 # CARGO_PROFILE_DEV_DEBUG=2 for a run a debugger needs locals in.
 [profile.dev]
 debug = "line-tables-only"
+{{- if lookPath "kache" }}
+
+# kache caches rustc and C/C++ compiles; wired up only where it is installed
+[build]
+rustdoc = "{{ .chezmoi.homeDir }}/.local/lib/kache/shims/rustdoc"
+rustc-wrapper = "kache"
+
+[env]
+HOST_CC = "kache cc"
+HOST_CXX = "kache c++"
+CC_KNOWN_WRAPPER_CUSTOM = "kache"
+{{- end }}

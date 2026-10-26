@@ -78,6 +78,12 @@ if [ -d "$HOME/.dotnet" ]; then
   export PATH="$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools"
 fi
 
+# kache compiler cache: its cc/c++/rustdoc shims must shadow the real compilers
+if [ -d "$HOME/.local/lib/kache/shims" ]; then
+  export PATH="$HOME/.local/lib/kache/shims:$PATH"
+  export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER="${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER:-kache test-runner}"
+fi
+
 # Note: Fish uses mise (via conf.d/mise.fish) for unified version management.
 # Bash uses mise as well, falling back to legacy managers if needed.
 
