@@ -4,3 +4,9 @@ retry = 3
 # mold is installed via mise — dramatically faster linking on Linux
 [target.x86_64-unknown-linux-gnu]
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+# Keeps file and line in a backtrace, drops variable and type inspection. Full
+# debuginfo is four fifths of a debug binary that links wgpu or egui; set
+# CARGO_PROFILE_DEV_DEBUG=2 for a run a debugger needs locals in.
+[profile.dev]
+debug = "line-tables-only"
