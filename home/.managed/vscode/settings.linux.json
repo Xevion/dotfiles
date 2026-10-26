@@ -159,8 +159,10 @@
   "github.copilot.chat.claudeAgent.useSdkExtension": true,
   "github.copilot.chat.claudeAgent.allowDangerouslySkipPermissions": true,
   "chat.useClaudeHooks": true,
-  "gitlens.ai.model": "vscode",
-  "gitlens.ai.vscode.model": "copilot:gpt-4o-mini",
   "claudeCode.allowDangerouslySkipPermissions": true,
   "chat.agents.claude.preferAgentHost": true,
+  "workbench.preferredLightColorTheme": "One Dark Pro Flat",
+  "claudeCode.hideOnboarding": true,
+  "claudeCode.preferredLocation": "panel",
+  "svelte.enable-ts-plugin": true,
 }
