@@ -102,7 +102,12 @@ const desired: Record<string, unknown> = {
   ],
 };
 
-// Merge: desired keys overwrite current, current-only keys preserved
-const merged = { ...current, ...desired };
+// Merge: desired keys overwrite current, current-only keys preserved. Plugins
+// merge per entry so one installed at runtime survives an apply.
+const merged = {
+  ...current,
+  ...desired,
+  enabledPlugins: { ...current.enabledPlugins, ...(desired.enabledPlugins as object) },
+};
 
 console.log(JSON.stringify(merged, null, 2));
