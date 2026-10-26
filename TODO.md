@@ -118,6 +118,7 @@
 - [x] Add global CLAUDE.md to dotfiles
 - [ ] Create project-specific CLAUDE.md templates
 - [ ] Document sync strategy across machines
+- [x] Consolidate rules/permissions across projects (2026-09-16 audit, below)
 
 ---
 
@@ -291,6 +292,54 @@
 - [ ] Update .gitattributes for proper file type detection
 - [ ] Clean up temporary/test files
 - [ ] Reorganize directory structure if needed
+
+---
+
+## AI Configuration Consolidation
+
+Audit run 2026-09-16 across ~100 projects, 8,189 recorded sessions, and 85 project settings files.
+
+**Done:**
+- [x] Prune project permission bloat — 2,746 entries down to 1,901 (845 removed: 23 malformed shell fragments, 11 stale tool names, 811 already granted globally)
+- [x] Fix `Read(/tmp/**)`/`Edit(/tmp/**)` in `meta/permissions.ts` — a single leading slash anchors to the settings file's directory, not the filesystem root, so these never matched. Now `//tmp/**`
+- [x] Fix the guard hook grant — Bash rules match command text literally, so the `~/` form never matched an absolute-path invocation. Both forms now emitted
+- [x] Gate `git checkout`, `git reset`, `git revert` as ask (`checkout -- <path>` destroys uncommitted work with no reflog, same class as `restore`)
+- [x] Drop `ssh`/`scp` from ask; leave absent so dynamic approval can decide
+- [x] Remove dead commented-out `rm` ask block
+- [x] Broaden the git rule past committing to all state mutation, in both full and minimal rulesets
+- [x] Add the missing autonomous-commit prohibition to the Gemini minimal ruleset
+- [x] Fix `bun -e` self-contradiction in `common-rules.md.tmpl`
+- [x] Correct stale subagent model claims (investigate/research are sonnet, not opus; 24 agents, not 3)
+- [x] Add rules backed by session history: verify-before-asserting, no unrequested plan documents, silent-omission scope failure, log-message design
+- [x] Ban commit references and suite counts in issue-tracker comments (they bitrot; commits get reworded and bundled here)
+- [x] Replace `linear-project` Step 5's CLAUDE.md template — it was generating the nine near-identical Linear sections
+- [x] Add `In Review` and `Duplicate` to the `linear-workflow` transition map
+- [x] Global git ignore now covers `.claude/`, `.opencode/`, `.cursor/`, with per-repo negations where tracked
+- [x] Retire `recall` from chezmoi sync (CLI broken, session DB stale since 2026-03-27; project kept locally)
+- [x] Document `dot_codex/` in ARCHITECTURE.md
+
+**Done (continued):**
+- [x] Remove blanket tool grants from project settings — 105 across 42 projects (arbitrary-exec vectors, plus blankets for tools the generator already curates). Entries down to 1,796 from 2,746
+- [x] Linear label Phase 2 — 17 of 18 retirements (`Debugger` deliberately kept: a precise, distinct idakit subsystem on an active project, and the analysis contradicted itself by listing it as both promote and retire)
+- [x] Linear label Phase 0 — 27 description rewrites so cross-project-usable labels stop reading as one project's vocabulary. Zero issues touched, fully reversible
+- [x] File guard defects found by analysis: XEV-1675 through XEV-1683
+- [x] Remove `xargs` and `env` from the general-CLI bare allow list — both take a command as their argument, so prefix matching made `Bash(xargs:*)` cover `xargs rm -rf build` and `Bash(env:*)` cover `env FOO=1 rm -rf build`, overriding every other rule in the table
+
+**Open:**
+- [x] Linear label Phase 3 — all merges done, 28 labels retired total, ~79 workspace-visible remain. Verified: every loser label is empty, unrelated labels on touched issues survived. `Tech Debt` came to 143 issues (94 already carried `Refactoring` and dropped a label, 50 gained it), and `Refactoring`'s description now covers debt paydown
+- [ ] `Engine` vs the retired `Game Engine` — two labels one word apart, one now gone. Rename `Engine` to something unambiguous or accept it as project-bound, but don't leave the near-collision
+- [ ] `BF4` sits on 73% of its project's issues, over the 40% saturation threshold, but the project genuinely hosts `AC` and `Hired Ops` work too. Recommendation was keep it and stop applying it to unambiguously-BF4 new issues
+- [ ] Encode the labeling rules where labels are actually applied (`linear-issue`, `linear-project`): the ≤3 cap, exactly one type label, and the 40% saturation rule (never apply a subsystem label already on >40% of a project's issues)
+- [ ] Linear label Phase 1 as originally specified is impossible — a label's team cannot be changed, so "promote the 5 team-scoped labels to workspace scope" is really create + relabel + retire. Note: team-scoped labels are invisible to a workspace-level label listing (107 of 112 visible), so any future audit must enumerate per-team
+- [ ] Decide the split for write-capable tools still bare-allowed in the static table: `sed` (`-i`), `sort` (`-o`), `awk` (`-i inplace`), `tee`, `script` (`-c`), `rsync` (`--delete`), `mv`, `cp`. Straight removal is too costly since `sed -n` and `jq .` are everyday reads; a per-tool split is likely, but flag position varies. Noted on XEV-1677
+- [ ] Resolve the interpreter-class boundary in `permissions.ts`: it currently allows `python`, `python3`, `bun`, `npx`, `bunx`, `uv run`, `uvx` while `node`, `deno`, `bash`, `perl`, `ruby` would be absent. Either interpreters are absent (those lines come out) or scripting runtimes are fine (node/deno go in) — the hoist proposal's comment wording depends on which
+- [ ] **Architecture (XEV-1684): move the permission table into guard and generate the Claude Code allow list from it.** The flat matrix cannot express recursion, subcommand nesting, verb-changing flags, global options before a subcommand, or ecosystem wrappers, and patching holes into it is unbounded work. guard already parses and normalizes properly, so it should own the model and emit the list as an artifact. Needs a ~100-tool audit to find the right shape, including recursive wrapper parsing (`uv run toolA` evaluating `toolA`) and aliases for the same tool under different ecosystem names
+- [ ] Apply the tool-hoist proposal: 54 allow, 6 split, 17 absent from Group A; compilers (`rustc`/`gcc`/`clang`/`cc`) allowed; `make`/`cmake` split not bare (`cmake -E rm -rRf` is a plain recursive delete); 16 `uv` subcommands added with `uv publish` as the one ask
+- [ ] Hoist recurring per-project tool grants into `meta/permissions.ts` (XEV-1681). Needs the three-way allow / absent / ask decision per tool, where `absent` is preferred over `ask` because an `ask` entry can never be overridden afterward
+- [ ] Cross-machine sync for untracked project rule files. `CLAUDE.local.md` plus a global ignore line would remove the per-repo exclude bookkeeping, but neither it nor the auto-memory directory (machine-local by design) actually syncs. Deferred: the problem has not bitten
+- [ ] Grafana/VictoriaMetrics/VictoriaLogs MCP servers, duplicated in `local.config` and `railway-collector` project settings, pointing at `tower`. Token is likely dead and the servers may never have been used; set them up properly or remove
+- [ ] Game Hacking has 18 issues In Progress, 12 stale since May-June 2026
+- [ ] Figsaw (0 issues, Cancelled), WebSAM (0 issues, marked Completed), Pac-Man (1 issue) carry Linear rules governing almost nothing
 
 ---
 
