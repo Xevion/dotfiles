@@ -130,6 +130,15 @@ Some config files need to be editable in-place without running `chezmoi apply` (
 
 Edits made by the application write through the symlink directly to the source file, so they're immediately tracked by git without needing `chezmoi re-add`.
 
+### Volatile settings (`meta/reconcile.ts`)
+
+Apps also rewrite settings nobody chose (a light/dark toggle, window geometry, install IDs). `meta/reconcile-policy.ts` lists those per file, opt-in, so every unlisted setting still shows up as a diff:
+
+- **Symlinked files**: `.gitattributes` runs every `home/.managed/**` file through the `reconcile` clean filter (defined in the repo's `.gitconfig`), so git records listed keys at their policy value or leaves them out. The working file keeps the live value.
+- **Apps that save by rename** (OBS), which replaces a symlink with a plain file, deploy through a `modify_` script instead: `reconcile.ts modify` prints the source with the deployed file's volatile values kept, so `chezmoi diff` shows only real changes. `bun meta/reconcile.ts pull <source path>` copies the deployed file back into the source.
+
+Formats: `jsonc` (comments and trailing commas preserved) and `ini`, which also covers flat `key = value` files like btop's.
+
 > **Note**: Glob does not search hidden directories. Use `ls -la home/.managed/` to list managed subdirectories. Known subdirs: `btop`, `cline`, `cursor`, `git`, `intellij`, `lazygit`, `mise`, `nvim`, `obs-studio`, `share`, `skills`, `spicetify`, `vscode`, `zed`.
 
 ## Secret Management

@@ -1,2 +1,4 @@
 [diff "age"]
   textconv = "age -d -i ~/key.txt"
+[filter "reconcile"]
+  clean = bun meta/reconcile.ts clean %f

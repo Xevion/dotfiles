@@ -246,6 +246,9 @@
 ### 13. Quality of Life Improvements
 
 - [ ] Add chezmoi status checking script (detect drift)
+- [x] Volatile-setting reconciler for app-written configs (`meta/reconcile.ts`): git clean filter for symlinked files, `modify_` for OBS
+- [ ] Decide which btop keys are volatile (`shown_boxes`, `proc_sorting`, `proc_reversed`, `show_disks` flip from the UI)
+- [ ] YAML adapter for the reconciler, once lazygit grows a volatile key
 - [ ] Create update reminder system (terminal startup notification)
 - [ ] Implement "unmanaged files" workflow (mentioned in README.md:48-54)
 - [ ] Add fuzzy search for config diffs (fzf integration)
