@@ -1,0 +1,15 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# hash: {{ output "sh" "-c" (printf "cat '%s'/dot_claude/agents/*.md | sha256sum" .chezmoi.sourceDir) | trim }}
+# hash: {{ include "../meta/opencode-agents.ts" | sha256sum }}
+set -euo pipefail
+
+if ! command -v bun &>/dev/null; then
+  echo "[opencode-agents] bun not found, skipping conversion"
+  exit 0
+fi
+
+bun "{{ .chezmoi.sourceDir }}/../meta/opencode-agents.ts" \
+  "{{ .chezmoi.homeDir }}/.claude/agents" \
+  "{{ .chezmoi.homeDir }}/.config/opencode/agents"
+{{- end }}

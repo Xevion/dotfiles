@@ -210,7 +210,11 @@ home/dot_claude/
 home/dot_config/opencode/
 ├── AGENTS.md.tmpl          # OpenCode: includes common-rules + OpenCode-specific rules
 ├── opencode.jsonc.tmpl     # OpenCode settings; calls meta/permissions.ts via `output` for its permission map
-└── command/                # Symlinks → ../../../dot_claude/commands/*.md
+├── command/                # Symlinks → ../../../dot_claude/commands/*.md
+└── plugins/guard/index.ts  # Shim that runs the `guard` hook binary on bash/edit/write tool calls
+
+# Skills are shared by pointing opencode.jsonc `skills` at ~/.claude/skills. Agents are
+# converted from dot_claude/agents by meta/opencode-agents.ts (run_onchange_after_convert-opencode-agents).
 
 home/dot_codex/
 ├── AGENTS.md.tmpl          # Codex: includes common-rules

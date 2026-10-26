@@ -1,13 +1,28 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "anthropic/claude-sonnet-4-6",
-  "plugin": [
-    // "@tarquinen/opencode-dcp@latest",
-    "@franlol/opencode-md-table-formatter@0.0.3",
-    "@mohak34/opencode-notifier@latest",
-    // "opencode-anthropic-auth",
-    "opencode-claude-auth",
-  ],
+  "model": "anthropic/claude-sonnet-5-5",
+  "providers": {
+    "anthropic": {
+      "settings": {
+        "baseURL": "http://127.0.0.1:3456/v1",
+        "apiKey": "{{ dopplerProjectJson.DARIO_API_KEY }}",
+      },
+      "models": {
+        "claude-haiku-4-5": { "disabled": true },
+        "claude-haiku-4-5-20251001": { "disabled": true },
+        "claude-sonnet-4-5": { "disabled": true },
+        "claude-sonnet-4-5-20250929": { "disabled": true },
+        "claude-sonnet-4-6": { "disabled": true },
+        "claude-opus-4-5": { "disabled": true },
+        "claude-opus-4-5-20251101": { "disabled": true },
+        "claude-opus-4-6": { "disabled": true },
+        "claude-opus-4-7": { "disabled": true },
+        "claude-opus-4-8": { "disabled": true },
+        "claude-opus-4-8-fast": { "disabled": true },
+      },
+    },
+  },
+  "skills": ["{{ .chezmoi.homeDir }}/.claude/skills"],
   "agent": {
     "explore": {
       "disable": true,

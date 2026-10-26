@@ -44,3 +44,6 @@
 
 # recall retired: the CLI is broken and the session DB went stale; project kept locally
 .claude/skills/recall/SKILL.md
+
+# opencode v2 does not load v1-format plugins
+.config/opencode/plugin/chezmoi-safety.ts
