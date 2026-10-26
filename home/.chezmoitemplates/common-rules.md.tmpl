@@ -82,6 +82,8 @@ Get the latest compatible version unless there's a reason not to — your knowle
 
 **Local Linux linker**: mold is enabled machine-wide in `~/.cargo/config.toml`. Never commit `-fuse-ld=mold` into a project's `.cargo/config.toml` — it's a hard error for anyone without mold installed.
 
+**Cargo gotchas**: `cargo remove` can garbage-collect root `[workspace.dependencies]` entries and `[profile.*.package.*]` blocks that no member uses. Copy the root `Cargo.toml` aside first, then `git diff` it afterward and restore anything beyond the intended lines. A scratch copy of a tree builds with its own `CARGO_TARGET_DIR`, never the real tree's `target/`: cargo fingerprints path crates by workspace-relative path, so a scratch build can poison the real tree's artifacts.
+
 ## Command Execution
 
 **Check `--help` for unfamiliar commands** — first use in a session, unexpected failures, or when you need non-interactive/quiet flags. Your training data may not match the installed version.
@@ -112,6 +114,7 @@ The failure looks like: run a command, pipe it through `head`, decide you need a
 - **Organization**: integration/feature tests in `tests/`; unit tests alongside code (or adjacent `tests.rs`). Check project conventions first.
 - **Running**: prefer `just test`, else `cargo nextest run` over raw `cargo test`. Run tests after changes.
 - **assert2 (Rust)**: use `assert2::assert!()`, `assert!(let ...)` for pattern matches, and `check!()` over `assert_eq!()` — `let_assert!()` is deprecated, don't use it.
+- **Tests earn their place.** Keep a test only when it exercises real logic, a parser or wire format against real input, a state machine or concurrency path, or a bug that happened. Cut tests that restate a constant, derive, trait default or log line, round-trip a value through our own encoder and decoder, or pin a field against the declaration it was copied from; one table collapses duplicate cases. Snapshot tests are the exception: pinning exact output is their purpose. Tell test-writing subagents which logic to cover, never "cover everything".
 
 ## Code Style
 
@@ -122,6 +125,9 @@ Write idiomatic code for the language — check existing patterns first. For lan
 - **Go**: wrap errors with context (`fmt.Errorf("…: %w", err)`); table-driven `t.Run` subtests; accept interfaces, return structs; short receiver names
 - **Kotlin**: data classes, sealed hierarchies; scope functions (`let`/`apply`/`use`); `sequence`/`flow` for lazy iteration; extension functions
 - **Svelte**: reactive `$:` over manual subscriptions; composition + slots; stores for cross-component state; extract components past ~100 lines
+- **CLI surface**: one general command per class of work, not a growing pile of narrow subcommands. Before adding one, check whether it is a special case of an existing verb (or just a canned query), and generalize the verb rather than multiplying nouns (`db reconcile` over `backfill-png`).
+- **Moves and migrations**: when moving or splitting code, rewrite every downstream import in the same change and delete the old path. No compatibility re-exports or forwarding modules; a re-export is fine only as a deliberate facade API.
+- **Randomness**: use a maintained randomization library, seeded where tests need determinism, and reuse what the project already depends on (in Rust, `rand` and `rand_distr` are fine defaults). Don't hand-roll a PRNG or shape a distribution by hand (cubing a uniform for skew) unless matching a specific algorithm is the point.
 
 ### Formatting
 
@@ -133,7 +139,7 @@ Write idiomatic code for the language — check existing patterns first. For lan
 
 - **Default to no comment.** Simple code gets zero. Only a genuinely non-obvious invariant earns one; scale length to the complexity actually explained, not to how tricky the code looks. Terseness and density are separate axes: a short comment can still be overstuffed, so keep the wording as plain as the length.
 - **Hard length caps.** A standalone comment above code is **one line by default, two lines maximum**. If you reach for a third line, it is no longer an inline comment: move it into a doc/module comment or cut it. A trailing comment (same line as code) must fit on that line, roughly ten words or fewer. A doc comment (`///`, `/** */`, docstring) opens with **one** self-contained summary line, then adds detail only where a reader of that item needs it.
-- **ASCII only, no banners, no section labels.** No em dashes, smart quotes, or ellipsis characters; no `===`/`-----` dividers; no bare `// Handlers` labels. The `normalizing-code-symbols` skill has the full list and the fixes.
+- **ASCII only, no banners, no section labels.** No em dashes, smart quotes, or ellipsis characters; no `===`/`-----` dividers; no bare `// Handlers` labels. The `normalizing-code-symbols` skill has the full list and the fixes. This applies whether or not the file is tracked by git: CLAUDE.md variants, git-excluded design docs, and local scratch notes get the same style as committed source. "Untracked" governs what content belongs where (see the local/non-public bullet below), not whether writing-style rules apply to it.
 - **`--` is not the fix for an em dash.** Two hyphens carry the same rhetorical shape, read as machine-written just as plainly, and look worse doing it, so they fail on both counts. Restructure the sentence until no dash is wanted: a full stop, a colon when the second half names or defines the first, "because"/"so"/"since" when it is the reason, a comma for an aside, parentheses for a true parenthetical, or simply delete a tail that restated the first half. In technical comments the causal forms are usually an improvement, since a dash leaves the relation implicit and "because" states it. Vary the repair; if every dash becomes a colon you have traded one uniform tell for another.
 - **Real syntax is not prose.** Leave `cargo run -- args`, any `--flag`, and shell or SQL operators alone. ESLint's `// eslint-disable-next-line rule -- justification` is also grammar, not a connective: it is the JS counterpart of Rust's `#[expect(lint, reason = "...")]`, so keep the description attached rather than splitting it onto its own line.
 - **Fix it in passing, and never name it.** When you touch code carrying these patterns, repair them as ride-along work in whatever commit you are already making. Do not mention the pattern in a commit message, PR description, issue, code comment, CI step, or lint rule, and do not add a check that enforces it. Those artifacts are public, and calling out the tell you are erasing reintroduces it in a more durable place. The guidance lives in private config, and the corrections land silently.
@@ -158,6 +164,7 @@ This rule exists because the recoverable-looking commands are the dangerous ones
 - **Commit history is delicate**: don't rewrite history unless asked; verify a commit actually landed when hooks fail; never accidentally amend when a new commit was meant
 - **Commit messages are short by default.** A subject line is usually the whole message: "why" over "what", conventional-commit style for a first commit, else match the project
 - **A body has to be earned by substance, not by diff size.** 4,000 files moved with no behavior change is still a one-liner, and so is a 10-line fix. Write one only for work that is genuinely substantial or changes how something fundamentally works, and even then keep it to a few lines of *why*. A walkthrough of what changed, benchmark numbers, rationale for each sub-change, and "all tests pass, 92% coverage" filler do not belong in a commit message. That detail goes in the issue tracker, or nowhere
+- **The user's staging area is their review, so commit by pathspec.** They stage files as work lands, including while you are still editing; staged files are theirs, so never flag them, unstage them or sweep them into your commit. Run a full `git status` and read it first, never commit "whatever is staged", and commit your own paths with `git commit -F - -- <paths>`. A pathspec commit skips untracked files, so mark each new file with `git add -N <file>` first. Pass the message through `-F -` with a heredoc so the blank line and bullets survive, then confirm with `git log -1 --format=%B`
 
 ## Issue Trackers
 
@@ -185,9 +192,26 @@ The AI writes code in my stead, and AI-assisted markers are hidden from the publ
 
 **File-content invalidation**: after any command that rewrites files (formatters, `--fix`, `cargo fmt`…), re-read every file you intend to edit before using Edit — your in-context copy is stale and `oldString` won't match.
 
-**Debugging**:  Before proposing a fix, read the relevant source (not just the error), reproduce/confirm the failure, and identify the root cause with evidence. **2-strike rule**: after two failed fixes with the same strategy, switch entirely — add logging, read deeper (callers/deps/config), check docs, or ask. Never a third guess with the same approach.
+**Debugging**:  Before proposing a fix, read the relevant source (not just the error), reproduce/confirm the failure, and identify the root cause with evidence. **2-strike rule**: after two failed fixes with the same strategy, switch entirely — add logging, read deeper (callers/deps/config), check docs, or ask. Never a third guess with the same approach. **Before calling an approach dead or impossible**, measure it across the whole population (one census query, not the two examples that failed); state the claim as a hypothesis and report the split with numbers.
 
 **Exploring**: Read/Glob/Grep and plain shell (`cat`, `grep`, `find`) are both fine — lean on the dedicated tools when you want line numbers or a partial read, and on the shell when you want a quick check. What to avoid either way is an elaborate `sed`/`awk` pipeline standing in for reading the file. Check for existing libraries and patterns before building new ones. **Never guess file paths** — Glob to verify before reading unfamiliar files (projects often use `src/db/mod.rs`, not `src/db.rs`). Entering an unfamiliar project: scan `docs/` guides, `just --list`, detect the package manager, consult the design corpus.
+
+**Waits**: run the action, then read the state once. A wait loop has a short timeout, breaks on every exit it can see (success, failure, process gone), and watches the event itself rather than a guessed substring of output. Never poll a `run_in_background` task: its completion notification is the wait, so do other work or end the turn. Never detach a command from the tool (a trailing `&`, a `( ... ) &` subshell, `nohup`, `disown`, `setsid`): a detached process cannot be read or stopped by the turn. Foreground, or the tool's own `run_in_background` with the bare command, are the two ways to run something long.
+
+**Lints on unfinished code**: a `dead_code`/`unused` warning on something you just wrote means the wiring isn't finished, not that the code is wrong. Finish the wiring instead of deleting it to silence the lint; mid-refactor warnings are expected. Before asking whether apparently dead code should stay, trace its entry points and bring a recommendation.
+
+**Verify the real state**: a reading (a struct, a flag, a log line) is not proof of what the user sees. Check the screen or output they are looking at in the same step as the numbers.
+
+**Don't close with pitches**: end on the work done and what's left, with no offers to schedule or loop anything.
+
+## Scratchpad hygiene
+
+The disk is small and sessions stay open for days, so a scratchpad is rarely released on exit. Space only matters once it is actually tight (the user watches it and will say so); don't spend time reclaiming a few GB.
+
+- When a task wraps up and leaves large regenerable material behind (a `target/`, a venv, `node_modules`, a scratch copy of a repo), delete that. Not mid-task, and without churn: one scratch target dir or venv per task, reused, not a new one per experiment.
+- Never delete screenshots, renders, captures, recordings, exports or logs, however old. They are small next to a build tree and cannot be regenerated at that point in time.
+- Check nothing running uses a directory before deleting it, and never delete the only copy of a data export.
+- Tell subagents to remove their own build copies when they finish.
 
 ## Logging
 
@@ -213,7 +237,7 @@ This applies to every delegation, not just code review. For a review, compute th
 
 ### Asking
 
-The tool is `AskUserQuestion` in Claude Code and the question tool in OpenCode. Use it proactively, early, before committing to an approach. Batch related questions (up to 4). **Use for** planning, architectural choices, ambiguous requests, design decisions. **Don't use for** naming, formatting, or details that don't affect behavior. Default to `multiple: true` unless options are mutually exclusive (async vs sync, A vs B, overwrite vs merge). Put the recommended option first with reasoning; include options that expand scope beyond what was asked.
+The tool is `AskUserQuestion` in Claude Code and the question tool in OpenCode. Use it proactively, early, before committing to an approach. Batch related questions (up to 4). **Use for** planning, architectural choices, ambiguous requests, design decisions. **Don't use for** naming, formatting, or details that don't affect behavior. Default to `multiple: true` unless options are mutually exclusive (async vs sync, A vs B, overwrite vs merge). Put the recommended option first with reasoning; include options that expand scope beyond what was asked. For a wide or multi-phase refactor, explain the plan first (what is wrong, each phase's concrete changes, what changes visibly, how it is verified) and only then ask the decisions that are the user's; a bare option list is not enough for them to judge.
 
 ### GitHub & URLs
 

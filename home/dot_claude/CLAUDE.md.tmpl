@@ -38,11 +38,28 @@ API lookup, which context7 answers directly. If the answer is in local code, use
 
 ### Choosing a model
 
-The definitions carry a sensible default (`find` on haiku, `investigate` and `research` on sonnet),
-but the `model` parameter overrides it per dispatch. Pick by the stakes and scope of the work
-rather than by the agent: routine or well-scoped work stays on the default, and a large,
-high-consequence, or genuinely ambiguous problem earns opus. Cost tracks the choice, so don't
-reach for the larger model on mechanical work.
+**Pass `model` and `effort` explicitly on every dispatch** (Agent tool, Workflow `agent()`). Most
+agent types pin neither, so an omitted `model` inherits the parent and an omitted `effort` runs at
+the model default. Pick by the shape of the task, not the agent type: a `rust-general` dispatch
+can be a mechanical sweep or a design problem.
+
+| Task shape | Model | Effort |
+| --- | --- | --- |
+| Pure lookup or summary: `find`, `summarizer`, locating call sites, reading files for facts | haiku | `low` |
+| Bounded mechanical work with an escape hatch: one edit across many sites or crates, type migrations, applying a decided pattern, annotating named regions, narrow `investigate` questions | haiku | `medium`; `high` when each site needs care |
+| Judgment inside the task: design-heavy implementation, ambiguous `investigate`/`research`, `code-reviewer` on risky diffs, exploratory `general-purpose` | sonnet | `medium`; `high` for cross-crate, novel or risky work |
+| Planning, architecture, hard debugging after a sonnet pass failed, wide synthesis | opus | `medium` |
+
+- **Opus subagents require explicit user confirmation**; ask before dispatching one.
+- **Never `xhigh` or `max` by default**, and never haiku above `high`. A higher effort for one
+  dispatch is fine when you state why. Effort scales thinking volume, not just quality: `xhigh`
+  cost 3-5x a `high` run on sonnet, and haiku `xhigh` is mostly thinking tokens.
+- **Haiku dispatches carry a review clause.** The prompt tells it to finish the work, then list
+  anything it doubts, skipped or found underspecified under "needs parent review". Reconcile that
+  block before reporting the task done.
+- **Haiku is the wrong call for** open-ended agentic coding loops from scratch, prompts over 100K
+  tokens (the price jumps 5x), and work likely to trip safety classifiers, since haiku has no
+  server-side refusal fallback.
 
 ### Caller Responsibilities
 
@@ -54,6 +71,35 @@ reach for the larger model on mechanical work.
 3. **Split large tasks.** Past roughly twenty files, run several focused agents in parallel rather
    than one overloaded one.
 4. **Don't over-split.** Three related questions sharing context belong in one dispatch.
+   **Split by task, not by source.** One agent should carry a task end to end across every source
+   it needs (query the database, read the reference code, change the implementation, test it,
+   iterate on what the test shows) instead of three agents that each own one source and report
+   back, which costs a round trip per hand-off and loses the cross-source reasoning. Pick an agent
+   type whose tools cover all of it; a read-only or MCP-less type cannot, so name the type that can.
+   Parallel agents are for work that is independent, not for the sources of one task.
+   **When deep analysis in several directions is genuinely needed**, run them separately, but the
+   parent relays each one's findings into the others' prompts (and into follow-ups with
+   `SendMessage`) so no agent spends its budget re-deriving what another already settled.
+5. **Scale fan-out to the work.** How many agents to run is a judgment of scope, effort and
+   importance weighed together, not a constant. Small, file-disjoint streams justify a few; a
+   wide, cleanly separable sweep can justify many. Light reading, doc drafts and surveys stay in
+   the foreground. A burst of agents costs tokens the user did not ask for, so size it to what
+   the task needs and say why when it is large.
+6. **Delegate only bounded questions.** A hard, wide, open-ended hunt with no clean exit burns its
+   whole budget making no progress, and a budget line in the prompt does not fix that. Narrow it
+   to an answerable sub-question or keep it in the foreground where you can steer.
+7. **Review implementer diffs yourself by default.** Reviewer effort scales with scope and risk:
+   read small diffs directly, and let a large, risky or cross-cutting change earn reviewers, as
+   few and as combined as the risk allows. Never a spec-reviewer then quality-reviewer chain per
+   task.
+8. **When asked for findings, a plan and questions, deliver those first.** Dispatch nothing,
+   read-only agents included, until the user answers.
+9. **Edit dispatches carry a scope lock.** Include verbatim: "Stay strictly inside the items
+   being changed. Do not delete, rename or rewrite anything else; if the compiler forces another
+   change, stop and report. Do not delete code as unused: get build and tests green and leave
+   lint-clean for the final pass."
+10. **Subagents never touch git** (no add, stage, branch, stash, reset or commit). If one did,
+    stop and report.
 
 ---
 
