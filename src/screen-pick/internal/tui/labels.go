@@ -6,8 +6,8 @@ import (
 )
 
 // labelAlphabet is home row first, so the commonest labels are the easiest
-// to type. It avoids nothing: labels are typed before any action key counts.
-const labelAlphabet = "asdfghjklqwertyuiopzxcvbnm"
+// to type. It leaves out q, which quits.
+const labelAlphabet = "asdfghjklwertyuiopzxcvbnm"
 
 // labels returns n prefix-free labels, shortest first: once a label is fully
 // typed no longer label can still be meant.

@@ -239,6 +239,8 @@ var scanCases = []scanCase{
 	{"all digits", "1234567", nil},
 	{"too short", "abc123", nil},
 	{"too long", "a7a5ba1c3d4e5f60718293a4b5c6d7e8f90123456", nil},
+	{"md5 is not a sha", "id 1b7a526227c06c3f60ab04a7659d5789", nil},
+	{"between abbreviated and full", "3f2a9c1d4e5f60718293a4", nil},
 	{"sha256 digest", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", nil},
 
 	// Non-ASCII letters belong to the name; symbols do not.
@@ -275,6 +277,7 @@ var scanCases = []scanCase{
 	{"windows env var", `%APPDATA%\App\cfg.ini`, []string{`path:%APPDATA%\App\cfg.ini`}},
 	{"unquoted space in wine path", `loaded C:\Program Files\App\app.log ok`, []string{`path:C:\Program Files\App\app.log`}},
 	{"drive letter alone", "C:", nil},
+	{"trailing backslash is not an escape", `Z:\srv\inst\ -Port 1`, []string{`path:Z:\srv\inst\`}},
 
 	// Terminal plumbing: wrap markers and escapes never split or join a target.
 	{"cr wrap marker", "/tmp/build-ca\r\nche/5b090f6779e3.log", []string{"path:/tmp/build-cache/5b090f6779e3.log"}},

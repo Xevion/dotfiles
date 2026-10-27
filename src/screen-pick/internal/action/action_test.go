@@ -1,6 +1,9 @@
 package action
 
 import (
+	"errors"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -10,39 +13,68 @@ import (
 	"screenpick/internal/resolve"
 )
 
-var disk = fakefs.New("/home/u/proj/src/main.rs", "/tmp/build-cache/")
+var disk = fakefs.New("/home/u/proj/.git/", "/home/u/proj/src/main.rs", "/tmp/build-cache/", "/home/u/.wine/drive_c/app.exe", "/home/u/proj/tool")
+
+// heads stands in for file contents; anything unlisted reads as text.
+var heads = map[string]string{
+	"/home/u/.wine/drive_c/app.exe": "MZ\x90\x00",
+	"/home/u/proj/tool":             "\x7fELF\x02",
+}
+
+func head(p string) ([]byte, error) { return []byte(heads[p]), nil }
+
+func lookPath(installed ...string) func(string) (string, error) {
+	return func(name string) (string, error) {
+		if slices.Contains(installed, name) {
+			return "/usr/bin/" + name, nil
+		}
+		return "", errors.New("not found")
+	}
+}
 
 func pathMatch(text, p string, exists, dir bool) detect.Match {
 	return detect.Match{Kind: detect.KindPath, Text: text, Resolution: resolve.Resolution{Path: p, Exists: exists, IsDir: dir}}
 }
 
-// keyed renders actions as "key verb arg" for compact comparison.
+// keyed renders actions as "key verb arg" for compact comparison, with the
+// directory and argv of commands that carry them.
 func keyed(as []Action) []string {
-	names := map[Verb]string{Copy: "copy", Open: "open", Edit: "edit", Tab: "tab", Show: "show", Search: "search"}
+	names := map[Verb]string{Copy: "copy", Open: "open", Edit: "edit", Tab: "tab", Run: "run", Git: "git", Search: "search"}
 	out := make([]string, len(as))
 	for i, a := range as {
 		out[i] = a.Key + " " + names[a.Verb] + " " + a.Arg
+		if a.Argv != nil {
+			out[i] += " [" + strings.Join(a.Argv, " ") + " in " + a.Dir + "]"
+		}
 	}
 	return out
 }
 
 func TestFor(t *testing.T) {
-	ctx := Context{Cwd: "/home/u/proj", Stat: disk.Lstat}
-	withLine := pathMatch("src/main.rs", "/home/u/proj/src/main.rs", true, false)
-	withLine.Line, withLine.Col = 12, 4
+	ctx := Context{
+		Cwd: "/home/u/proj", Stat: disk.Lstat, Head: head, LookPath: lookPath("wine", "ida"),
+		CommitRepo: func(sha string) string {
+			if sha == "3f2a9c1" {
+				return "/home/u/proj"
+			}
+			return ""
+		},
+	}
 	cases := []struct {
 		name string
 		m    detect.Match
 		want []string
 	}{
-		{"relative file: shown equals relative, so one copy", pathMatch("src/main.rs", "/home/u/proj/src/main.rs", true, false), []string{
+		{"file in a repo: shown equals relative and repo path, so one copy", pathMatch("src/main.rs", "/home/u/proj/src/main.rs", true, false), []string{
 			"e edit /home/u/proj/src/main.rs",
 			"o open /home/u/proj/src/main.rs",
 			"f open /home/u/proj/src",
 			"t tab /home/u/proj/src",
+			"R tab /home/u/proj",
+			"l git src/main.rs [log --follow -- src/main.rs in /home/u/proj]",
 			"y copy /home/u/proj/src/main.rs",
 			"r copy src/main.rs",
-			"d copy /home/u/proj/src",
+			"Y copy /home/u/proj/src",
 			"/ search src/main.rs",
 		}},
 		{"absolute file outside cwd: shown equals path", pathMatch("/etc/hosts", "/etc/hosts", true, false), []string{
@@ -51,7 +83,7 @@ func TestFor(t *testing.T) {
 			"f open /etc",
 			"t tab /etc",
 			"y copy /etc/hosts",
-			"d copy /etc",
+			"Y copy /etc",
 			"/ search /etc/hosts",
 		}},
 		{"tilde form is its own copy", pathMatch("~/proj/src/main.rs", "/home/u/proj/src/main.rs", true, false), []string{
@@ -59,17 +91,46 @@ func TestFor(t *testing.T) {
 			"o open /home/u/proj/src/main.rs",
 			"f open /home/u/proj/src",
 			"t tab /home/u/proj/src",
+			"R tab /home/u/proj",
+			"l git src/main.rs [log --follow -- src/main.rs in /home/u/proj]",
 			"y copy /home/u/proj/src/main.rs",
 			"r copy src/main.rs",
 			"s copy ~/proj/src/main.rs",
-			"d copy /home/u/proj/src",
+			"Y copy /home/u/proj/src",
 			"/ search ~/proj/src/main.rs",
+		}},
+		{"windows program: wine and a disassembler, no editor", pathMatch(`C:\app.exe`, "/home/u/.wine/drive_c/app.exe", true, false), []string{
+			"w run /home/u/.wine/drive_c/app.exe [/usr/bin/wine /home/u/.wine/drive_c/app.exe in /home/u/.wine/drive_c]",
+			"i run /home/u/.wine/drive_c/app.exe [/usr/bin/ida /home/u/.wine/drive_c/app.exe in /home/u/.wine/drive_c]",
+			"f open /home/u/.wine/drive_c",
+			"t tab /home/u/.wine/drive_c",
+			"y copy /home/u/.wine/drive_c/app.exe",
+			`s copy C:\app.exe`,
+			"Y copy /home/u/.wine/drive_c",
+			`/ search C:\app.exe`,
+		}},
+		{"native program: no editor, no wine", pathMatch("tool", "/home/u/proj/tool", true, false), []string{
+			"i run /home/u/proj/tool [/usr/bin/ida /home/u/proj/tool in /home/u/proj]",
+			"f open /home/u/proj",
+			"t tab /home/u/proj",
+			"l git tool [log --follow -- tool in /home/u/proj]",
+			"y copy /home/u/proj/tool",
+			"r copy tool",
+			"Y copy /home/u/proj",
+			"/ search tool",
 		}},
 		{"directory", pathMatch("/tmp/build-cache", "/tmp/build-cache", true, true), []string{
 			"o open /tmp/build-cache",
 			"t tab /tmp/build-cache",
 			"y copy /tmp/build-cache",
 			"/ search /tmp/build-cache",
+		}},
+		{"repo root itself", pathMatch(".", "/home/u/proj", true, true), []string{
+			"o open /home/u/proj",
+			"t tab /home/u/proj",
+			"y copy /home/u/proj",
+			"s copy .",
+			"/ search .",
 		}},
 		// The reported menu: a missing absolute path offered the same copy
 		// twice and two folder actions for one folder.
@@ -96,7 +157,12 @@ func TestFor(t *testing.T) {
 			"h copy localhost",
 		}},
 		{"bare ip", detect.Match{Kind: detect.KindHost, Text: "10.0.0.1"}, []string{"y copy 10.0.0.1"}},
-		{"sha", detect.Match{Kind: detect.KindSHA, Text: "3f2a9c1"}, []string{"g show 3f2a9c1", "y copy 3f2a9c1"}},
+		{"sha runs git where the commit is", detect.Match{Kind: detect.KindSHA, Text: "3f2a9c1"}, []string{
+			"g git 3f2a9c1 [show 3f2a9c1 in /home/u/proj]",
+			"R tab /home/u/proj",
+			"y copy 3f2a9c1",
+		}},
+		{"sha in no repo can only be copied", detect.Match{Kind: detect.KindSHA, Text: "abcdef1"}, []string{"y copy abcdef1"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -105,6 +171,8 @@ func TestFor(t *testing.T) {
 			}
 		})
 	}
+	withLine := pathMatch("src/main.rs", "/home/u/proj/src/main.rs", true, false)
+	withLine.Line, withLine.Col = 12, 4
 	edit := For(withLine, ctx)[0]
 	if edit.Label != "edit at line 12" || edit.Line != 12 || edit.Col != 4 {
 		t.Errorf("edit action lost its location: %+v", edit)
@@ -116,14 +184,28 @@ func TestMenusHaveUniqueKeys(t *testing.T) {
 		pathMatch("src/main.rs", "/home/u/proj/src/main.rs", true, false),
 		pathMatch("x", "/tmp/build-cache", true, true),
 		pathMatch("gone.rs", "/home/u/proj/gone.rs", false, false),
+		pathMatch("app.exe", "/home/u/.wine/drive_c/app.exe", true, false),
 	}
 	for _, m := range ms {
 		seen := map[string]bool{}
-		for _, a := range For(m, Context{Cwd: "/elsewhere", Stat: disk.Lstat}) {
+		for _, a := range For(m, Context{Cwd: "/elsewhere", Stat: disk.Lstat, Head: head, LookPath: lookPath("wine", "ida", "ghidraRun")}) {
 			if seen[a.Key] {
 				t.Errorf("%q: key %q used twice", m.Text, a.Key)
 			}
 			seen[a.Key] = true
+		}
+	}
+}
+
+func TestRepoRoot(t *testing.T) {
+	for dir, want := range map[string]string{
+		"/home/u/proj/src": "/home/u/proj",
+		"/home/u/proj":     "/home/u/proj",
+		"/tmp/build-cache": "",
+		"/":                "",
+	} {
+		if got := RepoRoot(dir, disk.Lstat); got != want {
+			t.Errorf("RepoRoot(%q) = %q, want %q", dir, got, want)
 		}
 	}
 }

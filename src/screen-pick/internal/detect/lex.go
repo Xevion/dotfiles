@@ -1,6 +1,7 @@
 package detect
 
 import (
+	"screenpick/internal/decode"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -105,8 +106,9 @@ func splitWords(s string) []word {
 	start := -1
 	for i, r := range s {
 		in := isWordRune(r)
-		// A backslash-escaped space continues the word.
-		if r == ' ' && start >= 0 && escaped(s, i) {
+		// A backslash-escaped space continues the word, except in a Windows path
+		// where the backslash is a separator.
+		if r == ' ' && start >= 0 && escaped(s, i) && !decode.IsWindowsPath(s[start:i]) {
 			in = true
 		}
 		switch {

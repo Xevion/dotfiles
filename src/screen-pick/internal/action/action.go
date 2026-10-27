@@ -14,6 +14,7 @@ import (
 	"syscall"
 
 	"screenpick/internal/detect"
+	"screenpick/internal/filetype"
 )
 
 type Verb uint8
@@ -27,114 +28,210 @@ const (
 	Edit
 	// Tab opens a kitty tab with Arg as its working directory.
 	Tab
-	// Show runs `git show Arg` in this terminal.
-	Show
+	// Run starts Argv detached, in Dir.
+	Run
+	// Git runs git with Argv in this terminal, in Dir.
+	Git
 	// Search walks the disk for the target.
 	Search
 )
+
+// Group sorts a menu into sections.
+type Group uint8
+
+const (
+	GroupOpen Group = iota
+	GroupGit
+	GroupCopy
+	GroupSearch
+)
+
+func (g Group) String() string {
+	return [...]string{"open", "git", "copy", "search"}[g]
+}
 
 // Action is one menu entry. Key is its single-key accelerator.
 type Action struct {
 	Key   string
 	Label string
+	Group Group
 	Verb  Verb
-	Arg   string
-	Line  int
-	Col   int
+	// Arg is what the action is about, and what Copy copies.
+	Arg  string
+	Argv []string
+	Dir  string
+	Line int
+	Col  int
 }
 
-// Context is what menus need beyond the match itself.
+// Context is what menus need beyond the match itself. Nil functions use the
+// real system.
 type Context struct {
-	Cwd string
-	// Stat defaults to os.Stat.
-	Stat func(string) (fs.FileInfo, error)
+	Cwd      string
+	Stat     func(string) (fs.FileInfo, error)
+	Head     func(string) ([]byte, error)
+	LookPath func(string) (string, error)
+	// CommitRepo finds the checkout that has a commit, or "".
+	CommitRepo func(sha string) string
+}
+
+func (c *Context) defaults() {
+	if c.Stat == nil {
+		c.Stat = os.Stat
+	}
+	if c.Head == nil {
+		c.Head = filetype.Head
+	}
+	if c.LookPath == nil {
+		c.LookPath = exec.LookPath
+	}
+	if c.CommitRepo == nil {
+		c.CommitRepo = func(string) string { return "" }
+	}
 }
 
 // For lists the actions that make sense for m, without duplicate effects.
 func For(m detect.Match, ctx Context) []Action {
-	if ctx.Stat == nil {
-		ctx.Stat = os.Stat
-	}
+	ctx.defaults()
 	var b builder
 	switch m.Kind {
 	case detect.KindPath:
 		forPath(&b, m, ctx)
 	case detect.KindURL:
-		b.add("o", "open in browser", Open, m.Text)
-		b.add("y", "copy", Copy, m.Text)
+		b.add("o", "open in browser", GroupOpen, Open, m.Text)
+		b.add("y", "copy", GroupCopy, Copy, m.Text)
 	case detect.KindHost:
 		host, port := splitHostPort(m.Text)
 		if port != "" {
-			b.add("o", "open in browser", Open, "http://"+m.Text)
+			b.add("o", "open in browser", GroupOpen, Open, "http://"+m.Text)
 		}
-		b.add("y", "copy", Copy, m.Text)
+		b.add("y", "copy", GroupCopy, Copy, m.Text)
 		if port != "" {
-			b.add("h", "copy host", Copy, host)
+			b.add("h", "copy host", GroupCopy, Copy, host)
 		}
 	case detect.KindSHA:
-		b.add("g", "git show", Show, m.Text)
-		b.add("y", "copy", Copy, m.Text)
+		if repo := ctx.CommitRepo(m.Text); repo != "" {
+			b.put(Action{Key: "g", Label: "git show", Group: GroupGit, Verb: Git, Arg: m.Text, Argv: []string{"show", m.Text}, Dir: repo})
+			b.add("R", "new tab at repo root", GroupGit, Tab, repo)
+		}
+		b.add("y", "copy", GroupCopy, Copy, m.Text)
 	}
 	return b.actions
+}
+
+// tools are the programs that can open a binary, by the name they install as.
+var tools = []struct{ key, label, bin string }{
+	{"i", "open in IDA", "ida"},
+	{"G", "open in Ghidra", "ghidraRun"},
 }
 
 func forPath(b *builder, m detect.Match, ctx Context) {
 	p := m.Path
 	shown := m.Text
-	rel := relativeTo(p, ctx.Cwd)
-	switch {
-	case m.Exists && m.IsDir:
-		b.add("o", "open folder", Open, p)
-		b.add("t", "new tab here", Tab, p)
-	case m.Exists:
+	if !m.Exists {
+		b.add("s", "copy as shown", GroupCopy, Copy, shown)
+		if p != "" {
+			b.add("y", "copy resolved path", GroupCopy, Copy, p)
+			if near := nearestDir(path.Dir(p), ctx.Stat); near != "/" {
+				b.add("f", "open nearest existing folder", GroupOpen, Open, near)
+			}
+		}
+		b.add("/", "search the disk", GroupSearch, Search, shown)
+		return
+	}
+
+	dir := p
+	if !m.IsDir {
+		dir = path.Dir(p)
+		forFile(b, m, ctx)
+		b.add("f", "open containing folder", GroupOpen, Open, dir)
+		b.add("t", "new tab in folder", GroupOpen, Tab, dir)
+	} else {
+		b.add("o", "open folder", GroupOpen, Open, p)
+		b.add("t", "new tab here", GroupOpen, Tab, p)
+	}
+
+	repo := RepoRoot(dir, ctx.Stat)
+	inRepo := relativeTo(p, repo)
+	if repo != "" {
+		b.add("R", "new tab at repo root", GroupGit, Tab, repo)
+		if inRepo != "" {
+			b.put(Action{Key: "l", Label: "git log", Group: GroupGit, Verb: Git, Arg: inRepo, Argv: []string{"log", "--follow", "--", inRepo}, Dir: repo})
+		}
+	}
+
+	b.add("y", "copy path", GroupCopy, Copy, p)
+	b.add("r", "copy relative path", GroupCopy, Copy, relativeTo(p, ctx.Cwd))
+	b.add("p", "copy repo path", GroupCopy, Copy, inRepo)
+	b.add("s", "copy as shown", GroupCopy, Copy, shown)
+	if !m.IsDir {
+		b.add("Y", "copy folder", GroupCopy, Copy, dir)
+	}
+	b.add("/", "search for more copies", GroupSearch, Search, shown)
+}
+
+// forFile offers what suits the file's type: an editor only for text, Wine and
+// disassemblers for programs, the desktop handler for everything else.
+func forFile(b *builder, m detect.Match, ctx Context) {
+	p := m.Path
+	class := filetype.Text
+	if head, err := ctx.Head(p); err == nil {
+		class = filetype.Sniff(p, head).Class
+	}
+	switch class {
+	case filetype.Text, filetype.Unknown:
 		label := "edit"
 		if m.Line > 0 {
 			label += " at line " + strconv.Itoa(m.Line)
 		}
-		b.addAt("e", label, Edit, p, m.Line, m.Col)
-		b.add("o", "open", Open, p)
-		b.add("f", "open containing folder", Open, path.Dir(p))
-		b.add("t", "new tab in folder", Tab, path.Dir(p))
-	}
-	if m.Exists {
-		b.add("y", "copy path", Copy, p)
-		b.add("r", "copy relative path", Copy, rel)
-		b.add("s", "copy as shown", Copy, shown)
-		if !m.IsDir {
-			b.add("d", "copy folder", Copy, path.Dir(p))
+		b.put(Action{Key: "e", Label: label, Group: GroupOpen, Verb: Edit, Arg: p, Line: m.Line, Col: m.Col})
+		b.add("o", "open with default app", GroupOpen, Open, p)
+	case filetype.Image, filetype.Document, filetype.Archive, filetype.Media:
+		b.add("o", "open with default app", GroupOpen, Open, p)
+	default:
+		if wine, err := ctx.LookPath("wine"); err == nil && class == filetype.WindowsExe {
+			b.put(Action{Key: "w", Label: "run with Wine", Group: GroupOpen, Verb: Run, Arg: p, Argv: []string{wine, p}, Dir: path.Dir(p)})
 		}
-		b.add("/", "search for more copies", Search, shown)
-		return
-	}
-	b.add("s", "copy as shown", Copy, shown)
-	if p != "" {
-		b.add("y", "copy resolved path", Copy, p)
-		if near := nearestDir(path.Dir(p), ctx.Stat); near != "/" {
-			b.add("f", "open nearest existing folder", Open, near)
+		for _, t := range tools {
+			if bin, err := ctx.LookPath(t.bin); err == nil {
+				b.put(Action{Key: t.key, Label: t.label, Group: GroupOpen, Verb: Run, Arg: p, Argv: []string{bin, p}, Dir: path.Dir(p)})
+			}
 		}
 	}
-	b.add("/", "search the disk", Search, shown)
 }
 
 type builder struct {
 	actions []Action
 }
 
-func (b *builder) add(key, label string, verb Verb, arg string) {
-	b.addAt(key, label, verb, arg, 0, 0)
+func (b *builder) add(key, label string, g Group, verb Verb, arg string) {
+	b.put(Action{Key: key, Label: label, Group: g, Verb: verb, Arg: arg})
 }
 
-// addAt skips empty arguments and any effect already offered.
-func (b *builder) addAt(key, label string, verb Verb, arg string, line, col int) {
-	if arg == "" {
+// put skips empty arguments and any effect already offered.
+func (b *builder) put(a Action) {
+	if a.Arg == "" {
 		return
 	}
-	for _, a := range b.actions {
-		if a.Verb == verb && a.Arg == arg {
+	for _, have := range b.actions {
+		if have.Verb == a.Verb && have.Arg == a.Arg && have.Dir == a.Dir && strings.Join(have.Argv, "\x00") == strings.Join(a.Argv, "\x00") {
 			return
 		}
 	}
-	b.actions = append(b.actions, Action{Key: key, Label: label, Verb: verb, Arg: arg, Line: line, Col: col})
+	b.actions = append(b.actions, a)
+}
+
+// RepoRoot returns the git checkout containing dir, or "".
+func RepoRoot(dir string, stat func(string) (fs.FileInfo, error)) string {
+	for d := dir; d != "" && d != "."; d = path.Dir(d) {
+		if _, err := stat(path.Join(d, ".git")); err == nil {
+			return d
+		}
+		if d == "/" {
+			break
+		}
+	}
+	return ""
 }
 
 // relativeTo returns p relative to dir when p is inside it, else "".
@@ -174,11 +271,17 @@ func (a Action) Command(editor string) (cmd *exec.Cmd, detached bool) {
 		return exec.Command("xdg-open", a.Arg), true
 	case Tab:
 		return exec.Command("kitten", "@", "launch", "--type=tab", "--cwd="+a.Arg), true
+	case Run:
+		cmd = exec.Command(a.Argv[0], a.Argv[1:]...)
+		cmd.Dir = a.Dir
+		return cmd, true
 	case Edit:
 		argv := EditorArgs(editor, a.Arg, a.Line, a.Col)
 		return exec.Command(argv[0], argv[1:]...), false
-	case Show:
-		return exec.Command("git", "show", a.Arg), false
+	case Git:
+		cmd = exec.Command("git", a.Argv...)
+		cmd.Dir = a.Dir
+		return cmd, false
 	}
 	return nil, false
 }

@@ -198,6 +198,10 @@
     - [x] Detection engine to green (direct checks: screen directories, process/root/window bases, Wine prefixes)
     - [x] Streaming resolution: git-index suffix search, on-demand deep walk
     - [x] TUI, kitty bindings, build script
+    - [x] Layout pass: side detail pane when wide, inline expansion when narrow, hints menu away from its target, Nerd Font icons with a legend, grouped menu with file previews
+    - [x] Type-aware actions (no editor for binaries; Wine, IDA, Ghidra), repo root tab and `git log`, `git show` run in the checkout that has the commit
+    - [x] Picking among copies is per-menu and never rewrites the match; a disk search only adds copies
+    - [ ] Check the overlay inside real kitty: `KITTY_LISTEN_ON` reaching it, `@active-kitty-window-id` substitution
     - [ ] Retire `screen_paths.py` and the `kitty-paths` shim once the new pickers have been lived with
 - [ ] Add Alacritty config (if used)
 - [ ] Document terminal color schemes

@@ -16,6 +16,7 @@ import (
 	"screenpick/internal/detect"
 	"screenpick/internal/fakefs"
 	"screenpick/internal/lookup"
+	"screenpick/internal/preview"
 	"screenpick/internal/resolve"
 )
 
@@ -101,6 +102,9 @@ func (f *fakeBackend) Command(a action.Action) *exec.Cmd {
 	return exec.Command("true")
 }
 func (f *fakeBackend) Stat(p string) (fs.FileInfo, error) { return f.disk.Lstat(p) }
+func (f *fakeBackend) Preview(m detect.Match, rows int) preview.Preview {
+	return preview.Text("preview of "+m.Path, rows)
+}
 
 const screen = "see /etc/hosts here\r\nand src/main.rs:12 too\nhttps://x.y/a"
 
@@ -233,12 +237,65 @@ func TestStreamedResultsReachOpenMenu(t *testing.T) {
 	if m.streams != 0 {
 		t.Errorf("stream count %d after the stream closed", m.streams)
 	}
-	press(m, "tab")
-	if m.matches[1].Path != "/home/u/proj/b/src/main.rs" || m.matches[1].Alternatives[0].Path != "/home/u/proj/src/main.rs" {
-		t.Errorf("tab should rotate to the alternative: %+v", m.matches[1].Resolution)
+}
+
+// The reported bug: after a disk search, cycling copies rewrote the match,
+// so the menu reopened on whichever copy was last looked at.
+func TestPickingACopyLastsOnlyForTheMenu(t *testing.T) {
+	m, b := newTest(t, Hints)
+	b.deep = []lookup.Result{
+		{ID: 1, Path: "/home/u/proj/b/src/main.rs", Source: resolve.SourceSearch},
+		{ID: 1, Path: "/mnt/x/src/main.rs", Source: resolve.SourceSearch},
 	}
-	if !strings.Contains(m.actions[0].Arg, "/b/src/main.rs") {
-		t.Errorf("actions should follow the new best reading: %+v", m.actions[0])
+	drain(m, press(m, "s", "/"))
+	best := m.matches[1].Resolution.Path
+	if best != "/home/u/proj/src/main.rs" || len(m.matches[1].Alternatives) != 2 {
+		t.Fatalf("a disk search must only add copies: %+v", m.matches[1].Resolution)
+	}
+
+	press(m, "tab")
+	if m.mode != alts || len(m.altList) != 3 || m.altList[0].Path != best {
+		t.Fatalf("tab lists every copy, best first: mode %v, %+v", m.mode, m.altList)
+	}
+	if m.altList[1].Path != "/home/u/proj/b/src/main.rs" {
+		t.Errorf("copies nearest the best reading come next: %+v", m.altList)
+	}
+	press(m, "down", "enter")
+	if m.mode != menu || m.target().Path != "/home/u/proj/b/src/main.rs" || !strings.Contains(m.actions[0].Arg, "/b/src/main.rs") {
+		t.Fatalf("enter acts on the picked copy: target %q, first action %+v", m.target().Path, m.actions[0])
+	}
+	if m.matches[1].Path != best {
+		t.Errorf("picking a copy must not rewrite the match: %q", m.matches[1].Path)
+	}
+
+	press(m, "esc", "s")
+	if m.target().Path != best || !strings.Contains(m.actions[0].Arg, "/proj/src/main.rs") {
+		t.Errorf("reopening starts from the best reading again: %q", m.target().Path)
+	}
+}
+
+func TestListCursorSurvivesTheMenu(t *testing.T) {
+	m, _ := newTest(t, List)
+	press(m, "down")
+	at := m.items[m.cursor]
+	press(m, "enter", "down", "down")
+	if m.sel != at || m.cursor != 1 || m.act != 2 {
+		t.Fatalf("menu keys move the menu, not the list: cursor %d act %d sel %d", m.cursor, m.act, m.sel)
+	}
+	press(m, "esc")
+	if m.mode != List || m.cursor != 1 {
+		t.Errorf("esc returns to the same list row: mode %v cursor %d", m.mode, m.cursor)
+	}
+}
+
+func TestFailedCommandReportsStderr(t *testing.T) {
+	m, _ := newTest(t, Hints)
+	press(m, "s")
+	st := &tail{}
+	st.Write([]byte("hint: x\nfatal: bad object 4ecb91bf\n"))
+	m.Update(execDoneMsg{errors.New("exit status 128"), st})
+	if m.status != "exit status 128: fatal: bad object 4ecb91bf" || m.ctx.Err() != nil {
+		t.Errorf("a failed command should stay open and explain: %q", m.status)
 	}
 }
 
@@ -260,7 +317,7 @@ func TestActions(t *testing.T) {
 	m, b = newTest(t, Hints)
 	b.deep = []lookup.Result{{ID: 0, Path: "/mnt/x/etc/hosts", Source: resolve.SourceSearch}}
 	drain(m, press(m, "d", "/"))
-	if n := len(m.matches[0].Alternatives); n != 1 || m.status != "search finished" {
+	if n := len(m.matches[0].Alternatives); n != 1 || m.status != "search finished: 1 other copies" {
 		t.Errorf("search should stream into alternatives: %d alternatives, status %q", n, m.status)
 	}
 }
@@ -304,11 +361,89 @@ func TestList(t *testing.T) {
 
 func TestMenuView(t *testing.T) {
 	m, _ := newTest(t, Hints)
+	m.Update(tea.WindowSizeMsg{Width: 60, Height: 30})
 	press(m, "s")
 	view := ansi.Strip(m.View().Content)
 	for _, want := range []string{"src/main.rs:12", "~/proj/src/main.rs", "via process", "edit at line 12", "copy relative path"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("menu missing %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestSmallWindowScrollsTheMenu(t *testing.T) {
+	m, _ := newTest(t, Hints)
+	press(m, "s")
+	for range len(m.actions) - 1 {
+		press(m, "down")
+	}
+	last := m.actions[len(m.actions)-1].Label
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, last) || len(strings.Split(view, "\n")) > 10 {
+		t.Errorf("the selected action must stay visible in a 10-row window:\n%s", view)
+	}
+}
+
+func TestShortenMiddle(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		w    int
+		want string
+	}{
+		{"/a/b.rs", 20, "/a/b.rs"},
+		{"/home/u/projects/deep/tree/main.rs", 20, "/home/u/pro…/main.rs"},
+		{"/x/a-very-long-file-name.txt", 12, "…le-name.txt"},
+		{"https://example.com/a", 1, "…"},
+	} {
+		if got := shortenMiddle(tc.in, tc.w); got != tc.want || ansi.StringWidth(got) > tc.w {
+			t.Errorf("shortenMiddle(%q, %d) = %q, want %q", tc.in, tc.w, got, tc.want)
+		}
+	}
+}
+
+func TestRankCopies(t *testing.T) {
+	res := resolve.Resolution{Path: "/home/u/proj/src/main.rs", Source: resolve.SourceProcess, Alternatives: []resolve.Candidate{
+		{Path: "/mnt/backup/proj/src/main.rs", Source: resolve.SourceSearch},
+		{Path: "/home/u/proj/vendor/x/src/main.rs", Source: resolve.SourceSearch},
+		{Path: "/home/u/proj/b/src/main.rs", Source: resolve.SourceIndex},
+	}}
+	var got []string
+	for _, c := range rankCopies(res) {
+		got = append(got, c.Path)
+	}
+	want := []string{"/home/u/proj/src/main.rs", "/home/u/proj/b/src/main.rs", "/home/u/proj/vendor/x/src/main.rs", "/mnt/backup/proj/src/main.rs"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("best first, then nearest (-want +got):\n%s", diff)
+	}
+}
+
+func TestQuitFromAnywhereButTyping(t *testing.T) {
+	m, _ := newTest(t, Hints)
+	press(m, "s", "q")
+	if m.ctx.Err() == nil {
+		t.Error("q in the menu should quit outright")
+	}
+	m, _ = newTest(t, Hints)
+	press(m, "q")
+	if m.ctx.Err() == nil {
+		t.Error("q in hints should quit, so it can never be a label")
+	}
+	m, _ = newTest(t, List)
+	press(m, "q")
+	if m.ctx.Err() != nil || m.filter != "q" {
+		t.Errorf("q in the list filter is a letter: filter %q", m.filter)
+	}
+}
+
+func TestBlockFitsItsWidth(t *testing.T) {
+	m, b := newTest(t, Hints)
+	b.deep = []lookup.Result{{ID: 1, Path: "/home/u/proj/b/src/main.rs", Source: resolve.SourceSearch}}
+	drain(m, press(m, "s", "/"))
+	press(m, "tab", "down", "enter")
+	for _, w := range []int{24, 30, 40} {
+		for _, l := range m.block(m.target(), w, 40, true) {
+			if got := ansi.StringWidth(l); got > w {
+				t.Errorf("width %d: line is %d wide: %q", w, got, ansi.Strip(l))
+			}
 		}
 	}
 }

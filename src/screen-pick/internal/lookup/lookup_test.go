@@ -174,6 +174,9 @@ func TestMerger(t *testing.T) {
 		{"direct hit stays best", resolve.Resolution{Path: "/p/a.rs", Source: resolve.SourceProcess, Exists: true}, []Result{
 			{Path: "/q/a.rs", Source: idx, Rank: 0},
 		}, resolve.Resolution{Path: "/p/a.rs", Source: resolve.SourceProcess, Exists: true, Alternatives: []resolve.Candidate{cand("/q/a.rs", idx)}}},
+		{"disk search never displaces a found file", resolve.Resolution{}, []Result{
+			{Path: "/win/a.rs", Source: idx, Rank: 2}, {Path: "/home/a.rs", Source: resolve.SourceSearch},
+		}, resolve.Resolution{Path: "/win/a.rs", Source: idx, Exists: true, Alternatives: []resolve.Candidate{cand("/home/a.rs", resolve.SourceSearch)}}},
 		{"duplicates and errors ignored", resolve.Resolution{}, []Result{
 			{Path: "/p/a.rs", Source: idx}, {Path: "/p/a.rs", Source: idx}, {Err: errors.New("x")},
 		}, resolve.Resolution{Path: "/p/a.rs", Source: idx, Exists: true}},

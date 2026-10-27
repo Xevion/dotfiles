@@ -357,7 +357,8 @@ var (
 	ipv6Br     = regexp.MustCompile(`\[([0-9A-Fa-f:.]+)\](?::\d{1,5})?`)
 	ipv6Re     = regexp.MustCompile(`[0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){2,7}`)
 	hostPortRe = regexp.MustCompile(`(?i)\b(localhost|(?:[a-z0-9-]+\.)+[a-z]{2,}):(\d{1,5})`)
-	shaRe      = regexp.MustCompile(`\b[0-9a-f]{7,40}\b`)
+	// Abbreviated hashes run 7 to 16 digits; 32 is an MD5 or a machine ID.
+	shaRe = regexp.MustCompile(`\b(?:[0-9a-f]{40}|[0-9a-f]{7,16})\b`)
 )
 
 func hostCands(s string) []cand {

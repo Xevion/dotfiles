@@ -189,7 +189,9 @@ func Roots(r *resolve.Resolver, ms []detect.Match) []string {
 }
 
 // Merger folds streamed results into resolutions. Direct-check results stay
-// best; among search results the most trusted root wins.
+// best; among index results the most trusted root wins. A disk search only
+// adds alternatives once something was found, since its walk order says
+// nothing about which copy was meant.
 type Merger struct {
 	rank map[int]int
 }
@@ -208,7 +210,7 @@ func (m *Merger) Apply(id int, res *resolve.Resolution, r Result) bool {
 	case !res.Exists:
 		*res = resolve.Resolution{Path: r.Path, Source: r.Source, Exists: true}
 		m.rank[id] = r.Rank
-	case searched && r.Rank < best:
+	case searched && r.Source == resolve.SourceIndex && r.Rank < best:
 		res.Alternatives = slices.Insert(res.Alternatives, 0, resolve.Candidate{Path: res.Path, Source: res.Source})
 		res.Path, res.Source = r.Path, r.Source
 		m.rank[id] = r.Rank
