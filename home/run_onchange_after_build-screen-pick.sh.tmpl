@@ -1,0 +1,20 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# Builds screen-pick, the kitty path and URL picker, from src/screen-pick
+# (outside .chezmoiroot; only the binary deploys). Re-runs when any non-test
+# source or the module files change.
+# hash: {{ output "sh" "-c" (print "find " (joinPath .chezmoi.sourceDir ".." "src" "screen-pick") " -type f \\( \\( -name '*.go' ! -name '*_test.go' \\) -o -name go.mod -o -name go.sum \\) -print | sort | xargs cat 2>/dev/null | sha256sum || true") }}
+set -euo pipefail
+
+MODULE="{{ .chezmoi.sourceDir }}/../src/screen-pick"
+OUT="{{ .chezmoi.homeDir }}/.local/bin/screen-pick"
+
+if ! command -v go >/dev/null 2>&1; then
+  echo "[build-screen-pick] go not found, skipping (existing binary kept)"
+  exit 0
+fi
+
+echo "[build-screen-pick] Building screen-pick"
+go -C "$MODULE" build -trimpath -ldflags="-s -w" -o "$OUT" ./cmd/screen-pick
+echo "[build-screen-pick] Installed -> $OUT"
+{{ end -}}

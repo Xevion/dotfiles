@@ -1,0 +1,18 @@
+alias c := check
+
+default: check
+
+check:
+    gofmt -l -w .
+    go vet ./...
+    go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 -checks all,-ST1000,-ST1003 ./...
+
+test *args:
+    go test ./... {{args}}
+
+bench *args:
+    go test -run '^$' -bench . -benchmem ./... {{args}}
+
+# Scan a captured screen and print what was found: `just scan < screen.txt`
+scan *args:
+    go run ./cmd/screen-pick scan {{args}}

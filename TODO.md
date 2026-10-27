@@ -193,6 +193,12 @@
 - [ ] Expand Kitty configuration (currently at `home/dot_config/kitty/`)
   - [x] Two-stage path pickers (`ctrl+shift+d` hints, `ctrl+shift+space` fzf list) via `screen_paths.py`
   - [x] Restore native `ctrl+shift+e`/`x`/`u` and the `ctrl+shift+p` hints chord (scratch pad → `ctrl+alt+p`)
+  - [ ] Go rewrite of the pickers in `src/screen-pick`: one overlay per binding with its own labels and action menu (no hints kitten, no fzf), and URL/host/SHA detection
+    - [x] Detection test corpus (`detect/detect_test.go`, fake filesystem)
+    - [x] Detection engine to green (direct checks: screen directories, process/root/window bases, Wine prefixes)
+    - [x] Streaming resolution: git-index suffix search, on-demand deep walk
+    - [x] TUI, kitty bindings, build script
+    - [ ] Retire `screen_paths.py` and the `kitty-paths` shim once the new pickers have been lived with
 - [ ] Add Alacritty config (if used)
 - [ ] Document terminal color schemes
 - [ ] Add font configuration and Nerd Fonts setup

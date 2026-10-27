@@ -37,9 +37,10 @@ chezmoi/
 │   ├── private_dot_ssh/           # ~/.ssh/ (600 permissions, encrypted content)
 │   ├── AppData/                   # Windows-only: %APPDATA% targets
 │   └── Documents/                 # Windows-only: ~/Documents/ targets
-├── src/                           # Bun sources for compiled binaries (outside
+├── src/                           # Sources for compiled binaries (outside
 │   ├── banner-comment-lint.ts     #   .chezmoiroot, so only the built binary
-│   └── claude-usage.ts            #   is deployed)
+│   ├── claude-usage.ts            #   is deployed)
+│   └── screen-pick/               # Go module: kitty's path/URL picker
 ├── docs/                          # Reference documentation
 │   ├── platform-detection.md      # Template variable reference
 │   └── symlink-patterns.md        # How .managed/ symlinks work
@@ -186,6 +187,7 @@ Hooks are TypeScript scripts run by Bun before chezmoi applies changes:
 | `run_onchange_before_setup-intellij-keymaps.ts.tmpl` | Keymap files change | Symlink JetBrains keymaps |
 | `run_onchange_after_compile-bun-binaries.sh.tmpl` | Any `src/*.ts` listed in it changes | Compile every Bun binary to its deploy path |
 | `run_onchange_after_build-guard.sh.tmpl` | `~/projects/guard` crate changes | Build the `guard` hook; skips when that repo is not cloned |
+| `run_onchange_after_build-screen-pick.sh.tmpl` | Any non-test file in `src/screen-pick` changes | Build `screen-pick` into `~/.local/bin`; skips without `go` |
 | `run_onchange_after_compile-git-revival.sh.tmpl` | Private CLI source changes | Build `git-revival` when the repo is cloned |
 
 Adding a Bun binary means adding an entry to the `BINARIES` array in that script
