@@ -225,8 +225,9 @@ func (m *Model) quit() tea.Cmd {
 }
 
 func (m *Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	// q quits outright wherever it is not typed into a filter; esc steps back.
-	if k.String() == "ctrl+c" || k.String() == "q" && (m.mode == Hints || m.mode == menu) {
+	// q quits outright wherever it is not typed into a filter, ctrl+q even
+	// there; esc steps back.
+	if k.String() == "ctrl+c" || k.String() == "ctrl+q" || k.String() == "q" && (m.mode == Hints || m.mode == menu) {
 		return m, m.quit()
 	}
 	switch m.mode {

@@ -432,6 +432,18 @@ func TestQuitFromAnywhereButTyping(t *testing.T) {
 	if m.ctx.Err() != nil || m.filter != "q" {
 		t.Errorf("q in the list filter is a letter: filter %q", m.filter)
 	}
+	m.Update(tea.KeyPressMsg{Code: 'q', Mod: tea.ModCtrl})
+	if m.ctx.Err() == nil {
+		t.Error("ctrl+q should quit while typing a filter")
+	}
+	m, b := newTest(t, Hints)
+	b.deep = []lookup.Result{{ID: 1, Path: "/home/u/proj/b/src/main.rs", Source: resolve.SourceSearch}}
+	drain(m, press(m, "s", "/"))
+	press(m, "tab", "q")
+	m.Update(tea.KeyPressMsg{Code: 'q', Mod: tea.ModCtrl})
+	if m.altFilter != "q" || m.ctx.Err() == nil {
+		t.Errorf("in the copies filter q types and ctrl+q quits: filter %q", m.altFilter)
+	}
 }
 
 func TestBlockFitsItsWidth(t *testing.T) {

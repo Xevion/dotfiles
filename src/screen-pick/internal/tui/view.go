@@ -143,14 +143,14 @@ func (m *Model) footer(w int) string {
 	var keys string
 	switch m.mode {
 	case List:
-		keys = "type to filter  ·  ↑↓ move  ·  enter: actions  ·  esc: quit"
+		keys = "type to filter  ·  ↑↓ move  ·  enter: actions  ·  esc or ctrl+q: quit"
 	case menu:
 		keys = "key or enter: run  ·  esc: back  ·  q: quit"
 		if n := len(m.matches[m.sel].Alternatives); n > 0 {
 			keys = fmt.Sprintf("key or enter: run  ·  tab: %d other copies  ·  esc: back  ·  q: quit", n)
 		}
 	case alts:
-		keys = "type to filter  ·  enter: act on this copy  ·  esc: back  ·  ctrl+c: quit"
+		keys = "type to filter  ·  enter: act on this copy  ·  esc: back  ·  ctrl+q: quit"
 	}
 	out := styleDim.Render(keys)
 	if l := legend(); ansi.StringWidth(out)+4+ansi.StringWidth(l) <= w {
