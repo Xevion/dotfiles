@@ -138,6 +138,10 @@ customCommands:
     context: "files"
     description: "Open file in GitHub"
     command: "gh browse {{.SelectedFile.Name}}"
+  - key: "E"
+    context: "files"
+    description: "Open file in Zed (project)"
+    command: 'zed "$(git rev-parse --show-toplevel)" "$(git rev-parse --show-toplevel)/{{.SelectedFile.Name}}"'
   - key: "<c-r>"
     context: "localBranches"
     description: "Create PR for branch"

@@ -7,6 +7,14 @@
 // custom settings, run `zed: open default settings` from the
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
+  "proxy": "",
+  "minimap": {
+    "display_in": "active_editor",
+    "thumb": "always",
+    "current_line_highlight": "all",
+    "max_width_columns": 80,
+    "show": "auto"
+  },
   "diff_view_style": "unified",
   "cli_default_open_behavior": "existing_window",
   "outline_panel": {
@@ -16,18 +24,14 @@
     "dock": "right",
   },
   "git_panel": {
+    "group_by": "staging",
     "dock": "right",
   },
   "agent_servers": {
-    "opencode": {
-      "type": "registry"
-    },
-    "github-copilot-cli": {
-      "type": "registry",
-    },
     "claude-acp": {
       "default_config_options": {
-        "model": "sonnet",
+        "effort": "high",
+        "model": "haiku",
       },
       "type": "registry",
     },
@@ -36,11 +40,15 @@
     "provider": "copilot",
   },
   "project_panel": {
+    "entry_spacing": "standard",
+    "bold_folder_labels": false,
     "dock": "left",
     "hide_hidden": false,
     "hide_gitignore": false,
   },
   "agent": {
+    "show_turn_stats": true,
+    "thinking_display": "preview",
     "dock": "right",
     "default_model": {
       "provider": "copilot_chat",
@@ -61,8 +69,8 @@
   "auto_signature_help": false,
   "theme": {
     "mode": "dark",
-    "light": "One Light",
-    "dark": "Ayu Dark",
+    "light": "Catppuccin Latte",
+    "dark": "One Dark",
   },
   "terminal": {
     "font_family": "ZedMono Nerd Font",
