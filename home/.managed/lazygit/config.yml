@@ -57,10 +57,14 @@ gui:
   commitAuthorShortLength: 2
   commitAuthorLongLength: 17
 git:
-  # Paging (use delta)
+  # Diff renderers, cycle with `|`
   diffRenderers:
-    - colorArg: always
-      command: delta --paging=never
+    - command: 'delta --paging=never --hyperlinks-file-link-format="lazygit-edit://{path}:{line}"'
+    - name: delta side-by-side
+      command: 'delta --paging=never --side-by-side --hyperlinks-file-link-format="lazygit-edit://{path}:{line}"'
+    - type: rawGit
+      name: color-words
+      args: [--color-words]
   # Auto-behaviors
   autoFetch: true
   autoRefresh: true
