@@ -45,6 +45,29 @@ zizmor = "latest"
 pinact = "latest"
 gcloud = "latest"
 
+act = "latest"
+# The gnu build needs a newer glibc than this host has.
+"github:atuinsh/atuin" = { version = "latest", asset_pattern = "atuin-x86_64-unknown-linux-musl.tar.gz" }
+bat = "latest"
+doppler = "latest"
+dprint = "latest"
+fd = "latest"
+hugo = "latest"
+lychee = "latest"
+ripgrep = "latest"
+starship = "latest"
+zola = "latest"
+"pipx:git-filter-repo" = "latest"
+"pipx:pipenv" = "latest"
+
+ast-grep = "latest"
+bottom = "latest"
+cargo-binstall = "latest"
+cargo-insta = "latest"
+eza = "latest"
+hyperfine = "latest"
+resvg = "latest"
+
 # Python CLIs: the pipx backend shells out to uv, so extras land in the tool's own venv.
 "pipx:comfy-cli" = "latest"
 "pipx:fonttools" = { version = "latest", extras = ["woff"] }

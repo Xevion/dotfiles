@@ -95,6 +95,11 @@
 - [x] Add mise configuration file (`.mise.toml` or per-project configs)
 - [ ] Document mise setup and installation
 - [x] Integrate mise activation with shell configs
+- [x] One installer per tool: duplicate brew/cargo/standalone copies of mise-managed tools removed (railway, lsd, zoxide, bun, deno, pnpm, delta, lazygit, bat, fd, ripgrep, starship, atuin, doppler, eza, hyperfine and others)
+- [ ] Upgrade policy: `latest` pins never move on their own (36 tools were behind); decide on a periodic `mise upgrade` or an apply hook
+- [ ] Remaining cargo-installed tools with no mise registry entry (bacon, cargo-nextest, cargo-deny, cargo-audit, samply, nu, others): try the `cargo:` backend
+- [ ] Duplicate-binary check in `meta/` that flags one name resolving to two installers
+- [ ] Shims were measured and rejected: ~22 ms per call after updating mise (was ~90 ms), against ~1.6 ms direct
 - [ ] Document tool version management strategy
 - [ ] Add mise to installation checklist
 
