@@ -12,7 +12,7 @@ gui:
     optionsTextColor:
       - "#bd93f9" # Purple
     selectedLineBgColor:
-      - "#44475a" # Current Line
+      - "#6d5a9c" # Muted purple, visible beside delta's green/red backgrounds
     inactiveViewSelectedLineBgColor:
       - bold
     cherryPickedCommitFgColor:
@@ -58,9 +58,9 @@ gui:
   commitAuthorLongLength: 17
 git:
   # Paging (use delta)
-  pagers:
+  diffRenderers:
     - colorArg: always
-      pager: delta --paging=never
+      command: delta --paging=never
   # Auto-behaviors
   autoFetch: true
   autoRefresh: true
