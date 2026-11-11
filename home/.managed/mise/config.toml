@@ -115,7 +115,7 @@ resvg = "latest"
 "cargo:trunk" = "latest"
 "cargo:vtracer" = "latest"
 # The CLI version must match the wasm-bindgen crate version of each project.
-"cargo:wasm-bindgen-cli" = "0.2.117"
+"cargo:wasm-bindgen-cli" = "0.2.130"
 
 # Python CLIs: the pipx backend shells out to uv, so extras land in the tool's own venv.
 "pipx:comfy-cli" = "latest"
