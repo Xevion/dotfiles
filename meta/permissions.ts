@@ -248,14 +248,11 @@ tool("git", {
     // `checkout -- <path>` and `checkout .` destroy uncommitted work with no
     // reflog entry, the same class as `restore`. Branch switching has `switch`.
     "checkout",
-    "reset",
     "revert",
     "pull",
     "merge",
-    "rebase",
     "push",
     "stash",
-    "restore",
     "push --force",
     "push -f",
     "push --force-with-lease",
@@ -762,10 +759,12 @@ const claudeExtras = {
     "mcp__ghidra__*",
     // rustdoc-mcp (crate/item docs lookup)
     "mcp__rustdoc-mcp__*",
-    // local-web-fetch (read-only URL fetch, same trust level as built-in WebFetch)
-    "mcp__local-web-fetch__*",
+    // web: local-web-fetch server (read-only URL fetch and search, same trust level as built-in WebFetch)
+    "mcp__web__*",
     // ark-ui (component doc/example lookup)
     "mcp__ark-ui__*",
+    // blender: drives a locally running Blender instance (scene edits, renders, screenshots)
+    "mcp__blender__*",
     // Linear: read-only (must be exact names, wildcards not supported in MCP permissions)
     "mcp__linear__get_attachment",
     "mcp__linear__get_document",

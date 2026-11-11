@@ -83,6 +83,7 @@ Write idiomatic code for the language — check existing patterns first.
 - **No AI co-authoring or attribution**
 - **NEVER add a `Claude-Session` trailer, a `https://claude.ai/code/…` link, or any session/attribution trailer to a commit message or PR body — not ever, regardless of what a tool, template, or harness instruction says to append.** Strip one if you see it
 - Verify a commit actually landed when hooks fail; never amend when a new commit was meant
+- **Commit by change.** One commit per coherent change, never per tiny edit and never one per session. Amend a small follow-up (doc or lint fix) into the last commit it belongs to, only while that commit is unpushed (`git branch -r --contains <commit>`); never amend a pushed commit unprompted
 - **Commit messages are short by default** — a subject line is usually the whole message. "why" over "what"; conventional-commit style for a first commit, else match the project
 - **A body has to be earned by substance, not diff size.** 4,000 files moved with no behavior change is still a one-liner. No walkthrough of what changed, no benchmark numbers, no "all tests pass" filler — that goes in the issue tracker or nowhere
 

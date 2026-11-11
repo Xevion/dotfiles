@@ -322,7 +322,7 @@ Audit run 2026-09-16 across ~100 projects, 8,189 recorded sessions, and 85 proje
 - [x] Prune project permission bloat — 2,746 entries down to 1,901 (845 removed: 23 malformed shell fragments, 11 stale tool names, 811 already granted globally)
 - [x] Fix `Read(/tmp/**)`/`Edit(/tmp/**)` in `meta/permissions.ts` — a single leading slash anchors to the settings file's directory, not the filesystem root, so these never matched. Now `//tmp/**`
 - [x] Fix the guard hook grant — Bash rules match command text literally, so the `~/` form never matched an absolute-path invocation. Both forms now emitted
-- [x] Gate `git checkout`, `git reset`, `git revert` as ask (`checkout -- <path>` destroys uncommitted work with no reflog, same class as `restore`)
+- [x] Gate `git checkout`, `git revert` as ask (`checkout -- <path>` destroys uncommitted work with no reflog). Bare `reset`, `rebase`, `restore` later moved to absent so guard decides; `reset --hard` stays ask
 - [x] Drop `ssh`/`scp` from ask; leave absent so dynamic approval can decide
 - [x] Remove dead commented-out `rm` ask block
 - [x] Broaden the git rule past committing to all state mutation, in both full and minimal rulesets

@@ -89,7 +89,6 @@ const desired: Record<string, unknown> = {
     "rust-analyzer-lsp@claude-plugins-official": false,
     "gopls-lsp@claude-plugins-official": false,
     "code-simplifier@claude-plugins-official": true,
-    "ralph-loop@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
   },
   alwaysThinkingEnabled: true,

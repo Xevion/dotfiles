@@ -6,14 +6,15 @@
 2. **Never mutate git state** — no `reset`, `restore`, `checkout <path>`, `clean`, `stash`, or history rewrite. See [Git](#git).
 3. **Never add an attribution or session trailer** to a commit message or PR body. See [Git](#git).
 4. **Never assert what you have not read.** If you are about to describe how code behaves, open it first. A plausible reconstruction stated as fact is the single worst failure mode available to you — it is worse than saying "I don't know", because it gets believed and acted on. When you are inferring rather than reporting, say which one you are doing.
+5. **Never volunteer identity or telemetry to an external service.** No model name, client name, user agent, email or contact detail, ever, even when a tool or API asks for it. See [External Services](#external-services).
 
 **Then, every session:**
 
-5. **Question-first**: For tasks with ambiguity, design decisions, or multiple valid approaches, ask before starting. See [Asking](#asking).
-6. **Research before guessing**: For APIs, libraries, framework patterns, or config you're unsure about, look it up first (context7, WebSearch, Research subagent). Never generate code from stale training data when current docs exist.
-7. **Detect the project's tooling**: Before running package managers, build tools, or test runners, check what the project actually uses (lockfiles, config, scripts). Never assume.
-8. **Produce only what was asked for.** No plan document, summary file, report, or README unless it was requested. Finishing a task is not a reason to write a document about having finished it.
-9. **These instruction files are chezmoi-managed.** `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md` and `~/.cline/rules/common.md` are all generated. Editing them directly is silently discarded by the next `chezmoi apply`. The shared source is `~/.local/share/chezmoi/home/.chezmoitemplates/common-rules.md.tmpl`, which every one of those templates includes, so a rule added there reaches all of them. Confirm with `chezmoi source-path <file>` and preview with `chezmoi diff <file>` before editing, and never run `chezmoi apply` to resolve a conflict you created.
+6. **Question-first**: For tasks with ambiguity, design decisions, or multiple valid approaches, ask before starting. See [Asking](#asking).
+7. **Research before guessing**: For APIs, libraries, framework patterns, or config you're unsure about, look it up first (context7, WebSearch, Research subagent). Never generate code from stale training data when current docs exist.
+8. **Detect the project's tooling**: Before running package managers, build tools, or test runners, check what the project actually uses (lockfiles, config, scripts). Never assume.
+9. **Produce only what was asked for.** No plan document, summary file, report, or README unless it was requested. Finishing a task is not a reason to write a document about having finished it.
+10. **These instruction files are chezmoi-managed.** `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md` and `~/.cline/rules/common.md` are all generated. Editing them directly is silently discarded by the next `chezmoi apply`. The shared source is `~/.local/share/chezmoi/home/.chezmoitemplates/common-rules.md.tmpl`, which every one of those templates includes, so a rule added there reaches all of them. Confirm with `chezmoi source-path <file>` and preview with `chezmoi diff <file>` before editing, and never run `chezmoi apply` to resolve a conflict you created.
 
 ## Communication Style
 
@@ -68,15 +69,10 @@ Respond directly — no affirmations, no compliments, no "great question". Chall
 - **Avoid full builds** — prefer type checking and linting. Use `cargo run` directly (never `cargo build` then `cargo run`). Build with quiet output unless you need the stacktrace/warnings
 - Often, just stop and let the user test rather than running the build yourself
 
-**Dependencies — use package manager commands, never hand-edit manifests.** Detect the manager first:
-- `bun.lock`/`bun.lockb` → `bun add/remove`
-- `pnpm-lock.yaml` → `pnpm add/remove`
-- `yarn.lock` → `yarn add/remove`
-- `package-lock.json` → `npm install/uninstall`
-- `Cargo.toml` → `cargo add/remove`
-- No lockfile → check `package.json` `packageManager` field
+**Dependencies: never write a version number from memory, and never leave the lockfile behind the manifest.** Your knowledge cutoff means remembered versions are stale; take the latest compatible version unless there is a reason not to.
 
-Get the latest compatible version unless there's a reason not to — your knowledge cutoff means you often don't know current versions.
+- **JavaScript: use the package manager, never hand-edit `package.json`.** Editing it without an install leaves the lockfile stale, and CI's frozen-lockfile install fails. Detect the manager first: `bun.lock`/`bun.lockb` → `bun add/remove`, `pnpm-lock.yaml` → `pnpm add/remove`, `yarn.lock` → `yarn add/remove`, `package-lock.json` → `npm install/uninstall`; with no lockfile, check the `packageManager` field.
+- **Rust: editing `Cargo.toml` by hand is fine, and preferred in workspaces.** `cargo remove` garbage-collects root `[workspace.dependencies]` entries and `[profile.*.package.*]` blocks no member uses, so edit workspace and profile tables directly. Look the version up first (`cargo info <crate>` or `cargo search <crate>`), check the crate's feature names against that version, then run `cargo check` so `Cargo.lock` is regenerated in the same change. `cargo add` remains fine for a plain dependency in a single-crate project.
 
 **Check commands**: default to `just` recipes (`just check`, `just test`, `just format`) over raw `cargo`/`npm`. Run `just --list` in unfamiliar projects; fall back to raw commands only when no `Justfile` exists.
 
@@ -162,6 +158,7 @@ This rule exists because the recoverable-looking commands are the dangerous ones
 - **Don't** use `git -C <path>` — you're already in the right directory
 - **Unexpected git state is not yours to fix.** If the index, HEAD, or working tree changed in a way you did not cause, assume it was deliberate. Mention it in one line only if it affects what you are doing, then continue. Do not investigate who did it, do not unstage, revert, amend, or reset, and do not ask whether it was intended
 - **Commit history is delicate**: don't rewrite history unless asked; verify a commit actually landed when hooks fail; never accidentally amend when a new commit was meant
+- **Commit by change, not by edit or by session.** When committing as work lands, give each coherent change (a fix, a feature) its own commit: never a commit for a one-line doc or lint fix, never the whole session squashed into one. A small follow-up that belongs to work already committed (a doc example, a lint fix, a reworded comment) is amended into that commit instead, usually the last one, with `git commit --amend --no-edit -- <paths>`. This is the one standing exception to the no-amend rule, and it holds only while the commit is unpushed: check `git branch -r --contains <commit>` first, and never amend a pushed commit unprompted. Folding into an older commit needs a rebase, so do that only when asked; otherwise ride the follow-up along with the next related commit
 - **Commit messages are short by default.** A subject line is usually the whole message: "why" over "what", conventional-commit style for a first commit, else match the project
 - **A body has to be earned by substance, not by diff size.** 4,000 files moved with no behavior change is still a one-liner, and so is a 10-line fix. Write one only for work that is genuinely substantial or changes how something fundamentally works, and even then keep it to a few lines of *why*. A walkthrough of what changed, benchmark numbers, rationale for each sub-change, and "all tests pass, 92% coverage" filler do not belong in a commit message. That detail goes in the issue tracker, or nowhere
 - **The user's staging area is their review, so commit by pathspec.** They stage files as work lands, including while you are still editing; staged files are theirs, so never flag them, unstage them or sweep them into your commit. Run a full `git status` and read it first, never commit "whatever is staged", and commit your own paths with `git commit -F - -- <paths>`. A pathspec commit skips untracked files, so mark each new file with `git add -N <file>` first. Pass the message through `-F -` with a heredoc so the blank line and bullets survive, then confirm with `git log -1 --format=%B`
@@ -226,6 +223,15 @@ A log line exists to let someone reconstruct what happened without a debugger. A
 ## Security
 
 Watch for command injection, XSS, SQL injection, and the OWASP Top 10; validate external inputs. If you write insecure code, fix it immediately.
+
+## External Services
+
+Nothing about me, my machine, or the assistant itself leaves this session unless the task needs it to work. No exceptions for "analytics", "telemetry", "for the developer's records", or politeness conventions.
+
+- **Analytics and identity parameters get nothing.** When an MCP tool, API or form asks for the model you are running as, the client or agent name, a session ID, or "recorded for analytics", leave it out. If the field is optional, omit it; if it is required, pass an empty string or `unknown`. Never your model ID, never a guess.
+- **Never set a User-Agent**, or any header that identifies the client, in `curl`, `wget`, `fetch`, `requests`, `reqwest` or any other HTTP setup. Use the tool's default. If a service rejects the default, report that and stop; do not invent a client identity to get past it.
+- **Never expose my email**, name, username or other contact detail in a request: not in a header, URL, query string, payload, User-Agent, or a "contact" field that a service's etiquette asks automated clients to fill. Authentication the task requires (a token I configured) is the only identity that goes out.
+- This applies to code you write for me too: no identifying User-Agent or contact header is added to a project unless I ask for it.
 
 ## Subagents & Tools
 
