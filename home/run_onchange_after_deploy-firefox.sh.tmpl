@@ -1,0 +1,28 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# Copies policies and autoconfig into the Firefox Developer Edition install dir.
+# Copies, not symlinks: content processes are sandboxed away from $HOME but can read the install dir.
+#
+# policies.json hash: {{ include "../firefox/policies.json" | sha256sum }}
+# autoconfig.js hash: {{ include "../firefox/autoconfig.js" | sha256sum }}
+# mozilla.cfg hash: {{ include "../firefox/mozilla.cfg" | sha256sum }}
+# WheelTabChild hash: {{ include "../firefox/autoconfig/WheelTabChild.sys.mjs" | sha256sum }}
+# WheelTabParent hash: {{ include "../firefox/autoconfig/WheelTabParent.sys.mjs" | sha256sum }}
+
+set -eu
+
+SRC="{{ .chezmoi.sourceDir }}/../firefox"
+DEST="/opt/firefox-dev"
+
+if [ ! -x "$DEST/firefox" ]; then
+    echo "chezmoi: Firefox Developer Edition not found at $DEST, skipping"
+    exit 0
+fi
+
+install -D -m 644 "$SRC/policies.json" "$DEST/distribution/policies.json"
+install -D -m 644 "$SRC/autoconfig.js" "$DEST/defaults/pref/autoconfig.js"
+install -D -m 644 "$SRC/mozilla.cfg" "$DEST/mozilla.cfg"
+install -D -m 644 -t "$DEST/autoconfig" "$SRC"/autoconfig/*.sys.mjs
+
+echo "chezmoi: Firefox config deployed to $DEST (takes effect on next Firefox restart)"
+{{ end -}}

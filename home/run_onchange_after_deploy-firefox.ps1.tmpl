@@ -1,0 +1,41 @@
+{{ if eq .chezmoi.os "windows" -}}
+# Copies policies and autoconfig into the Firefox Developer Edition install dir.
+# Program Files needs an elevated shell; without one this warns and exits cleanly.
+#
+# policies.json hash: {{ include "../firefox/policies.json" | sha256sum }}
+# autoconfig.js hash: {{ include "../firefox/autoconfig.js" | sha256sum }}
+# mozilla.cfg hash: {{ include "../firefox/mozilla.cfg" | sha256sum }}
+# WheelTabChild hash: {{ include "../firefox/autoconfig/WheelTabChild.sys.mjs" | sha256sum }}
+# WheelTabParent hash: {{ include "../firefox/autoconfig/WheelTabParent.sys.mjs" | sha256sum }}
+
+$ErrorActionPreference = "Stop"
+
+$Src = "{{ .chezmoi.sourceDir }}\..\firefox"
+$Dest = Join-Path $env:ProgramFiles "Firefox Developer Edition"
+
+if (-not (Test-Path (Join-Path $Dest "firefox.exe"))) {
+    Write-Host "chezmoi: Firefox Developer Edition not found at $Dest, skipping"
+    exit 0
+}
+
+$Copies = @(
+    @{ From = "policies.json"; To = "distribution\policies.json" },
+    @{ From = "autoconfig.js"; To = "defaults\pref\autoconfig.js" },
+    @{ From = "mozilla.cfg"; To = "mozilla.cfg" },
+    @{ From = "autoconfig\WheelTabChild.sys.mjs"; To = "autoconfig\WheelTabChild.sys.mjs" },
+    @{ From = "autoconfig\WheelTabParent.sys.mjs"; To = "autoconfig\WheelTabParent.sys.mjs" }
+)
+
+try {
+    foreach ($c in $Copies) {
+        $target = Join-Path $Dest $c.To
+        New-Item -ItemType Directory -Force -Path (Split-Path $target) | Out-Null
+        Copy-Item -Force (Join-Path $Src $c.From) $target
+    }
+} catch [System.UnauthorizedAccessException] {
+    Write-Warning "chezmoi: no write access to $Dest; rerun 'chezmoi apply' from an elevated shell"
+    exit 0
+}
+
+Write-Host "chezmoi: Firefox config deployed to $Dest (takes effect on next Firefox restart)"
+{{ end -}}

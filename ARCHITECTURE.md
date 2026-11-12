@@ -41,6 +41,8 @@ chezmoi/
 │   ├── banner-comment-lint.ts     #   .chezmoiroot, so only the built binary
 │   ├── claude-usage.ts            #   is deployed)
 │   └── screen-pick/               # Go module: kitty's path/URL picker
+├── firefox/                       # Firefox Dev Edition install-dir config (policies,
+│                                  #   autoconfig, actor modules); copied by a run script
 ├── docs/                          # Reference documentation
 │   ├── platform-detection.md      # Template variable reference
 │   └── symlink-patterns.md        # How .managed/ symlinks work
@@ -189,6 +191,11 @@ Hooks are TypeScript scripts run by Bun before chezmoi applies changes:
 | `run_onchange_after_build-guard.sh.tmpl` | `~/projects/guard` crate changes | Build the `guard` hook; skips when that repo is not cloned |
 | `run_onchange_after_build-screen-pick.sh.tmpl` | Any non-test file in `src/screen-pick` changes | Build `screen-pick` into `~/.local/bin`; skips without `go` |
 | `run_onchange_after_compile-git-revival.sh.tmpl` | Private CLI source changes | Build `git-revival` when the repo is cloned |
+| `run_onchange_after_deploy-firefox.{sh,ps1}.tmpl` | Any file in `firefox/` changes | Copy `policies.json`, autoconfig and actor modules into the Firefox Developer Edition install dir (`/opt/firefox-dev`, or Program Files from an elevated shell) |
+
+The Firefox files are copied, not symlinked: Firefox's sandboxed content processes
+can read the install dir but not `$HOME`, and the actor modules load in content.
+Adding a file under `firefox/` needs a hash line and a copy line in both scripts.
 
 Adding a Bun binary means adding an entry to the `BINARIES` array in that script
 **and** a matching `include` hash line at the top; without the hash line the
