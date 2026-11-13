@@ -1,0 +1,22 @@
+$ rg -n "load\(" src
+src/main.rs
+14:    let cfg = load(&args.config).unwrap();
+27:    let other = load("fallback.toml");
+
+src/lib.rs
+88:pub fn load(path: &Path) -> Result<Config> {
+91:    let raw = std::fs::read_to_string(path)?;
+
+$ grep -rn "TODO" --include=*.rs .
+./src/main.rs:31:    // TODO: handle signals
+./src/server/mod.rs:7:// TODO(ann): graceful shutdown
+./tests/test_api.py:12:# TODO flaky
+$ rg --vimgrep "fn main"
+src/main.rs:12:4:fn main() {
+cmd/app/main.go:19:6:func main() {
+$ rg -C1 "port" src/main.rs
+src/main.rs-13-    let args = Args::parse();
+src/main.rs:14:    let port = args.port;
+src/main.rs-15-    run(port);
+$ grep -c error /var/log/syslog
+17

@@ -3,8 +3,12 @@ package preview
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
+	"unicode"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -62,11 +66,40 @@ func TestDir(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(dir, "zdir"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	want := []Line{{Text: "zdir", Dir: true}, {Text: "A.txt"}, {Text: "… 2 more"}}
-	if diff := cmp.Diff(want, Dir(dir, 3).Lines); diff != "" {
-		t.Errorf("folders first, then names, then a count (-want +got):\n%s", diff)
+	want := []Line{{Text: "zdir", Dir: true}, {Text: "A.txt"}, {Text: "b.txt"}}
+	got := Dir(dir, 3)
+	if diff := cmp.Diff(want, got.Lines); diff != "" || got.More != 1 {
+		t.Errorf("folders first, then names, then a count (-want +got):\n%s\nmore=%d", diff, got.More)
+	}
+	if got := Dir(dir, 0); len(got.Lines) != 0 || got.More != 4 {
+		t.Errorf("no rows lists nothing: %+v", got)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "x\x1b_Gq\x1b\\\n"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := Dir(dir, 8); slices.ContainsFunc(got.Lines, func(l Line) bool { return strings.ContainsFunc(l.Text, unicode.IsControl) }) {
+		t.Errorf("entry names must not carry control characters: %+v", got.Lines)
 	}
 	if got := Dir(t.TempDir(), 3); got.Note != "empty folder" {
 		t.Errorf("empty folder note: %+v", got)
+	}
+}
+
+// Opening a named pipe for reading blocks until something writes to it, which
+// would hang the pane's loader for good.
+func TestFileDoesNotBlockOnAPipe(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "fifo")
+	if err := syscall.Mkfifo(p, 0o600); err != nil {
+		t.Skip(err)
+	}
+	done := make(chan Preview, 1)
+	go func() { done <- File(p, 0, 5) }()
+	select {
+	case got := <-done:
+		if got.Note == "" {
+			t.Errorf("a pipe should leave a note: %+v", got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("File blocked on a named pipe")
 	}
 }

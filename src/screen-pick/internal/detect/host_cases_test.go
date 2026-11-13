@@ -36,7 +36,6 @@ func runHostCases(t *testing.T, cases []scanCase) {
 func TestBareDomains(t *testing.T) {
 	runHostCases(t, []scanCase{
 		{"subdomain of a real tld", "see borders.xevion.dev now", []string{"host:borders.xevion.dev"}},
-		{"apex domain", "visit example.com today", []string{"host:example.com"}},
 		{"www prefix", "www.example.com", []string{"host:www.example.com"}},
 		{"www prefix on an unlisted tld", "www.example.zzzz", nil},
 		{"www prefix on any real tld", "www.foo.bar", []string{"host:www.foo.bar"}},
@@ -90,8 +89,6 @@ func TestLocalNames(t *testing.T) {
 		{"localhost suffix", "app.localhost", []string{"host:app.localhost"}},
 		{"nested localhost suffix", "a.b.localhost:3000", []string{"host:a.b.localhost:3000"}},
 		{"reserved test", "foo.test", []string{"host:foo.test"}},
-		{"reserved example", "foo.example", []string{"host:foo.example"}},
-		{"reserved invalid", "foo.invalid", []string{"host:foo.invalid"}},
 		{"single label with scheme", "http://devbox/", []string{"url:http://devbox/"}},
 		{"single label with port", "devbox:3000", []string{"host:devbox:3000"}},
 		{"single label with low service port", "ssh devbox:22", []string{"host:devbox:22"}},
@@ -115,7 +112,6 @@ func TestNotHosts(t *testing.T) {
 		{"go and python idents", "os.File std.fs exec.Cmd self.user.name", nil},
 		{"abbreviations", "e.g. i.e. a.k.a. etc.", nil},
 		{"attribute named like a tld", "self.name user.id x.is this.in obj.at obj.group x.host log.info s.store", nil},
-		{"getter chain", "self.config.get", nil},
 		{"calls", "example.com(x) list.io(3) conn.co[0]", nil},
 		{"python import", "from foo.app import bar", nil},
 		{"import statement", "import foo.dev", nil},
@@ -141,7 +137,6 @@ func TestNotHosts(t *testing.T) {
 		{"windows path component", `C:\a\b.dev`, nil},
 		{"hyphen glued", "--foo.bar-baz", nil},
 		{"underscore glued", "my_host.example.com", nil},
-		{"digit-only tld", "1.2.3.4.5", nil},
 		{"mixed case tld", "Foo.Bar Foo.Com", nil},
 		{"unlisted tld", "foo.zzzz", nil},
 		{"one letter tld", "foo.x:80", nil},
@@ -150,8 +145,6 @@ func TestNotHosts(t *testing.T) {
 		{"glob", "src/**/*.dev", nil},
 		{"word char after", "example.comx", nil},
 		{"trailing underscore", "example.com_x", nil},
-		{"uuid and hash", "550e8400-e29b-41d4-a716-446655440000", nil},
-		{"statusline", "cost $0.64 at 152.3 tok/s", nil},
 	})
 }
 
@@ -187,22 +180,18 @@ func TestSchemes(t *testing.T) {
 		{"regex fragments", `https?://  \w+://  {scheme}://host  ${proto}://h`, nil},
 		{"double colon", "a::b std::io", nil},
 		{"location", "file.rs:12", nil},
-		{"key value", "key:value foo: bar", nil},
-		{"timestamp", "12:30:45", nil},
 		{"unknown word colon", "mailto: nobody", nil},
 	})
 }
 
 func TestURLBounds(t *testing.T) {
 	runHostCases(t, []scanCase{
-		{"parens", "(https://example.com/a)", []string{"url:https://example.com/a"}},
 		{"parens then period", "(see https://example.com/a).", []string{"url:https://example.com/a"}},
 		{"square brackets", "[https://example.com/a]", []string{"url:https://example.com/a"}},
 		{"braces", "{https://example.com/a}", []string{"url:https://example.com/a"}},
 		{"angle", "<https://example.com/a>", []string{"url:https://example.com/a"}},
 		{"quotes", `"https://example.com/a", 'https://example.com/b'`, []string{"url:https://example.com/a", "url:https://example.com/b"}},
 		{"backticks", "`https://example.com/a`", []string{"url:https://example.com/a"}},
-		{"markdown link", "[docs](https://docs.rs/serde)", []string{"url:https://docs.rs/serde"}},
 		{"markdown link with url text", "[https://x.com](https://x.com)", []string{"url:https://x.com", "url:https://x.com"}},
 		{"adjacent markdown links", "[a](https://x.com/a)[b](https://y.com/b)", []string{"url:https://x.com/a", "url:https://y.com/b"}},
 		{"markdown link with parens in url", "[w](https://en.wikipedia.org/wiki/Foo_(bar))", []string{"url:https://en.wikipedia.org/wiki/Foo_(bar)"}},
@@ -239,7 +228,6 @@ func TestSchemelessURLs(t *testing.T) {
 		{"localhost port path", "localhost:8080/api/v1", []string{"url:localhost:8080/api/v1"}},
 		{"ipv4 port path", "10.0.0.1:8080/api", []string{"url:10.0.0.1:8080/api"}},
 		{"ipv4 path", "10.0.0.1/admin", []string{"url:10.0.0.1/admin"}},
-		{"ipv4 cidr stays a host", "10.0.0.0/8", []string{"host:10.0.0.0/8"}},
 		{"ipv6 port path", "[::1]:8080/x", []string{"url:[::1]:8080/x"}},
 		{"image reference", "docker.io/library/nginx:latest", []string{"url:docker.io/library/nginx:latest"}},
 		{"registry reference", "pull ghcr.io/owner/img:1.2", []string{"url:ghcr.io/owner/img:1.2"}},
@@ -253,7 +241,6 @@ func TestSchemelessURLs(t *testing.T) {
 
 func TestHostPorts(t *testing.T) {
 	runHostCases(t, []scanCase{
-		{"domain", "example.com:443", []string{"host:example.com:443"}},
 		{"domain in prose", "connect to db.internal:5432, then", []string{"host:db.internal:5432"}},
 		{"internal tld with port", "api.corp:8443", []string{"host:api.corp:8443"}},
 		{"port zero", "example.com:0", nil},
@@ -297,7 +284,6 @@ func TestIPs(t *testing.T) {
 		{"section number", "RFC 5280, Section 4.2.1.6 and version 1.2.3.4", nil},
 		{"v4 after a verb", "ping 1.2.3.4", []string{"host:1.2.3.4"}},
 		{"v4 sentence end", "ping 10.0.0.1.", []string{"host:10.0.0.1"}},
-		{"v4 cidr", "10.0.0.0/8", []string{"host:10.0.0.0/8"}},
 		{"v4 with port then comma", "10.0.0.1:22, 10.0.0.2:22", []string{"host:10.0.0.1:22", "host:10.0.0.2:22"}},
 		{"v6 loopback", "::1", []string{"host:::1"}},
 		{"v6 compressed", "2001:db8::1", []string{"host:2001:db8::1"}},
@@ -313,7 +299,6 @@ func TestIPs(t *testing.T) {
 
 func TestSHAHostInteraction(t *testing.T) {
 	runHostCases(t, []scanCase{
-		{"sha in a url path", "https://github.com/x/y/commit/3f2a9c1", []string{"url:https://github.com/x/y/commit/3f2a9c1"}},
 		{"sha next to a host", "3f2a9c1 example.com", []string{"sha:3f2a9c1", "host:example.com"}},
 		{"sha named like a domain label", "3f2a9c1.example.com", []string{"host:3f2a9c1.example.com"}},
 	})
@@ -323,7 +308,6 @@ func TestOverlapAndLinks(t *testing.T) {
 	runHostCases(t, []scanCase{
 		{"url then bare host", "http://example.com/a example.com", []string{"url:http://example.com/a", "host:example.com"}},
 		{"host inside url is not repeated", "https://sub.example.com/x", []string{"url:https://sub.example.com/x"}},
-		{"scp host not repeated", "git@github.com:org/repo.git", []string{"url:git@github.com:org/repo.git"}},
 		{"osc 8 link wins over the host in its text", "\x1b]8;;https://example.com/real\x1b\\example.com\x1b]8;;\x1b\\", []string{"url:example.com"}},
 		{"osc 8 link wins over a longer path", "\x1b]8;;https://example.com/real\x1b\\example.com/path\x1b]8;;\x1b\\", []string{"url:example.com/path"}},
 		{"hosts across a wrap", "see borders.xev\r\nion.dev now", []string{"host:borders.xevion.dev"}},

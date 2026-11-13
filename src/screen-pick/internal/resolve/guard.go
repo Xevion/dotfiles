@@ -46,6 +46,12 @@ func (g *Guard) Wrap(env Env) Env {
 	return env
 }
 
+// WrapStat returns stat guarded the same way: a call that outlasts the budget
+// returns ErrSlow, and so does every later one under that mount.
+func (g *Guard) WrapStat(stat func(string) (fs.FileInfo, error)) func(string) (fs.FileInfo, error) {
+	return func(p string) (fs.FileInfo, error) { return guarded(g, p, stat) }
+}
+
 func guarded[T any](g *Guard, p string, call func(string) (T, error)) (T, error) {
 	var zero T
 	if g.isSlow(p) {

@@ -1,8 +1,8 @@
 package detect
 
 import (
-	"regexp"
 	"screenpick/internal/decode"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -16,18 +16,50 @@ type link struct {
 	target     string
 }
 
-// clean strips escape sequences and soft-wrap markers. offs[i] is the index
-// in text of cleaned byte i, so spans map back onto the screen.
+// offsets maps cleaned byte indexes back to indexes in the original text. The
+// two only drift apart where something was stripped or inserted, so it keeps
+// one entry per linear run instead of one per byte.
+type offsets struct {
+	clean, raw []int
+	// cleanLen and rawLen are the lengths of the cleaned and original text.
+	cleanLen, rawLen int
+}
+
+// add records that cleaned byte c came from original byte r. Bytes are added
+// in cleaned order.
+func (o *offsets) add(c, r int) {
+	if k := len(o.clean) - 1; k >= 0 && r == o.raw[k]+c-o.clean[k] {
+		return
+	}
+	o.clean = append(o.clean, c)
+	o.raw = append(o.raw, r)
+}
+
+// at is the index in the original text of cleaned byte c; at(cleanLen) is the
+// length of the original.
+func (o *offsets) at(c int) int {
+	if c >= o.cleanLen {
+		return o.rawLen
+	}
+	k := sort.Search(len(o.clean), func(i int) bool { return o.clean[i] > c }) - 1
+	return o.raw[k] + c - o.clean[k]
+}
+
+// clean strips escape sequences and soft-wrap markers. The offsets map
+// cleaned bytes back onto the screen.
 //
 // With width > 0, a wrap marker after a row narrower than width is read as a
 // hard break: a real wrap fills the row, while full-screen programs draw with
 // cursor moves that kitty records as wraps on every row.
-func clean(text string, width int) (string, []int, []link) {
+func clean(text string, width int) (string, *offsets, []link) {
 	var b strings.Builder
-	offs := make([]int, 0, len(text)+1)
+	b.Grow(len(text))
+	offs := &offsets{}
 	var links []link
 	open, target := -1, ""
 	rowStart := 0
+	// noTerminator is a position from which no string terminator follows.
+	noTerminator := len(text) + 1
 	for i := 0; i < len(text); {
 		c := text[i]
 		switch {
@@ -43,8 +75,8 @@ func clean(text string, width int) (string, []int, []link) {
 			}
 			if strings.IndexByte(cursorFinals, text[j]) >= 0 {
 				// Cursor movement parts the text on either side of it.
+				offs.add(b.Len(), i)
 				b.WriteByte(' ')
-				offs = append(offs, i)
 			}
 			i = j + 1
 		case c == 0x1b && i+1 < len(text) && text[i+1] == ']':
@@ -71,7 +103,7 @@ func clean(text string, width int) (string, []int, []link) {
 			}
 			i = next
 		case c == 0x1b:
-			i = skipEscape(text, i)
+			i = skipEscape(text, i, &noTerminator)
 		case c == '\r' || c == 0:
 			// kitty marks a soft wrap with CR (launch) or NUL (hints), each
 			// followed by the newline it introduced.
@@ -79,29 +111,29 @@ func clean(text string, width int) (string, []int, []link) {
 			i++
 			if i < len(text) && text[i] == '\n' {
 				if hard {
+					offs.add(b.Len(), i)
 					b.WriteByte('\n')
-					offs = append(offs, i)
 				}
 				i++
 			} else {
 				// A lone CR overwrites the line, so what follows is not a
 				// continuation of what came before.
+				offs.add(b.Len(), i-1)
 				b.WriteByte(' ')
-				offs = append(offs, i-1)
 			}
 			rowStart = i
 		case c == '\n':
+			offs.add(b.Len(), i)
 			b.WriteByte(c)
-			offs = append(offs, i)
 			i++
 			rowStart = i
 		default:
+			offs.add(b.Len(), i)
 			b.WriteByte(c)
-			offs = append(offs, i)
 			i++
 		}
 	}
-	offs = append(offs, len(text))
+	offs.cleanLen, offs.rawLen = b.Len(), len(text)
 	return b.String(), offs, links
 }
 
@@ -111,8 +143,9 @@ const cursorFinals = "ABCDEFGHdfX@P"
 // skipEscape returns the index after the non-CSI, non-OSC escape sequence at
 // text[i]. It consumes intermediates and one final byte, as in ESC ( B, but
 // leaves alone anything that is not a plausible final, so a stray ESC never
-// takes the first character of the text after it.
-func skipEscape(text string, i int) int {
+// takes the first character of the text after it. A search for a string
+// terminator that fails is not repeated past the point it started from.
+func skipEscape(text string, i int, noTerminator *int) int {
 	j := i + 1
 	for j < len(text) && strings.IndexByte(" #%()*+-.", text[j]) >= 0 {
 		j++
@@ -126,8 +159,11 @@ func skipEscape(text string, i int) int {
 	}
 	if j == i+1 && strings.IndexByte("P_^X", f) >= 0 {
 		// DCS, APC, PM and SOS strings run to a string terminator.
-		if end := strings.Index(text[j+1:], "\x1b\\"); end >= 0 {
-			return j + 1 + end + 2
+		if j+1 < *noTerminator {
+			if end := strings.Index(text[j+1:], "\x1b\\"); end >= 0 {
+				return j + 1 + end + 2
+			}
+			*noTerminator = j + 1
 		}
 	}
 	return j + 1
@@ -185,17 +221,19 @@ const splitChars = "()[]{}<>\"'`,;|="
 func segments(s string, a, b int) [][2]int {
 	var segs [][2]int
 	start := a
+	unclosed := false
 	for i := a; i < b; i++ {
 		c := s[i]
 		if c == '\\' {
 			i++
 			continue
 		}
-		if c == '$' && i+1 < b && s[i+1] == '{' {
+		if c == '$' && i+1 < b && s[i+1] == '{' && !unclosed {
 			if j := strings.IndexByte(s[i:b], '}'); j > 0 {
 				i += j
 				continue
 			}
+			unclosed = true
 		}
 		if strings.IndexByte(splitChars, c) >= 0 {
 			if i > start {
@@ -226,19 +264,80 @@ type spanSet struct {
 	s     string
 	out   []span
 	index map[[2]int]int
+	// budget is how many readings the span being added may still start at a
+	// root inside a word, and seen the interior readings already made.
+	budget int
+	seen   map[reading]struct{}
 }
+
+// reading is one call to addPre.
+type reading struct {
+	a, b      int
+	strict    bool
+	wordStart int
+	pre       int
+}
+
+const (
+	// maxSpan is the longest stretch of text read as one path: no file name
+	// is longer, and the cost of a reading grows with its length.
+	maxSpan = 4096
+	// maxInterior caps the readings that start at a root inside one span,
+	// not counting the elements of a colon-separated list.
+	maxInterior = 64
+)
 
 // add normalises [a,b) and records it, along with a git a/ or b/ stripped form
 // and every reading that starts at a root inside it. wordStart is where the
 // enclosing word began, for spotting a leading ….
 func (ss *spanSet) add(a, b int, strict bool, wordStart int) {
-	ss.addPre(a, b, strict, wordStart, -1)
+	ss.budget = maxInterior
+	ss.addPre(reading{a, b, strict, wordStart, -1})
 }
 
-func (ss *spanSet) addPre(a, b int, strict bool, wordStart, pre int) {
-	ss.addInterior(a, b, strict)
+// fresh reports whether the interior reading r is new, and marks it made.
+func (ss *spanSet) fresh(r reading) bool {
+	if _, ok := ss.seen[r]; ok {
+		return false
+	}
+	if ss.seen == nil {
+		ss.seen = map[reading]struct{}{}
+	}
+	ss.seen[r] = struct{}{}
+	return true
+}
+
+// interior adds the reading of [a,b) that starts at a root inside a word,
+// unless it was already made.
+func (ss *spanSet) interior(a, b int, strict bool, pre int) {
+	if r := (reading{a, b, strict, -1, pre}); ss.fresh(r) {
+		ss.addPre(r)
+	}
+}
+
+// addPre records a reading and everything that follows from it. A reading
+// that starts a chain of colon-separated roots is followed iteratively, and
+// recorded last to first.
+func (ss *spanSet) addPre(r reading) {
+	var buf [4]reading
+	chain := buf[:0]
+	for {
+		chain = append(chain, r)
+		next, more := ss.addInterior(r.a, r.b, r.strict)
+		if !more {
+			break
+		}
+		r = next
+	}
+	for i := len(chain) - 1; i >= 0; i-- {
+		ss.record(chain[i])
+	}
+}
+
+func (ss *spanSet) record(r reading) {
+	a, b, strict, wordStart, pre := r.a, r.b, r.strict, r.wordStart, r.pre
 	a, b = normalize(ss.s, a, b, wordStart)
-	if a >= b || strict && simplyWrapped(ss.s[a:b]) {
+	if a >= b || b-a > maxSpan || strict && simplyWrapped(ss.s[a:b]) {
 		return
 	}
 	t := ss.s[a:b]
@@ -261,8 +360,8 @@ func (ss *spanSet) addPre(a, b int, strict bool, wordStart, pre int) {
 		strict = true
 	}
 	if strings.IndexByte(t, '-') > 0 {
-		if m := contextLine.FindStringSubmatch(t); m != nil {
-			ss.put(a, a+len(m[1]), true, pre)
+		if n := contextEnd(t); n >= 0 {
+			ss.put(a, a+n, true, pre)
 		}
 	}
 	ss.put(a, b, strict, pre)
@@ -275,21 +374,12 @@ func (ss *spanSet) addPre(a, b int, strict bool, wordStart, pre int) {
 // a/ and b/, and the mnemonic i/ w/ c/ o/.
 const gitSides = "abciwo"
 
-var (
-	contextLine = regexp.MustCompile(`^(.+\.[A-Za-z][A-Za-z0-9]*)-\d+-(?:\D|$)`)
-	fragmentRe  = regexp.MustCompile(`#L\d+(?:C\d+)?(?:-L?\d+(?:C\d+)?)?$`)
-	hostPortEnd = regexp.MustCompile(`:\d+$`)
-)
-
 // fragmentStart is the index of a #L12 line fragment ending t, or -1.
 func fragmentStart(t string) int {
 	if !strings.Contains(t, "#L") {
 		return -1
 	}
-	if loc := fragmentRe.FindStringIndex(t); loc != nil {
-		return loc[0]
-	}
-	return -1
+	return fragmentIndex(t)
 }
 
 // trailingEscape is how many bytes of literal escape end t: a backslash
@@ -323,36 +413,73 @@ func trailingEscape(t string) int {
 // The junk is unknown, so these readings count only when the path is on disk,
 // except after a colon in a list of paths, where every element is trusted if
 // the first was.
-func (ss *spanSet) addInterior(a, b int, strict bool) {
+func (ss *spanSet) addInterior(a, b int, strict bool) (next reading, more bool) {
 	s := ss.s
 	rooted := rootAt(s[a+junkLen(s[a:b]) : b])
 	colonDone := false
+	// A prefix holding a scheme or a glob, or only dots, rules out every
+	// root after it, so where that starts is found once.
+	var blockAt, dotsEnd int
+	blockKnown := false
 	for i := a + 1; i < b; i++ {
 		if c := s[i-1]; c == ' ' || c == '\t' || c == '\n' {
 			return
 		}
+		if rooted && s[i-1] != ':' {
+			continue
+		}
 		if c := s[i]; s[i-1] != ':' && !mayStartRoot(c) {
 			continue
 		}
-		prefix := s[a:i]
 		t := s[i:b]
 		if s[i-1] == ':' {
 			if colonDone || !(unixRootAt(t) || junkLen(t) > 0) || isDriveColon(s, a, i-1) {
 				continue
 			}
 			colonDone = true
-			if rooted || junkLen(t) > 0 {
-				ss.addPre(i, b, strict, -1, -1)
+			if rooted {
+				if r := (reading{i, b, strict, -1, -1}); ss.fresh(r) {
+					return r, true
+				}
+				return
+			}
+			if junkLen(t) > 0 {
+				ss.interior(i, b, strict, -1)
 			} else {
-				ss.addPre(i, b, true, -1, a)
+				ss.interior(i, b, true, a)
 			}
 			continue
 		}
-		if rooted || !rootAt(t) || !interiorOK(prefix, t, s[i-1]) {
+		if ss.budget <= 0 || rooted || !rootAt(t) {
 			continue
 		}
-		ss.addPre(i, b, true, -1, a)
+		if !blockKnown {
+			blockKnown = true
+			blockAt, dotsEnd = interiorBlock(s, a, b)
+		}
+		if !interiorOK(s[a:i], t, s[i-1], i >= blockAt || i <= dotsEnd) {
+			continue
+		}
+		ss.budget--
+		ss.interior(i, b, true, a)
 	}
+	return
+}
+
+// interiorBlock finds, for the span [a,b), the first end of a prefix that
+// holds "://" or a * or ?, and the end of the run of dots the span starts
+// with.
+func interiorBlock(s string, a, b int) (blockAt, dotsEnd int) {
+	blockAt = b + 1
+	if k := strings.Index(s[a:b], "://"); k >= 0 {
+		blockAt = a + k + 3
+	}
+	if k := strings.IndexAny(s[a:b], "*?"); k >= 0 {
+		blockAt = min(blockAt, a+k+1)
+	}
+	for dotsEnd = a; dotsEnd < b && s[dotsEnd] == '.'; dotsEnd++ {
+	}
+	return
 }
 
 // isDriveColon reports whether the colon at s[c] follows a lone letter that
@@ -362,11 +489,11 @@ func isDriveColon(s string, a, c int) bool {
 }
 
 // interiorOK says whether a root t, found after prefix and a byte prev, may
-// start a path.
-func interiorOK(prefix, t string, prev byte) bool {
+// start a path. barred is set when prefix holds a scheme or a glob, or is
+// only dots.
+func interiorOK(prefix, t string, prev byte, barred bool) bool {
 	switch {
-	case strings.Contains(prefix, "://"), strings.ContainsAny(prefix, "*?"),
-		strings.Trim(prefix, ".") == "", hostPortEnd.MatchString(prefix):
+	case barred, endsInPort(prefix):
 		return false
 	case t[0] == '/':
 		return prev != '\\' && prev != '/' && !(len(prefix) == 1 && strings.IndexByte(gitSides, prefix[0]) >= 0)
@@ -394,10 +521,7 @@ func (ss *spanSet) put(a, b int, strict bool, pre int) {
 	ss.out = append(ss.out, span{a, b, strict, pre})
 }
 
-var (
-	userRoot  = regexp.MustCompile(`^~[A-Za-z_][\w.-]*/`)
-	caretPair = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_?"
-)
+const caretPair = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_?"
 
 // rootAt reports whether t starts with something a path begins with: /, ~/,
 // ~user/, ./, ../, $VAR/, a drive letter, a UNC share or %VAR%.
@@ -410,7 +534,7 @@ func rootAt(t string) bool {
 	case strings.HasPrefix(t, `\\`):
 		return len(t) > 2 && t[2] != '\\'
 	case t[0] == '%':
-		return windowsVar.MatchString(t)
+		return isWindowsVar(t)
 	}
 	return decode.IsDrivePath(t) || unixRootAt(t)
 }
@@ -429,9 +553,9 @@ func unixRootAt(t string) bool {
 	case t[0] == '/':
 		return len(t) > 1 && t[1] != '/'
 	case t[0] == '~':
-		return pathRoot.MatchString(t) || userRoot.MatchString(t)
+		return pathRootLen(t) > 0 || isUserRoot(t)
 	case t[0] == '.' || t[0] == '$':
-		return pathRoot.MatchString(t)
+		return pathRootLen(t) > 0
 	}
 	return false
 }
@@ -480,8 +604,11 @@ func normalize(s string, a, b, wordStart int) (int, int) {
 	for a < b && s[a] == '*' {
 		a++
 	}
-	if i := colonCut(s[a:b]); i >= 0 {
+	if i := colonCut(s[a:min(b, a+maxSpan+1)]); i >= 0 {
 		b = a + i
+	}
+	if b-a > maxSpan {
+		return a, a
 	}
 	for a < b && strings.IndexByte("*.,;:!?", s[b-1]) >= 0 {
 		b--
@@ -578,6 +705,10 @@ func pathSpans(s string) []span {
 // close before one, which may hold spaces.
 func addQuoted(ss *spanSet) {
 	s := ss.s
+	// closer[k] is the closing quote found for the last opening quote of kind k,
+	// or -1 when the line holds none before stop[k]. Openings come in text
+	// order, so the search is reused until it stops covering them.
+	var closer, stop [3]int
 	for i := 0; i < len(s); i++ {
 		q := s[i]
 		if q != '\'' && q != '"' && q != '`' || escaped(s, i) {
@@ -586,20 +717,34 @@ func addQuoted(ss *spanSet) {
 		if i > 0 && strings.IndexByte(" \t\n([{=:,", s[i-1]) < 0 {
 			continue
 		}
-		for j := i + 1; j < len(s) && s[j] != '\n'; j++ {
-			if s[j] != q || escaped(s, j) {
-				continue
-			}
-			if j+1 < len(s) && strings.IndexByte(" \t\n)]},;:.", s[j+1]) < 0 {
-				continue
-			}
+		k := strings.IndexByte("'\"`", q)
+		if closer[k] >= 0 && closer[k] <= i || closer[k] < 0 && i >= stop[k] {
+			closer[k], stop[k] = closingQuote(s, i)
+		}
+		if j := closer[k]; j >= 0 {
 			if j > i+1 {
 				ss.add(i+1, j, false, i+1)
 			}
 			i = j
-			break
 		}
 	}
+}
+
+// closingQuote finds the quote that closes the one at s[i] on the same line,
+// and where the search ended.
+func closingQuote(s string, i int) (closer, end int) {
+	q := s[i]
+	j := i + 1
+	for ; j < len(s) && s[j] != '\n'; j++ {
+		if s[j] != q || escaped(s, j) {
+			continue
+		}
+		if j+1 < len(s) && strings.IndexByte(" \t\n)]},;:.", s[j+1]) < 0 {
+			continue
+		}
+		return j, j
+	}
+	return -1, j
 }
 
 func isASCIILetter(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }

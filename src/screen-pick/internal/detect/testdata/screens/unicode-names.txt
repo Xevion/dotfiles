@@ -1,0 +1,13 @@
+$ ls
+naïve.txt  日本.txt  été.txt  ä.txt  résumé final.docx  Фото 2026.png
+$ cat /tmp/naïve.txt /tmp/日本.txt
+$ mv 日本/メモ.md ~/docs/ノート.md
+日本語のテキスト /home/u/proj/été.txt を開く。
+中文路径 /tmp/日本.txt，结束
+ファイル:src/main.rs:12:5
+see https://例え.jp/パス and https://xn--r8jz45g.jp/ for details
+Привет, /home/u/proj/README.md!
+emoji 🎉 /etc/hosts 🎉 done
+café.example.com and münchen.de/stadt
+cost: €12.50 · 5 files · ✓ /var/log/syslog ✗ /nope/missing.log
+😀😀😀 src/lib.rs

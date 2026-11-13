@@ -2,10 +2,12 @@ package index
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -97,5 +99,75 @@ func TestWalkStopsWhenCancelled(t *testing.T) {
 	}
 	if called {
 		t.Error("found a file after cancellation")
+	}
+}
+
+func walkRel(t *testing.T, root, query string) []string {
+	t.Helper()
+	var mu sync.Mutex
+	var got []string
+	err := Walk(context.Background(), []string{root}, query, func(p string) {
+		rel, _ := filepath.Rel(root, p)
+		mu.Lock()
+		got = append(got, rel)
+		mu.Unlock()
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(got)
+	return got
+}
+
+// A skipped name is still searched when the query itself goes through it.
+func TestWalkEntersSkippedDirNamedByQuery(t *testing.T) {
+	root := tree(t, "proj/target/debug/app", "proj/src/target/debug/app", "other/target/debug/app")
+	got := walkRel(t, root, "target/debug/app")
+	want := []string{"other/target/debug/app", "proj/src/target/debug/app", "proj/target/debug/app"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want +got):\n%s", diff)
+	}
+	if got := walkRel(t, root, "debug/app"); len(got) != 0 {
+		t.Errorf("a query not naming target should skip it, got %v", got)
+	}
+}
+
+// proc and sys only mean the kernel's trees at the top of the filesystem.
+func TestWalkSearchesProjectDirsNamedSys(t *testing.T) {
+	root := tree(t, "proj/sys/clock.c", "proj/proc/exec.c")
+	got := walkRel(t, root, "clock.c")
+	if diff := cmp.Diff([]string{"proj/sys/clock.c"}, got); diff != "" {
+		t.Errorf("(-want +got):\n%s", diff)
+	}
+}
+
+func TestGitDeduplicatesUnmergedPaths(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	root := tree(t)
+	run := func(stdin string, args ...string) string {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = root
+		cmd.Stdin = strings.NewReader(stdin)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	run("", "init", "-q")
+	blob := run("x", "hash-object", "-w", "--stdin")
+	var info strings.Builder
+	for stage := 1; stage <= 3; stage++ {
+		fmt.Fprintf(&info, "100644 %s %d\tconflict.txt\n", blob, stage)
+	}
+	run(info.String(), "update-index", "--index-info")
+	got, err := Git(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff([]string{"conflict.txt"}, got); diff != "" {
+		t.Errorf("(-want +got):\n%s", diff)
 	}
 }

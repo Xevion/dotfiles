@@ -1,0 +1,120 @@
+# width 0
+host "example.com" [6-17]
+url "http://localhost:3000/" [21-43]
+path "src/main.rs" @12:4 [54-65] -> "/home/u/proj/src/main.rs" process file +0
+path "Cargo.toml" [76-86] -> "/home/u/proj/Cargo.toml" process file +0
+url "git@github.com:example/proj.git" [252-283]
+url "ssh://git@example.com:2222/repo" [285-316]
+host "10.0.0.1:8080" [317-330]
+host "192.168.1.0/24" [331-345]
+host "[::1]:3000" [346-356]
+host "fe80::1" [357-364]
+host "2001:db8::ff00:42:8329" [365-387]
+sha "9c8d7e6" [395-402]
+sha "3f2a1b49c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3" [407-447]
+path "/home/u/My Documents/notes.txt" [529-559] -> "/home/u/My Documents/notes.txt" absolute file +0
+path "/home/u/No Such/x.txt" [562-583] -> "/home/u/No Such/x.txt" absolute missing +0
+path "/tmp/out.bin" [594-606] -> "/tmp/out.bin" absolute file +0
+path "~/.bashrc" [611-620] -> "/home/u/.bashrc" home file +0
+path "/var/log/syslog" [626-641] -> "/var/log/syslog" absolute file +0
+path "src/main.rs" [656-667] -> "/home/u/proj/src/main.rs" process file +0
+path "src/main.rs" [670-681] -> "/home/u/proj/src/main.rs" process file +0
+path "tests/test_x.py" [682-697] -> "/home/u/proj/tests/test_x.py" process missing +0
+path "/app/index.js" @5:3 [738-751] -> "/app/index.js" absolute missing +0
+path "foo.c" @12:0 [757-762] -> "/home/u/proj/foo.c" process missing +0
+path "/usr/lib/python3.12/os.py" @10:0 [786-811] -> "/usr/lib/python3.12/os.py" absolute file +0
+path "/tmp/build-cache/5b090f6779e3.log" [841-874] -> "/tmp/build-cache/5b090f6779e3.log" absolute file +0
+path "README.md" [883-892] -> "/home/u/proj/README.md" process file +0
+path "CLAUDE.md" [893-902] -> "/home/u/proj/CLAUDE.md" process missing +0
+path "package.json" [903-915] -> "/home/u/proj/package.json" process file +0
+path "b.d.ts" [916-922] -> "/home/u/proj/b.d.ts" process file +0
+path "a.tar.gz" [923-931] -> "/home/u/proj/a.tar.gz" process file +0
+url "https://docs.rs/serde/1.0.195/serde/" [1007-1043]
+url "docs.rs/serde" [1048-1061]
+host "localhost:5432" [1062-1076]
+host "devbox:3000" [1077-1088]
+path "~/.config/app/app.conf" [1108-1130] -> "/home/u/.config/app/app.conf" home file +0
+path "~root/x.txt" [1131-1142] -> "/root/x.txt" absolute missing +0
+path "~user/proj/main.rs" [1143-1161] -> "/home/user/proj/main.rs" absolute missing +0
+path "$HOME/.bashrc" [1162-1175] -> "/home/u/.bashrc" absolute file +0
+path "${HOME}/.bashrc" [1176-1191] -> "/home/u/.bashrc" absolute file +0
+# width 40
+host "example.com" [6-17]
+url "http://localhost:3000/" [21-43]
+path "src/main.rs" @12:4 [54-65] -> "/home/u/proj/src/main.rs" process file +0
+path "Cargo.toml" [76-86] -> "/home/u/proj/Cargo.toml" process file +0
+url "git@github.com:example/proj.git" [252-283]
+url "ssh://git@example.com:2222/repo" [285-316]
+host "10.0.0.1:8080" [317-330]
+host "192.168.1.0/24" [331-345]
+host "[::1]:3000" [346-356]
+host "fe80::1" [357-364]
+host "2001:db8::ff00:42:8329" [365-387]
+sha "9c8d7e6" [395-402]
+sha "3f2a1b49c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3" [407-447]
+path "/home/u/My Documents/notes.txt" [529-559] -> "/home/u/My Documents/notes.txt" absolute file +0
+path "/home/u/No Such/x.txt" [562-583] -> "/home/u/No Such/x.txt" absolute missing +0
+path "/tmp/out.bin" [594-606] -> "/tmp/out.bin" absolute file +0
+path "~/.bashrc" [611-620] -> "/home/u/.bashrc" home file +0
+path "/var/log/syslog" [626-641] -> "/var/log/syslog" absolute file +0
+path "src/main.rs" [656-667] -> "/home/u/proj/src/main.rs" process file +0
+path "src/main.rs" [670-681] -> "/home/u/proj/src/main.rs" process file +0
+path "tests/test_x.py" [682-697] -> "/home/u/proj/tests/test_x.py" process missing +0
+path "/app/index.js" @5:3 [738-751] -> "/app/index.js" absolute missing +0
+path "foo.c" @12:0 [757-762] -> "/home/u/proj/foo.c" process missing +0
+path "/usr/lib/python3.12/os.py" @10:0 [786-811] -> "/usr/lib/python3.12/os.py" absolute file +0
+path "/tmp/build-cache/5b090f6779e3.log" [841-874] -> "/tmp/build-cache/5b090f6779e3.log" absolute file +0
+path "README.md" [883-892] -> "/home/u/proj/README.md" process file +0
+path "CLAUDE.md" [893-902] -> "/home/u/proj/CLAUDE.md" process missing +0
+path "package.json" [903-915] -> "/home/u/proj/package.json" process file +0
+path "b.d.ts" [916-922] -> "/home/u/proj/b.d.ts" process file +0
+path "a.tar.gz" [923-931] -> "/home/u/proj/a.tar.gz" process file +0
+url "https://docs.rs/serde/1.0.195/serde/" [1007-1043]
+url "docs.rs/serde" [1048-1061]
+host "localhost:5432" [1062-1076]
+host "devbox:3000" [1077-1088]
+path "~/.config/app/app.conf" [1108-1130] -> "/home/u/.config/app/app.conf" home file +0
+path "~root/x.txt" [1131-1142] -> "/root/x.txt" absolute missing +0
+path "~user/proj/main.rs" [1143-1161] -> "/home/user/proj/main.rs" absolute missing +0
+path "$HOME/.bashrc" [1162-1175] -> "/home/u/.bashrc" absolute file +0
+path "${HOME}/.bashrc" [1176-1191] -> "/home/u/.bashrc" absolute file +0
+# width 120
+host "example.com" [6-17]
+url "http://localhost:3000/" [21-43]
+path "src/main.rs" @12:4 [54-65] -> "/home/u/proj/src/main.rs" process file +0
+path "Cargo.toml" [76-86] -> "/home/u/proj/Cargo.toml" process file +0
+url "git@github.com:example/proj.git" [252-283]
+url "ssh://git@example.com:2222/repo" [285-316]
+host "10.0.0.1:8080" [317-330]
+host "192.168.1.0/24" [331-345]
+host "[::1]:3000" [346-356]
+host "fe80::1" [357-364]
+host "2001:db8::ff00:42:8329" [365-387]
+sha "9c8d7e6" [395-402]
+sha "3f2a1b49c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3" [407-447]
+path "/home/u/My Documents/notes.txt" [529-559] -> "/home/u/My Documents/notes.txt" absolute file +0
+path "/home/u/No Such/x.txt" [562-583] -> "/home/u/No Such/x.txt" absolute missing +0
+path "/tmp/out.bin" [594-606] -> "/tmp/out.bin" absolute file +0
+path "~/.bashrc" [611-620] -> "/home/u/.bashrc" home file +0
+path "/var/log/syslog" [626-641] -> "/var/log/syslog" absolute file +0
+path "src/main.rs" [656-667] -> "/home/u/proj/src/main.rs" process file +0
+path "src/main.rs" [670-681] -> "/home/u/proj/src/main.rs" process file +0
+path "tests/test_x.py" [682-697] -> "/home/u/proj/tests/test_x.py" process missing +0
+path "/app/index.js" @5:3 [738-751] -> "/app/index.js" absolute missing +0
+path "foo.c" @12:0 [757-762] -> "/home/u/proj/foo.c" process missing +0
+path "/usr/lib/python3.12/os.py" @10:0 [786-811] -> "/usr/lib/python3.12/os.py" absolute file +0
+path "/tmp/build-cache/5b090f6779e3.log" [841-874] -> "/tmp/build-cache/5b090f6779e3.log" absolute file +0
+path "README.md" [883-892] -> "/home/u/proj/README.md" process file +0
+path "CLAUDE.md" [893-902] -> "/home/u/proj/CLAUDE.md" process missing +0
+path "package.json" [903-915] -> "/home/u/proj/package.json" process file +0
+path "b.d.ts" [916-922] -> "/home/u/proj/b.d.ts" process file +0
+path "a.tar.gz" [923-931] -> "/home/u/proj/a.tar.gz" process file +0
+url "https://docs.rs/serde/1.0.195/serde/" [1007-1043]
+url "docs.rs/serde" [1048-1061]
+host "localhost:5432" [1062-1076]
+host "devbox:3000" [1077-1088]
+path "~/.config/app/app.conf" [1108-1130] -> "/home/u/.config/app/app.conf" home file +0
+path "~root/x.txt" [1131-1142] -> "/root/x.txt" absolute missing +0
+path "~user/proj/main.rs" [1143-1161] -> "/home/user/proj/main.rs" absolute missing +0
+path "$HOME/.bashrc" [1162-1175] -> "/home/u/.bashrc" absolute file +0
+path "${HOME}/.bashrc" [1176-1191] -> "/home/u/.bashrc" absolute file +0

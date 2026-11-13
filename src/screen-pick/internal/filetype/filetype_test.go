@@ -3,7 +3,9 @@ package filetype
 import (
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
+	"time"
 )
 
 func TestSniff(t *testing.T) {
@@ -24,6 +26,9 @@ func TestSniff(t *testing.T) {
 		{"doc.pdf", []byte("%PDF-1.7\n"), Document},
 		{"a.zip", []byte("PK\x03\x04\x14\x00"), Archive},
 		{"save.dat", []byte("\x00\x01\x02\x03garbage"), Binary},
+		{"notes.txt", []byte("MZ Corp meeting notes\nagenda\n"), Text},
+		{"readings.dat", []byte("0.1 0.2 0.3\n0.4 0.5 0.6\n"), Text},
+		{"table.bin", []byte("id,name\n1,a\n"), Text},
 		{"icon.svg", []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`), Image},
 	}
 	for _, tc := range cases {
@@ -46,5 +51,33 @@ func TestHead(t *testing.T) {
 	}
 	if _, err := Head(filepath.Join(dir, "gone")); err == nil {
 		t.Error("a missing file should error")
+	}
+}
+
+// Opening a FIFO for reading blocks until a writer shows up, which would hang
+// the menu of a path that merely names one.
+func TestHeadSkipsFifo(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "pipe")
+	if err := syscall.Mkfifo(p, 0o600); err != nil {
+		t.Skip("no fifo support:", err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := Head(p)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Error("a fifo has no head to read")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Head blocked on a fifo")
+	}
+}
+
+func TestHeadSkipsDirectory(t *testing.T) {
+	if _, err := Head(t.TempDir()); err == nil {
+		t.Error("a directory has no head to read")
 	}
 }

@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"io/fs"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -85,3 +86,46 @@ func BenchmarkGuardedLstat(b *testing.B) {
 		env.Lstat("/etc/hosts")
 	}
 }
+
+// A check that timed out says nothing about the path, so the resolution must
+// not read as missing; a check that answered must.
+func TestResolveMarksTimedOutPathsUnknown(t *testing.T) {
+	g := NewGuard(10 * time.Millisecond)
+	g.parsed, g.mounts = true, []string{"/", "/mnt/nfs"}
+	release := make(chan struct{})
+	defer close(release)
+	env := g.Wrap(Env{
+		Home: "/home/u",
+		Bases: []Base{
+			{Dir: "/mnt/nfs/proj", Source: SourceProcess},
+			{Dir: "/home/u/work", Source: SourceWindow},
+		},
+		Lstat: func(p string) (fs.FileInfo, error) {
+			if strings.HasPrefix(p, "/mnt/nfs") {
+				<-release
+			}
+			if p == "/home/u/work/found.go" {
+				return fakeInfo{}, nil
+			}
+			return nil, fs.ErrNotExist
+		},
+	})
+	r := New(env)
+
+	if got := r.Resolve("lost.go", nil); got.Exists || !got.Unknown {
+		t.Errorf("a timed-out base leaves the path unknown: %+v", got)
+	}
+	if got := r.Resolve("found.go", nil); !got.Exists || got.Unknown {
+		t.Errorf("a path found elsewhere exists and is not unknown: %+v", got)
+	}
+	plain := New(Env{Home: "/home/u", Lstat: func(string) (fs.FileInfo, error) { return nil, fs.ErrNotExist }})
+	if got := plain.Resolve("/etc/nope", nil); got.Exists || got.Unknown {
+		t.Errorf("a clean miss is missing, not unknown: %+v", got)
+	}
+}
+
+type fakeInfo struct{ fs.FileInfo }
+
+func (fakeInfo) IsDir() bool { return false }
+
+func (fakeInfo) Mode() fs.FileMode { return 0 }

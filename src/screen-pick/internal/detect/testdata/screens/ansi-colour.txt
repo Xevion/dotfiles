@@ -1,0 +1,13 @@
+[1m[32mPASS[0m [2msrc/lib.rs[0m
+[1m[31mFAIL[0m [4mtests/test_api.py[0m:[33m27[0m
+[0;34m/home/u/proj/src/main.rs[0m:[0;32m14[0m:[0;32m20[0m: error
+[38;5;208mwarning[0m: unused variable `x` --> [1msrc/server/mod.rs[0m:3:5
+[38;2;255;100;0m/etc/hosts[0m and [48;5;236m ~/.bashrc [0m
+[1;4;36mhttps://example.com/docs[0m
+[90m12:01:44[0m [1mINFO[0m reading [3mCargo.toml[0m
+[32m+ src/lib.rs[0m
+[31m- src/old.rs[0m
+[2K[1Gprogress: 40%[0K
+[Kdone: /home/u/proj/README.md
+[?25l[?25h[?2004h$ ls[?2004l
+(B[m[1m/var/log/syslog(B[m

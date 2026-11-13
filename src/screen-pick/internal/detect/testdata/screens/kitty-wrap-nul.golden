@@ -1,0 +1,22 @@
+# width 0
+path "/home/u/proj/src/server/mod.rs" [6-38] -> "/home/u/proj/src/server/mod.rs" absolute file +0
+path "/home/u/proj/Cargo.toml" [43-66] -> "/home/u/proj/Cargo.toml" absolute file +0
+url "https://github.com/example/proj/blob/master/src/main.rs#L14-L20" [67-132]
+path "/etc/hosts" [155-165] -> "/etc/hosts" absolute file +0
+path "/var/log/syslog" [191-206] -> "/var/log/syslog" absolute file +0
+url "docs.example.com/guide/getting-started" [207-247]
+# width 40
+path "/home/u/proj/src/server/mod" [6-33] -> "/home/u/proj/src/server/mod" absolute missing +0
+path "/home/u/proj/Cargo.toml" [43-66] -> "/home/u/proj/Cargo.toml" absolute file +0
+url "https://github.com/example/proj/blob/master/src/main.rs#L14-L20" [67-132]
+path "/etc/hosts" [155-165] -> "/etc/hosts" absolute file +0
+path "/var/log/syslog" [191-206] -> "/var/log/syslog" absolute file +0
+url "docs.example.com/guide/getting-star" [207-242]
+# width 120
+path "/home/u/proj/src/server/mod" [6-33] -> "/home/u/proj/src/server/mod" absolute missing +0
+path "/home/u/proj/Cargo.toml" [43-66] -> "/home/u/proj/Cargo.toml" absolute file +0
+url "https://github.com/example/proj/blob/master/src/ma" [67-117]
+path "in.rs" @14:0 [119-124] -> "/home/u/proj/in.rs" process missing +0
+path "/etc/hosts" [155-165] -> "/etc/hosts" absolute file +0
+path "/var/log/syslog" [191-206] -> "/var/log/syslog" absolute file +0
+url "docs.example.com/guide/getting-star" [207-242]

@@ -1,0 +1,26 @@
+# width 0
+path "/home/u/.config/app/app.conf" [34-64] -> "/home/u/.config/app/app.conf" absolute file +0
+path "/home/u/proj/src/server/handler.rs" [73-107] -> "/home/u/proj/src/server/handler.rs" absolute file +0
+path "/home/u/proj/src/server/handler.rs" [135-171] -> "/home/u/proj/src/server/handler.rs" absolute file +0
+path "/etc/hosts" [218-228] -> "/etc/hosts" absolute file +0
+url "https://example.com/a/very/long/path/that/wraps/across/the/screen?q=1&r=2#frag" [229-309]
+path "/var/log/syslog" [338-353] -> "/var/log/syslog" absolute file +0
+path "src/main.rs" @14:20 [354-365] -> "/home/u/proj/src/main.rs" process file +0
+# width 40
+path "/home/u/.config/app/app.conf" [34-64] -> "/home/u/.config/app/app.conf" absolute file +0
+path "/home/u/proj/src/server/handler.rs" [73-107] -> "/home/u/proj/src/server/handler.rs" absolute file +0
+path "/home/u/proj/src/server/handler.rs" [135-171] -> "/home/u/proj/src/server/handler.rs" absolute file +0
+path "/etc/hosts" [218-228] -> "/etc/hosts" absolute file +0
+url "https://example.com/a/very/long/path/that/wraps/across/the/screen?q=1&r=2#frag" [229-309]
+path "/var/log/syslog" [338-353] -> "/var/log/syslog" absolute file +0
+path "src/main.rs" @14:2 [354-365] -> "/home/u/proj/src/main.rs" process file +0
+# width 120
+path "/home/u/.config/app/ap" [34-56] -> "/home/u/.config/app/ap" absolute missing +0
+path "p.conf" [58-64] -> "/home/u/proj/p.conf" process missing +0
+path "/home/u/proj/src/server/handler.rs" [73-107] -> "/home/u/proj/src/server/handler.rs" absolute file +0
+path "/home/u/proj/src/server/ha" [135-161] -> "/home/u/proj/src/server/ha" absolute missing +0
+path "ndler.rs" [163-171] -> "/home/u/proj/ndler.rs" process missing +0
+path "/etc/hosts" [218-228] -> "/etc/hosts" absolute file +0
+url "https://example.com/a/very/long/path/that/wraps/acro" [229-281]
+path "/var/log/syslog" [338-353] -> "/var/log/syslog" absolute file +0
+path "src/main.rs" @14:2 [354-365] -> "/home/u/proj/src/main.rs" process file +0

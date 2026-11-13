@@ -1,0 +1,72 @@
+# width 0
+path "C:\\Users\\u" [0-10] -> "/home/u/.wine/drive_c/users/u" wine dir +0
+path "C:\\Users\\u\\proj" [63-78] -> "/home/u/.wine/drive_c/Users/u/proj" wine missing +0
+path "Cargo.toml" [203-213] -> "/home/u/proj/Cargo.toml" process file +0
+path "C:\\Users\\u" [214-224] -> "/home/u/.wine/drive_c/users/u" wine dir +0
+path "C:\\Users\\u\\proj\\Cargo.toml" [231-257] -> "/home/u/.wine/drive_c/Users/u/proj/Cargo.toml" wine missing +0
+path "C:\\Users\\u" [258-268] -> "/home/u/.wine/drive_c/users/u" wine dir +0
+path "C:\\Program Files\\App\\app.log" [279-307] -> "/home/u/.wine/drive_c/Program Files/App/app.log" wine file +0
+path "C:\\Users\\u" [309-319] -> "/home/u/.wine/drive_c/users/u" wine dir +0
+path "%USERPROFILE%\\proj" [324-342] -> "" unknown missing +0
+path "C:\\Users\\u\\proj" [346-361] -> "/home/u/.wine/drive_c/Users/u/proj" wine missing +0
+path ".\\src\\main.rs" [375-388] -> "/home/u/proj/.\\src\\main.rs" process missing +0
+path "C:\\Users\\u\\proj\\src\\missing.rs" [421-451] -> "/home/u/.wine/drive_c/Users/u/proj/src/missing.rs" wine missing +0
+path "C:\\Users\\u\\proj\\run.ps1" @12:0 [500-523] -> "/home/u/.wine/drive_c/Users/u/proj/run.ps1" wine missing +0
+path "\\\\server\\share\\docs\\report.pdf" [534-564] -> "" unknown missing +0
+path "\\\\?\\C:\\very\\long\\path\\file.txt" [565-595] -> "/home/u/.wine/drive_c/very/long/path/file.txt" wine missing +0
+path "C:\\\\Users\\\\u\\\\Desktop\\\\notes.txt" [597-629] -> "/home/u/.wine/drive_c/users/u/Desktop/notes.txt" wine file +0
+path "D:\\Data\\file.bin" [631-647] -> "/media/d/Data/file.bin" wine file +0
+path "Z:\\home\\u\\x.html" [652-668] -> "/home/u/x.html" wine file +0
+path "C:/Users/u/AppData/Local/Vendor/run.log" [669-708] -> "/home/u/.wine/drive_c/users/u/AppData/Local/Vendor/run.log" wine file +0
+path "%APPDATA%\\Vendor\\settings.json" [709-739] -> "" unknown missing +0
+path "\\\\wsl$\\Ubuntu\\home\\u\\proj\\README.md" [740-775] -> "/home/u/proj/README.md" absolute file +0
+path "C:\\temp\\new.txt" [776-791] -> "/home/u/.wine/drive_c/temp/new.txt" wine missing +0
+path "c:\\windows\\win.ini" [811-829] -> "/home/u/.wine/drive_c/windows/win.ini" wine file +0
+# width 40
+path "C:\\Users\\u" [0-10] -> "/home/u/.wine/drive_c/users/u" wine dir +0
+path "C:\\Users\\u\\proj" [63-78] -> "/home/u/.wine/drive_c/Users/u/proj" wine missing +0
+path "Cargo.toml" [203-213] -> "/home/u/proj/Cargo.toml" process file +0
+path "C:\\Users\\u" [214-224] -> "/home/u/.wine/drive_c/users/u" wine dir +0
+path "C:\\Users\\u\\proj\\Cargo.toml" [231-257] -> "/home/u/.wine/drive_c/Users/u/proj/Cargo.toml" wine missing +0
+path "C:\\Users\\u" [258-268] -> "/home/u/.wine/drive_c/users/u" wine dir +0
+path "C:\\Program Files\\App\\app.log" [279-307] -> "/home/u/.wine/drive_c/Program Files/App/app.log" wine file +0
+path "C:\\Users\\u" [309-319] -> "/home/u/.wine/drive_c/users/u" wine dir +0
+path "%USERPROFILE%\\proj" [324-342] -> "" unknown missing +0
+path "C:\\Users\\u\\proj" [346-361] -> "/home/u/.wine/drive_c/Users/u/proj" wine missing +0
+path ".\\src\\main.rs" [375-388] -> "/home/u/proj/.\\src\\main.rs" process missing +0
+path "C:\\Users\\u\\proj\\src\\missing.rs" [421-451] -> "/home/u/.wine/drive_c/Users/u/proj/src/missing.rs" wine missing +0
+path "C:\\Users\\u\\proj\\run.ps1" @12:0 [500-523] -> "/home/u/.wine/drive_c/Users/u/proj/run.ps1" wine missing +0
+path "\\\\server\\share\\docs\\report.pdf" [534-564] -> "" unknown missing +0
+path "\\\\?\\C:\\very\\long\\path\\file.txt" [565-595] -> "/home/u/.wine/drive_c/very/long/path/file.txt" wine missing +0
+path "C:\\\\Users\\\\u\\\\Desktop\\\\notes.txt" [597-629] -> "/home/u/.wine/drive_c/users/u/Desktop/notes.txt" wine file +0
+path "D:\\Data\\file.bin" [631-647] -> "/media/d/Data/file.bin" wine file +0
+path "Z:\\home\\u\\x.html" [652-668] -> "/home/u/x.html" wine file +0
+path "C:/Users/u/AppData/Local/Vendor/run.log" [669-708] -> "/home/u/.wine/drive_c/users/u/AppData/Local/Vendor/run.log" wine file +0
+path "%APPDATA%\\Vendor\\settings.json" [709-739] -> "" unknown missing +0
+path "\\\\wsl$\\Ubuntu\\home\\u\\proj\\README.md" [740-775] -> "/home/u/proj/README.md" absolute file +0
+path "C:\\temp\\new.txt" [776-791] -> "/home/u/.wine/drive_c/temp/new.txt" wine missing +0
+path "c:\\windows\\win.ini" [811-829] -> "/home/u/.wine/drive_c/windows/win.ini" wine file +0
+# width 120
+path "C:\\Users\\u" [0-10] -> "/home/u/.wine/drive_c/users/u" wine dir +0
+path "C:\\Users\\u\\proj" [63-78] -> "/home/u/.wine/drive_c/Users/u/proj" wine missing +0
+path "Cargo.toml" [203-213] -> "/home/u/proj/Cargo.toml" process file +0
+path "C:\\Users\\u" [214-224] -> "/home/u/.wine/drive_c/users/u" wine dir +0
+path "C:\\Users\\u\\proj\\Cargo.toml" [231-257] -> "/home/u/.wine/drive_c/Users/u/proj/Cargo.toml" wine missing +0
+path "C:\\Users\\u" [258-268] -> "/home/u/.wine/drive_c/users/u" wine dir +0
+path "C:\\Program Files\\App\\app.log" [279-307] -> "/home/u/.wine/drive_c/Program Files/App/app.log" wine file +0
+path "C:\\Users\\u" [309-319] -> "/home/u/.wine/drive_c/users/u" wine dir +0
+path "%USERPROFILE%\\proj" [324-342] -> "" unknown missing +0
+path "C:\\Users\\u\\proj" [346-361] -> "/home/u/.wine/drive_c/Users/u/proj" wine missing +0
+path ".\\src\\main.rs" [375-388] -> "/home/u/proj/.\\src\\main.rs" process missing +0
+path "C:\\Users\\u\\proj\\src\\missing.rs" [421-451] -> "/home/u/.wine/drive_c/Users/u/proj/src/missing.rs" wine missing +0
+path "C:\\Users\\u\\proj\\run.ps1" @12:0 [500-523] -> "/home/u/.wine/drive_c/Users/u/proj/run.ps1" wine missing +0
+path "\\\\server\\share\\docs\\report.pdf" [534-564] -> "" unknown missing +0
+path "\\\\?\\C:\\very\\long\\path\\file.txt" [565-595] -> "/home/u/.wine/drive_c/very/long/path/file.txt" wine missing +0
+path "C:\\\\Users\\\\u\\\\Desktop\\\\notes.txt" [597-629] -> "/home/u/.wine/drive_c/users/u/Desktop/notes.txt" wine file +0
+path "D:\\Data\\file.bin" [631-647] -> "/media/d/Data/file.bin" wine file +0
+path "Z:\\home\\u\\x.html" [652-668] -> "/home/u/x.html" wine file +0
+path "C:/Users/u/AppData/Local/Vendor/run.log" [669-708] -> "/home/u/.wine/drive_c/users/u/AppData/Local/Vendor/run.log" wine file +0
+path "%APPDATA%\\Vendor\\settings.json" [709-739] -> "" unknown missing +0
+path "\\\\wsl$\\Ubuntu\\home\\u\\proj\\README.md" [740-775] -> "/home/u/proj/README.md" absolute file +0
+path "C:\\temp\\new.txt" [776-791] -> "/home/u/.wine/drive_c/temp/new.txt" wine missing +0
+path "c:\\windows\\win.ini" [811-829] -> "/home/u/.wine/drive_c/windows/win.ini" wine file +0

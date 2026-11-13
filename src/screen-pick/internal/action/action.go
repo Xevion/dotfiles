@@ -3,15 +3,18 @@
 package action
 
 import (
+	"errors"
 	"io/fs"
 	"net"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
+	"unicode"
 
 	"screenpick/internal/detect"
 	"screenpick/internal/filetype"
@@ -98,13 +101,13 @@ func For(m detect.Match, ctx Context) []Action {
 	case detect.KindPath:
 		forPath(&b, m, ctx)
 	case detect.KindURL:
-		if u, ok := detect.WebURL(m); ok {
+		if u, ok := detect.WebURL(m); ok && plainText(u) {
 			b.add("o", "open in browser", GroupOpen, Open, u)
 		}
 		b.add("y", "copy", GroupCopy, Copy, m.Text)
 	case detect.KindHost:
 		host, port := splitHostPort(m.Text)
-		if u, ok := detect.WebURL(m); ok {
+		if u, ok := detect.WebURL(m); ok && plainText(u) {
 			b.add("o", "open in browser", GroupOpen, Open, u)
 		}
 		b.add("y", "copy", GroupCopy, Copy, m.Text)
@@ -113,12 +116,18 @@ func For(m detect.Match, ctx Context) []Action {
 		}
 	case detect.KindSHA:
 		if repo := ctx.CommitRepo(m.Text); repo != "" {
-			b.put(Action{Key: "g", Label: "git show", Group: GroupGit, Verb: Git, Arg: m.Text, Argv: []string{"show", m.Text}, Dir: repo})
+			b.put(Action{Key: "g", Label: "git show", Group: GroupGit, Verb: Git, Arg: m.Text, Argv: []string{"show", m.Text, "--"}, Dir: repo})
 			b.add("R", "new tab at repo root", GroupGit, Tab, repo)
 		}
 		b.add("y", "copy", GroupCopy, Copy, m.Text)
 	}
 	return b.actions
+}
+
+// plainText reports whether s is free of control characters, which have no
+// place in an address handed to the desktop's opener.
+func plainText(s string) bool {
+	return !strings.ContainsFunc(s, unicode.IsControl)
 }
 
 // tools are the programs that can open a binary, by the name they install as.
@@ -158,7 +167,7 @@ func forPath(b *builder, m detect.Match, ctx Context) {
 	if repo != "" {
 		b.add("R", "new tab at repo root", GroupGit, Tab, repo)
 		if inRepo != "" {
-			b.put(Action{Key: "l", Label: "git log", Group: GroupGit, Verb: Git, Arg: inRepo, Argv: []string{"log", "--follow", "--", inRepo}, Dir: repo})
+			b.put(Action{Key: "l", Label: "git log", Group: GroupGit, Verb: Git, Arg: inRepo, Argv: []string{"--literal-pathspecs", "log", "--follow", "--", inRepo}, Dir: repo})
 		}
 	}
 
@@ -173,11 +182,16 @@ func forPath(b *builder, m detect.Match, ctx Context) {
 }
 
 // forFile offers what suits the file's type: an editor only for text, Wine and
-// disassemblers for programs, the desktop handler for everything else.
+// disassemblers for programs, the desktop handler for everything else, and
+// nothing for a pipe or device, which an editor would wait on forever.
 func forFile(b *builder, m detect.Match, ctx Context) {
 	p := m.Path
 	class := filetype.Text
-	if head, err := ctx.Head(p); err == nil {
+	head, err := ctx.Head(p)
+	switch {
+	case errors.Is(err, filetype.ErrNotRegular):
+		return
+	case err == nil:
 		class = filetype.Sniff(p, head).Class
 	}
 	switch class {
@@ -242,7 +256,7 @@ func relativeTo(p, dir string) string {
 		return ""
 	}
 	rel, err := filepath.Rel(dir, p)
-	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, "../") {
 		return ""
 	}
 	return rel
@@ -270,10 +284,13 @@ func splitHostPort(s string) (host, port string) {
 func (a Action) Command(editor string) (cmd *exec.Cmd, detached bool) {
 	switch a.Verb {
 	case Open:
-		return exec.Command("xdg-open", a.Arg), true
+		return exec.Command(opener(), a.Arg), true
 	case Tab:
 		return exec.Command("kitten", "@", "launch", "--type=tab", "--cwd="+a.Arg), true
 	case Run:
+		if len(a.Argv) == 0 {
+			return nil, false
+		}
 		cmd = exec.Command(a.Argv[0], a.Argv[1:]...)
 		cmd.Dir = a.Dir
 		return cmd, true
@@ -288,6 +305,22 @@ func (a Action) Command(editor string) (cmd *exec.Cmd, detached bool) {
 	return nil, false
 }
 
+// opener names the program that hands a path or address to the desktop's
+// default handler: xdg-open, or what stands in for it on WSL and macOS. On
+// Linux "open" is a different program (openvt) and never a candidate.
+func opener() string {
+	candidates := []string{"xdg-open", "wslview"}
+	if runtime.GOOS == "darwin" {
+		candidates = []string{"open"}
+	}
+	for _, bin := range candidates {
+		if _, err := exec.LookPath(bin); err == nil {
+			return bin
+		}
+	}
+	return "xdg-open"
+}
+
 // Detach starts cmd in its own session with no stdio, so closing the picker
 // does not take it down.
 func Detach(cmd *exec.Cmd) error {
@@ -299,10 +332,55 @@ func Detach(cmd *exec.Cmd) error {
 	return cmd.Process.Release()
 }
 
+// splitFields splits s on blanks the way a shell would for plain words:
+// single and double quotes and backslashes group, nothing expands. An
+// unterminated quote runs to the end.
+func splitFields(s string) []string {
+	var out []string
+	var cur strings.Builder
+	in := false
+	var quote rune
+	escaped := false
+	for _, r := range s {
+		switch {
+		case escaped:
+			cur.WriteRune(r)
+			escaped = false
+		case quote != 0:
+			switch {
+			case r == quote:
+				quote = 0
+			case r == '\\' && quote == '"':
+				escaped = true
+			default:
+				cur.WriteRune(r)
+			}
+		case r == '\\':
+			escaped, in = true, true
+		case r == '\'' || r == '"':
+			quote, in = r, true
+		case unicode.IsSpace(r):
+			if in {
+				out = append(out, cur.String())
+				cur.Reset()
+				in = false
+			}
+		default:
+			cur.WriteRune(r)
+			in = true
+		}
+	}
+	if in {
+		out = append(out, cur.String())
+	}
+	return out
+}
+
 // EditorArgs builds an editor invocation that lands on line and col when the
-// editor is known to accept them. editor may carry its own flags.
+// editor is known to accept them. editor may carry its own flags, quoted as a
+// shell would.
 func EditorArgs(editor, file string, line, col int) []string {
-	fields := strings.Fields(editor)
+	fields := splitFields(editor)
 	if len(fields) == 0 {
 		fields = []string{"micro"}
 	}

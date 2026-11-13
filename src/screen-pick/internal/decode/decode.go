@@ -10,6 +10,11 @@ import (
 // Decode returns the distinct readings of an escaped or encoded token, most
 // likely first, with the raw token last when it differs from them.
 func Decode(raw string) []string {
+	return AppendDecode(nil, raw)
+}
+
+// AppendDecode appends the readings Decode would return to dst.
+func AppendDecode(dst []string, raw string) []string {
 	var dec string
 	if IsWindowsPath(raw) {
 		// Backslashes are separators here, so the only escape worth undoing is
@@ -22,9 +27,9 @@ func Decode(raw string) []string {
 		dec = unescape(raw)
 	}
 	if dec == raw {
-		return []string{raw}
+		return append(dst, raw)
 	}
-	return []string{dec, raw}
+	return append(dst, dec, raw)
 }
 
 func IsDrivePath(s string) bool {
@@ -53,6 +58,9 @@ func allBackslashesPaired(s string) bool {
 // unescape undoes shell quoting, C and JSON string escapes, and percent
 // encoding in one pass. Anything malformed is kept literally.
 func unescape(s string) string {
+	if !strings.ContainsAny(s, "\\'\"%") {
+		return s
+	}
 	b := make([]byte, 0, len(s))
 	for i := 0; i < len(s); {
 		switch c := s[i]; {

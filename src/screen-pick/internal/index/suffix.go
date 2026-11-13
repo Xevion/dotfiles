@@ -25,8 +25,6 @@ func New(paths []string) *Index {
 	return ix
 }
 
-func (ix *Index) Len() int { return len(ix.paths) }
-
 // Match returns entries that end with query on a component boundary,
 // shallowest first. An elided component (... or …) stands for one or more
 // components; a leading one is dropped.
@@ -43,11 +41,6 @@ func (ix *Index) Match(query string) []string {
 	}
 	sortShallowFirst(out)
 	return out
-}
-
-// SuffixMatch is Match over a one-off list.
-func SuffixMatch(paths []string, query string) []string {
-	return New(paths).Match(query)
 }
 
 // parseQuery splits query into components, with "" marking an elided run.
@@ -69,21 +62,38 @@ func parseQuery(query string) []string {
 }
 
 // suffixMatches matches q against the tail of comps, where "" in q is a gap
-// of at least one component.
+// of at least one component. Each run of literals between gaps is taken at its
+// rightmost place, which leaves the most room for the runs before it, so one
+// right-to-left pass decides the match.
 func suffixMatches(comps, q []string) bool {
-	if len(q) == 0 {
-		return true
-	}
-	last := q[len(q)-1]
-	if last == "" {
-		for k := len(comps) - 1; k >= 0; k-- {
-			if suffixMatches(comps[:k], q[:len(q)-1]) {
-				return true
-			}
+	end := len(comps)
+	gap := false
+	for i := len(q); i > 0; {
+		if q[i-1] == "" {
+			gap = true
+			i--
+			continue
 		}
-		return false
+		j := i
+		for j > 0 && q[j-1] != "" {
+			j--
+		}
+		run := q[j:i]
+		start := end - len(run)
+		if gap {
+			start--
+			for start >= 0 && !slices.Equal(comps[start:start+len(run)], run) {
+				start--
+			}
+		} else if start >= 0 && !slices.Equal(comps[start:end], run) {
+			return false
+		}
+		if start < 0 {
+			return false
+		}
+		end, gap, i = start, false, j
 	}
-	return len(comps) > 0 && comps[len(comps)-1] == last && suffixMatches(comps[:len(comps)-1], q[:len(q)-1])
+	return !gap || end > 0
 }
 
 func sortShallowFirst(paths []string) {

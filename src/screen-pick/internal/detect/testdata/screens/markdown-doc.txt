@@ -1,0 +1,32 @@
+# Proj
+
+A small tool. See [the guide](docs/guide.md) and [contributing](CONTRIBUTING.md).
+
+## Install
+
+```sh
+cargo install --path .
+```
+
+Config lives in `~/.config/app/app.conf`; override with `--config /etc/app.conf`.
+
+## Links
+
+- Homepage: <https://example.com/proj>
+- Issues: https://github.com/example/proj/issues?q=is%3Aopen
+- Docs (https://docs.example.com/proj/latest).
+- Mail <mailto:ann@example.com>
+
+| File | Purpose |
+|------|---------|
+| `src/main.rs` | entry point |
+| `src/lib.rs` | library |
+| `Cargo.toml` | manifest |
+
+> Note: see **README.md** and _docs/guide.md_ for more.
+
+1. Edit `src/server/mod.rs`
+2. Run `cargo test`
+3. Open http://localhost:3000/ in a browser, or example.com/docs/intro
+
+Version 1.2.3 released 2026/10/27. Commit 9c8d7e6 fixes it.

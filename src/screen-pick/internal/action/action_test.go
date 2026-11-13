@@ -2,8 +2,12 @@ package action
 
 import (
 	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -71,7 +75,7 @@ func TestFor(t *testing.T) {
 			"f open /home/u/proj/src",
 			"t tab /home/u/proj/src",
 			"R tab /home/u/proj",
-			"l git src/main.rs [log --follow -- src/main.rs in /home/u/proj]",
+			"l git src/main.rs [--literal-pathspecs log --follow -- src/main.rs in /home/u/proj]",
 			"y copy /home/u/proj/src/main.rs",
 			"r copy src/main.rs",
 			"Y copy /home/u/proj/src",
@@ -92,7 +96,7 @@ func TestFor(t *testing.T) {
 			"f open /home/u/proj/src",
 			"t tab /home/u/proj/src",
 			"R tab /home/u/proj",
-			"l git src/main.rs [log --follow -- src/main.rs in /home/u/proj]",
+			"l git src/main.rs [--literal-pathspecs log --follow -- src/main.rs in /home/u/proj]",
 			"y copy /home/u/proj/src/main.rs",
 			"r copy src/main.rs",
 			"s copy ~/proj/src/main.rs",
@@ -113,7 +117,7 @@ func TestFor(t *testing.T) {
 			"i run /home/u/proj/tool [/usr/bin/ida /home/u/proj/tool in /home/u/proj]",
 			"f open /home/u/proj",
 			"t tab /home/u/proj",
-			"l git tool [log --follow -- tool in /home/u/proj]",
+			"l git tool [--literal-pathspecs log --follow -- tool in /home/u/proj]",
 			"y copy /home/u/proj/tool",
 			"r copy tool",
 			"Y copy /home/u/proj",
@@ -177,7 +181,7 @@ func TestFor(t *testing.T) {
 			"y copy git@github.com:org/repo.git",
 		}},
 		{"sha runs git where the commit is", detect.Match{Kind: detect.KindSHA, Text: "3f2a9c1"}, []string{
-			"g git 3f2a9c1 [show 3f2a9c1 in /home/u/proj]",
+			"g git 3f2a9c1 [show 3f2a9c1 -- in /home/u/proj]",
 			"R tab /home/u/proj",
 			"y copy 3f2a9c1",
 		}},
@@ -242,10 +246,166 @@ func TestEditorArgs(t *testing.T) {
 		{"zed", 12, 0, []string{"zed", "f.rs:12"}},
 		{"code --wait", 12, 4, []string{"code", "--wait", "-g", "f.rs:12:4"}},
 		{"unknown-editor", 12, 4, []string{"unknown-editor", "f.rs"}},
+		{`"/opt/My Editor/nvim" -u "my init.vim"`, 3, 0, []string{"/opt/My Editor/nvim", "-u", "my init.vim", "+3", "f.rs"}},
+		{`emacsclient -c -a ''`, 0, 0, []string{"emacsclient", "-c", "-a", "", "f.rs"}},
+		{`my\ editor --wait`, 0, 0, []string{"my editor", "--wait", "f.rs"}},
+		{`vim "unterminated`, 0, 0, []string{"vim", "unterminated", "f.rs"}},
 	}
 	for _, tc := range cases {
 		if diff := cmp.Diff(tc.want, EditorArgs(tc.editor, "f.rs", tc.line, tc.col)); diff != "" {
 			t.Errorf("EditorArgs(%q, %d, %d) (-want +got):\n%s", tc.editor, tc.line, tc.col, diff)
+		}
+	}
+}
+
+func TestRelativeTo(t *testing.T) {
+	cases := []struct{ p, dir, want string }{
+		{"/r/src/a.go", "/r", "src/a.go"},
+		{"/r/..data/key", "/r", "..data/key"},
+		{"/r/.../x", "/r", ".../x"},
+		{"/elsewhere/a.go", "/r", ""},
+		{"/r", "/r", ""},
+		{"/rr/a.go", "/r", ""},
+		{"/r/a.go", "", ""},
+	}
+	for _, tc := range cases {
+		if got := relativeTo(tc.p, tc.dir); got != tc.want {
+			t.Errorf("relativeTo(%q, %q) = %q, want %q", tc.p, tc.dir, got, tc.want)
+		}
+	}
+}
+
+// Text on screen picks the URL; nothing but a well-formed one may reach the
+// desktop's opener.
+func TestForWithholdsOpenFromControlCharacters(t *testing.T) {
+	for _, text := range []string{"https://x.y/a\nb", "https://x.y/\x1b[31m", "https://x.y/\x00", "steam://run/1\r"} {
+		got := keyed(For(detect.Match{Kind: detect.KindURL, Text: text}, Context{}))
+		if len(got) != 1 || !strings.HasPrefix(got[0], "y copy") {
+			t.Errorf("%q: want only a copy, got %q", text, got)
+		}
+	}
+}
+
+// File names are literal text: a name with glob characters must not select
+// other files' history.
+func TestGitLogTakesNamesLiterally(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	repo := t.TempDir()
+	git := func(args ...string) string {
+		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd.Dir = repo
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return string(out)
+	}
+	git("init", "-q")
+	for _, name := range []string{"a.txt", "[a].txt"} {
+		if err := os.WriteFile(filepath.Join(repo, name), []byte(name), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		git("add", "--", name)
+		git("commit", "-q", "-m", "add "+name)
+	}
+	m := pathMatch("[a].txt", filepath.Join(repo, "[a].txt"), true, false)
+	ctx := Context{Cwd: repo, Stat: os.Stat, Head: head, LookPath: lookPath()}
+	i := slices.IndexFunc(For(m, ctx), func(a Action) bool { return a.Key == "l" })
+	if i < 0 {
+		t.Fatal("no git log action")
+	}
+	cmd, _ := For(m, ctx)[i].Command("")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v: %v\n%s", cmd.Args, err, out)
+	}
+	if got := string(out); !strings.Contains(got, "add [a].txt") || strings.Contains(got, "add a.txt") {
+		t.Errorf("log covered the wrong files:\n%s", got)
+	}
+}
+
+// A hex string is also a plausible file name; without the separator git
+// refuses to guess between the two.
+func TestGitShowSurvivesFileNamedLikeTheCommit(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	repo := t.TempDir()
+	git := func(args ...string) string {
+		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd.Dir = repo
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	git("init", "-q")
+	git("commit", "-q", "--allow-empty", "-m", "first")
+	sha := git("rev-parse", "--short=7", "HEAD")
+	if err := os.WriteFile(filepath.Join(repo, sha), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx := Context{CommitRepo: func(string) string { return repo }}
+	as := For(detect.Match{Kind: detect.KindSHA, Text: sha}, ctx)
+	cmd, _ := as[0].Command("")
+	if out, err := cmd.CombinedOutput(); err != nil || !strings.Contains(string(out), "first") {
+		t.Errorf("%v: %v\n%s", cmd.Args, err, out)
+	}
+}
+
+func TestOpenUsesWhateverOpenerIsInstalled(t *testing.T) {
+	bin := t.TempDir()
+	t.Setenv("PATH", bin)
+	cmd, detached := (Action{Verb: Open, Arg: "/x"}).Command("")
+	if cmd.Args[0] != "xdg-open" || !detached {
+		t.Errorf("with nothing installed, got %v", cmd.Args)
+	}
+	if err := os.WriteFile(filepath.Join(bin, "wslview"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if cmd, _ := (Action{Verb: Open, Arg: "/x"}).Command(""); filepath.Base(cmd.Path) != "wslview" {
+		t.Errorf("with only wslview installed, got %v", cmd.Args)
+	}
+	if err := os.WriteFile(filepath.Join(bin, "xdg-open"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if cmd, _ := (Action{Verb: Open, Arg: "/x"}).Command(""); filepath.Base(cmd.Path) != "xdg-open" {
+		t.Errorf("xdg-open should win, got %v", cmd.Args)
+	}
+}
+
+// Whatever the editor setting holds, the file reaches the program as one
+// argument and never gets split or merged with the editor's own words.
+func FuzzEditorArgs(f *testing.F) {
+	f.Add(`code --wait`, "/a b/c.rs", 3, 1)
+	f.Add(`"x y`, "$(id)`id`;|&\n", 0, 0)
+	f.Fuzz(func(t *testing.T, editor, file string, line, col int) {
+		argv := EditorArgs(editor, file, line, col)
+		if len(argv) < 2 {
+			t.Fatalf("EditorArgs(%q) = %q, want a program and a file", editor, argv)
+		}
+		if line <= 0 && argv[len(argv)-1] != file {
+			t.Fatalf("file mangled: %q", argv)
+		}
+		if line > 0 && !slices.ContainsFunc(argv[1:], func(a string) bool { return strings.Contains(a, file) }) {
+			t.Fatalf("file lost with a line: %q", argv)
+		}
+	})
+}
+
+// An editor started on a named pipe or a device blocks until something writes
+// to it, so neither it nor the desktop opener is offered.
+func TestForAPipeOffersNoEditor(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "fifo")
+	if err := syscall.Mkfifo(p, 0o600); err != nil {
+		t.Skip(err)
+	}
+	for _, a := range For(pathMatch(p, p, true, false), Context{Cwd: "/", Stat: os.Stat, LookPath: lookPath()}) {
+		if a.Verb == Edit || a.Verb == Open && a.Arg == p {
+			t.Errorf("a pipe must not be opened: %+v", a)
 		}
 	}
 }

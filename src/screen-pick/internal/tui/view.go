@@ -3,8 +3,11 @@ package tui
 import (
 	"fmt"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -15,6 +18,7 @@ import (
 	"screenpick/internal/action"
 	"screenpick/internal/detect"
 	"screenpick/internal/filetype"
+	"screenpick/internal/preview"
 	"screenpick/internal/resolve"
 )
 
@@ -110,10 +114,16 @@ func legend() string {
 	return styleDim.Render(strings.Join(parts, "  "))
 }
 
-// icon is the package icon, except that a path nothing has looked up yet is
-// drawn neutral rather than missing.
+// unsure says a path is not known to be missing: nothing has looked it up
+// yet, or the look timed out.
+func (m *Model) unsure(mt detect.Match) bool {
+	return mt.Kind == detect.KindPath && !mt.Exists && mt.Path != "" && (m.unchecked || mt.Unknown)
+}
+
+// icon is the package icon, except that an unsure path is drawn neutral rather
+// than missing.
 func (m *Model) icon(mt detect.Match) (string, lipgloss.Style) {
-	if m.unchecked && mt.Kind == detect.KindPath && !mt.Exists {
+	if m.unsure(mt) {
 		return iconFile, stylePlain
 	}
 	return icon(mt)
@@ -135,15 +145,28 @@ func (m *Model) View() tea.View {
 	var content string
 	switch {
 	case len(m.matches) == 0:
-		content = styleDim.Render("No paths, URLs, hosts or commits on screen.  esc to close")
+		content = ansi.Truncate(styleDim.Render("No paths, URLs, hosts or commits on screen.  esc to close"), w, "")
 	case m.origin == List:
 		content = m.listLayout(w, h)
 	default:
 		content = m.hintsLayout(w, h)
 	}
-	v := tea.NewView(content)
+	v := tea.NewView(fit(content, w, h))
 	v.AltScreen = true
 	return v
+}
+
+// fit cuts content to h rows of w cells, so a layout that cannot fit a small
+// window is clipped rather than wrapped or scrolled by the terminal.
+func fit(content string, w, h int) string {
+	lines := strings.Split(content, "\n")
+	lines = lines[:min(len(lines), h)]
+	for i, l := range lines {
+		if ansi.StringWidth(l) > w {
+			lines[i] = ansi.Truncate(l, w, "")
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // footer is the key help for the current mode, with the icon legend when it
@@ -152,14 +175,14 @@ func (m *Model) footer(w int) string {
 	var keys string
 	switch m.mode {
 	case List:
-		keys = "type to filter  ·  ↑↓ move  ·  enter: actions  ·  esc or ctrl+q: quit"
+		keys = "type to filter  ·  ↑↓ pgup/pgdn: move  ·  enter: actions  ·  esc or ctrl+q: quit"
 	case menu:
 		keys = "key or enter: run  ·  esc: back  ·  q: quit"
 		if n := len(m.matches[m.sel].Alternatives); n > 0 {
 			keys = fmt.Sprintf("key or enter: run  ·  tab: %d other copies  ·  esc: back  ·  q: quit", n)
 		}
 	case alts:
-		keys = "type to filter  ·  enter: act on this copy  ·  esc: back  ·  ctrl+q: quit"
+		keys = "type to filter  ·  ↑↓ pgup/pgdn: move  ·  enter: act on this copy  ·  esc: back  ·  ctrl+q: quit"
 	}
 	out := styleDim.Render(keys)
 	if l := legend(); ansi.StringWidth(out)+4+ansi.StringWidth(l) <= w {
@@ -171,7 +194,7 @@ func (m *Model) footer(w int) string {
 // hintsLayout draws the screen with labels, and once a target is picked, its
 // menu on whichever half of the window the target is not on.
 func (m *Model) hintsLayout(w, h int) string {
-	lines, first := m.hintsLines(h)
+	lines, first := m.hintsLines(w, h)
 	if m.mode != menu && m.mode != alts {
 		return strings.Join(lines, "\n")
 	}
@@ -211,53 +234,78 @@ func (m *Model) hintsLayout(w, h int) string {
 
 // hintsLines redraws the captured screen faded, with each target coloured and
 // its label laid over its first cells. first is the screen row drawn first.
-func (m *Model) hintsLines(h int) (lines []string, first int) {
+// Every line is cut to w cells.
+func (m *Model) hintsLines(w, h int) (lines []string, first int) {
 	type mark struct {
 		piece
 		match int
-		first bool
+		label bool
 	}
 	byRow := make([][]mark, len(m.screen.rows))
 	if len(m.screen.rows) > h {
 		first = len(m.screen.rows) - h
 	}
-	// Matches wholly above the first row drawn never reach the screen.
-	visible := 0
-	if first > 0 {
-		visible = m.screen.rows[first].start
-	}
 	for i, mt := range m.matches {
-		if mt.End <= visible {
-			continue
-		}
-		for j, p := range m.screen.pieces(mt.Start, mt.End) {
-			byRow[p.row] = append(byRow[p.row], mark{p, i, j == 0})
+		ps := m.screen.pieces(mt.Start, mt.End)
+		// Pieces above the first row drawn never reach the screen.
+		ps = slices.DeleteFunc(ps, func(p piece) bool { return p.row < first })
+		// The label goes on the first piece that holds all of it, else the
+		// first piece.
+		at := slices.IndexFunc(ps, func(p piece) bool { return ansi.StringWidth(m.screen.text[p.start:p.end]) >= len(m.labels[i]) })
+		for j, p := range ps {
+			byRow[p.row] = append(byRow[p.row], mark{p, i, j == max(at, 0)})
 		}
 	}
 	for r := first; r < len(m.screen.rows); r++ {
 		var b strings.Builder
 		rw := m.screen.rows[r]
 		pos := rw.start
-		for _, mk := range byRow[r] {
+		marks := byRow[r]
+		slices.SortStableFunc(marks, func(a, b mark) int { return a.start - b.start })
+		for _, mk := range marks {
+			if mk.start < pos {
+				continue
+			}
 			b.WriteString(styleDim.Render(m.screen.text[pos:mk.start]))
 			text := m.screen.text[mk.start:mk.end]
 			label := m.labels[mk.match]
-			if !strings.HasPrefix(label, m.typed) {
+			if label == "" || !strings.HasPrefix(label, m.typed) {
 				b.WriteString(styleDim.Render(text))
 			} else {
-				if mk.first {
-					b.WriteString(styleTyped.Render(m.typed) + styleLabel.Render(label[len(m.typed):]))
-					text = ansi.TruncateLeft(text, len(label), "")
-				}
 				_, st := m.icon(m.matches[mk.match])
-				b.WriteString(st.Render(text))
+				if mk.label {
+					b.WriteString(m.overlay(text, label, st))
+				} else {
+					b.WriteString(st.Render(text))
+				}
 			}
 			pos = mk.end
 		}
 		b.WriteString(styleDim.Render(m.screen.text[pos:rw.end]))
-		lines = append(lines, b.String())
+		lines = append(lines, ansi.Truncate(b.String(), w, ""))
 	}
 	return lines, first
+}
+
+// overlay draws text with label over its first cells and the rest in st,
+// taking exactly the cells text takes: the label is cut to fit, and a wide
+// character split by the label leaves spaces in its place.
+func (m *Model) overlay(text, label string, st lipgloss.Style) string {
+	shown := min(len(label), ansi.StringWidth(text))
+	typed := min(len(m.typed), shown)
+	rest, cut := text, 0
+	for cut < shown && rest != "" {
+		g, gw := ansi.FirstGraphemeCluster(rest, ansi.GraphemeWidth)
+		if g == "" {
+			break
+		}
+		rest, cut = rest[len(g):], cut+gw
+	}
+	out := styleTyped.Render(m.typed[:typed]) + styleLabel.Render(label[len(m.typed):][:max(shown-typed, 0)])
+	if pad := cut - shown; pad > 0 {
+		out += st.Render(strings.Repeat(" ", pad))
+	}
+	return out + st.Render(rest)
 }
 
 // itemKey identifies a target across repeats on screen.
@@ -294,20 +342,20 @@ func (m *Model) refreshItems() {
 	m.cursor = min(m.cursor, max(len(m.items)-1, 0))
 }
 
-func (m *Model) count(i int) int {
-	k := itemKey(m.matches[i])
-	n := 0
+// tally counts the repeats of each target, once per frame.
+func (m *Model) tally() {
+	m.counts = make(map[string]int, len(m.items))
 	for _, mt := range m.matches {
-		if itemKey(mt) == k {
-			n++
-		}
+		m.counts[itemKey(mt)]++
 	}
-	return n
 }
+
+func (m *Model) count(i int) int { return m.counts[itemKey(m.matches[i])] }
 
 // listLayout is the list with the selected target's details beside it when
 // the window is wide, or expanded under its row when it is not.
 func (m *Model) listLayout(w, h int) string {
+	m.tally()
 	avail := h - 1
 	var lines []string
 	if w < wideMin {
@@ -338,18 +386,20 @@ func (m *Model) listLines(w, h int, inline bool) []string {
 	if m.streams > 0 {
 		info += "  searching…"
 	}
-	lines := []string{prompt + "  " + styleDim.Render(info)}
+	lines := []string{ansi.Truncate(prompt+"  "+styleDim.Render(info), w, "")}
 	if len(m.items) == 0 {
-		return append(lines, styleDim.Render("no match for "+strconv.Quote(m.filter)))
+		lines = append(lines, ansi.Truncate(styleDim.Render("no match for "+strconv.Quote(m.filter)), w, "…"))
+		return lines[:min(len(lines), max(h, 0))]
 	}
 
 	rows := h - 1
+	m.listRows = rows
 	var block []string
 	if inline && (m.mode == menu || m.mode == alts) {
 		for _, l := range m.block(m.target(), w-2, min(rows-1, 20), true) {
 			block = append(block, styleDim.Render("│ ")+l)
 		}
-		block = block[:min(len(block), rows-1)]
+		block = block[:max(min(len(block), rows-1), 0)]
 	}
 	if m.cursor < m.top {
 		m.top = m.cursor
@@ -366,7 +416,7 @@ func (m *Model) listLines(w, h int, inline bool) []string {
 			lines = append(lines, block...)
 		}
 	}
-	return lines[:min(len(lines), h)]
+	return lines[:min(len(lines), max(h, 0))]
 }
 
 type columns struct{ text, place, flags int }
@@ -406,6 +456,8 @@ func (m *Model) place(mt detect.Match) string {
 		return "cannot be placed here"
 	case m.unchecked && !mt.Exists:
 		return "checking"
+	case mt.Unknown && !mt.Exists:
+		return "not checked"
 	case !mt.Exists:
 		return "not found"
 	}
@@ -414,9 +466,9 @@ func (m *Model) place(mt detect.Match) string {
 		return ""
 	}
 	if rel := strings.TrimPrefix(mt.Text, "./"); strings.HasSuffix(mt.Path, "/"+rel) {
-		return "in " + tilde(strings.TrimSuffix(mt.Path, "/"+rel), m.home)
+		return plain("in " + tilde(strings.TrimSuffix(mt.Path, "/"+rel), m.home))
 	}
-	return p
+	return plain(p)
 }
 
 func (m *Model) flags(i int) string {
@@ -442,7 +494,7 @@ func (m *Model) listRow(i, w int, c columns, sel bool) string {
 	row := seg(ist, ic+" ") + seg(stylePlain, padRight(shortenMiddle(mt.Text+location(mt), c.text), c.text))
 	if c.place > 0 {
 		pst := styleDim
-		if mt.Kind == detect.KindPath && !mt.Exists && !m.unchecked {
+		if mt.Kind == detect.KindPath && !mt.Exists && !m.unsure(mt) {
 			pst = styleMissing.Faint(true)
 		}
 		row += seg(stylePlain, "  ") + seg(pst, padRight(shortenMiddle(m.place(mt), c.place), c.place))
@@ -454,7 +506,7 @@ func (m *Model) listRow(i, w int, c columns, sel bool) string {
 	if pad := w - ansi.StringWidth(row); pad > 0 {
 		row += seg(stylePlain, strings.Repeat(" ", pad))
 	}
-	return row
+	return ansi.Truncate(row, w, "")
 }
 
 // block describes one target in w×h cells: what it is and where, then its
@@ -480,7 +532,7 @@ func (m *Model) blockLines(mt detect.Match, w, h int, focused bool) []string {
 		var at int
 		acts, at = m.actionLines(w)
 		if m.status != "" {
-			acts = append(acts, "", m.status)
+			acts = append(acts, "", plain(m.status))
 		}
 		acts = fitAround(acts, at, h-len(head)-1)
 	}
@@ -489,7 +541,7 @@ func (m *Model) blockLines(mt detect.Match, w, h int, focused bool) []string {
 		left := append(m.infoLines(mt, lw), "")
 		narrow, at := m.actionLines(lw)
 		if m.status != "" {
-			narrow = append(narrow, "", shortenMiddle(m.status, lw))
+			narrow = append(narrow, "", shortenMiddle(plain(m.status), lw))
 		}
 		left = append(left, fitAround(narrow, at, h-len(left))...)
 		rows := min(h, max(len(left), 8))
@@ -536,19 +588,25 @@ func (m *Model) infoLines(mt detect.Match, w int) []string {
 		facts = append(facts, styleMissing.Render("cannot be placed on this machine"))
 	case m.unchecked && !mt.Exists:
 		facts = append(facts, "checking the disk")
+	case mt.Unknown && !mt.Exists:
+		facts = append(facts, "could not check: slow mount")
+		where = "looked for " + plain(tilde(mt.Path, m.home))
 	case !mt.Exists:
 		facts = append(facts, styleMissing.Render("not found"))
-		where = "looked for " + tilde(mt.Path, m.home)
+		where = "looked for " + plain(tilde(mt.Path, m.home))
 	default:
-		where = tilde(mt.Path, m.home)
-		if fi, err := m.backend.Stat(mt.Path); err == nil {
-			if fi.IsDir() {
+		where = plain(tilde(mt.Path, m.home))
+		switch st, ok := m.stats[mt.Path]; {
+		case !ok:
+			facts = append(facts, styleDim.Render("reading…"))
+		case st.err == nil:
+			if st.info.IsDir() {
 				facts = append(facts, "folder")
 			} else {
-				facts = append(facts, humanize.IBytes(uint64(fi.Size())))
+				facts = append(facts, humanize.IBytes(uint64(st.info.Size())))
 			}
-			if !fi.ModTime().IsZero() {
-				facts = append(facts, "modified "+humanize.Time(fi.ModTime()))
+			if !st.info.ModTime().IsZero() {
+				facts = append(facts, "modified "+humanize.Time(st.info.ModTime()))
 			}
 		}
 		via := "via " + mt.Source.String()
@@ -574,6 +632,9 @@ func (m *Model) infoLines(mt detect.Match, w int) []string {
 // actionLines lists the menu by group, reporting which line is selected. The
 // value column appears only where it says something the header does not.
 func (m *Model) actionLines(w int) (out []string, at int) {
+	if !m.actReady {
+		return []string{styleDim.Render("loading actions…")}, 0
+	}
 	target := m.target().Path
 	labelW := 0
 	for _, a := range m.actions {
@@ -593,7 +654,7 @@ func (m *Model) actionLines(w int) (out []string, at int) {
 			return st.Render(s)
 		}
 		line := seg(stylePlain, " ") + seg(styleKey, padRight(a.Key, 2)) + seg(stylePlain, padRight(a.Label, labelW))
-		if v := tilde(a.Arg, m.home); (a.Verb == action.Copy || a.Verb == action.Tab) && a.Arg != target && room(w, line) > 6 {
+		if v := plain(tilde(a.Arg, m.home)); (a.Verb == action.Copy || a.Verb == action.Tab) && a.Arg != target && room(w, line) > 6 {
 			line += seg(styleDim, "  "+shortenMiddle(v, room(w, line)-2))
 		}
 		if pad := w - ansi.StringWidth(line); pad > 0 && sel {
@@ -640,30 +701,45 @@ func besides(left, right []string, lw, rw, n int) []string {
 }
 
 // previewLines draws the file around its line, the folder's entries, or a
-// commit's summary.
+// commit's summary, from what the loader has read so far.
 func (m *Model) previewLines(mt detect.Match, w, rows int) []string {
-	if rows <= 0 || w < 10 {
+	if rows <= 0 || w < 10 || !previewable(mt) {
 		return nil
 	}
-	key := fmt.Sprint(mt.Kind, "\x00", mt.Path, "\x00", mt.Text, "\x00", mt.Line, "\x00", rows)
-	pv, ok := m.previews[key]
+	pv, ok := m.previews[previewKey(mt)]
 	if !ok {
-		pv = m.backend.Preview(mt, rows)
-		m.previews[key] = pv
+		return []string{styleDim.Render("reading…")}
 	}
 	if pv.Note != "" {
-		return []string{styleDim.Render(shortenMiddle(pv.Note, w))}
+		return []string{styleDim.Render(shortenMiddle(plain(pv.Note), w))}
+	}
+	lines, more := pv.Lines, 0
+	switch {
+	case mt.Line > 0:
+		first := max(1, mt.Line-rows/3)
+		if i := slices.IndexFunc(lines, func(l preview.Line) bool { return l.No >= first }); i > 0 {
+			lines = lines[i:]
+		}
+		lines = lines[:min(len(lines), rows)]
+	case mt.IsDir:
+		if total := len(lines) + pv.More; total > rows {
+			lines = lines[:max(rows-1, 0)]
+			more = total - len(lines)
+		}
+	default:
+		lines = lines[:min(len(lines), rows)]
 	}
 	gutter := 0
-	for _, l := range pv.Lines {
+	for _, l := range lines {
 		gutter = max(gutter, len(strconv.Itoa(l.No)))
 	}
 	var out []string
-	for _, l := range pv.Lines {
+	for _, l := range lines {
+		l.Text = plain(l.Text)
 		switch {
 		case l.No > 0:
 			num := fmt.Sprintf("%*d ", gutter, l.No)
-			text := ansi.Truncate(l.Text, w-len(num), "…")
+			text := ansi.Truncate(l.Text, max(w-len(num), 0), "…")
 			if l.Focus {
 				out = append(out, styleKey.Render(num)+styleBold.Background(selBG).Render(padRight(text, w-len(num))))
 			} else {
@@ -678,6 +754,9 @@ func (m *Model) previewLines(mt detect.Match, w, rows int) []string {
 			out = append(out, ansi.Truncate(l.Text, w, "…"))
 		}
 	}
+	if more > 0 {
+		out = append(out, styleDim.Render(fmt.Sprintf("… %d more", more)))
+	}
 	return out
 }
 
@@ -691,6 +770,7 @@ func (m *Model) altsLines(w, h int) []string {
 	}
 	out := []string{head, styleKey.Render(">") + " " + m.altFilter}
 	rows := h - len(out)
+	m.altRows = max(rows, 0)
 	if rows <= 0 {
 		return out[:max(h, 0)]
 	}
@@ -719,10 +799,10 @@ func (m *Model) altsLines(w, h int) []string {
 		if j == 0 {
 			note = "best, " + note
 		}
-		if fi, err := m.backend.Stat(c.Path); err == nil && !fi.ModTime().IsZero() {
-			note += ", " + humanize.Time(fi.ModTime())
+		if st, ok := m.stats[c.Path]; ok && st.err == nil && !st.info.ModTime().IsZero() {
+			note += ", " + humanize.Time(st.info.ModTime())
 		}
-		p := tilde(c.Path, m.home)
+		p := plain(tilde(c.Path, m.home))
 		pw := max(w-2-ansi.StringWidth(note)-2, 10)
 		p = shortenMiddle(p, pw)
 		dir, base := path.Split(p)
@@ -731,6 +811,17 @@ func (m *Model) altsLines(w, h int) []string {
 		out = append(out, line)
 	}
 	return out
+}
+
+// plain makes s safe to draw: control characters, which would start a terminal
+// command or move the cursor, and bytes that are not UTF-8 become U+FFFD.
+func plain(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return utf8.RuneError
+		}
+		return r
+	}, s)
 }
 
 func location(mt detect.Match) string {

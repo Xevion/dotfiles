@@ -1,0 +1,39 @@
+# width 0
+path "src/lib.rs" [22-32] -> "/home/u/proj/src/lib.rs" process file +0
+path "tests/test_api.py" @27:0 [59-76] -> "/home/u/proj/tests/test_api.py" process file +0
+path "/home/u/proj/src/main.rs" @14:20 [100-124] -> "/home/u/proj/src/main.rs" absolute file +0
+path "src/server/mod.rs" @3:5 [216-233] -> "/home/u/proj/src/server/mod.rs" process file +0
+path "/etc/hosts" [259-269] -> "/etc/hosts" absolute file +0
+path "~/.bashrc" [290-299] -> "/home/u/.bashrc" home file +0
+url "https://example.com/docs" [314-338]
+path "Cargo.toml" [386-396] -> "/home/u/proj/Cargo.toml" process file +0
+path "src/lib.rs" [408-418] -> "/home/u/proj/src/lib.rs" process file +0
+path "src/old.rs" [430-440] -> "/home/u/proj/src/old.rs" process missing +0
+path "/home/u/proj/README.md" [480-502] -> "/home/u/proj/README.md" absolute file +0
+path "/var/log/syslog" [546-561] -> "/var/log/syslog" absolute file +0
+# width 40
+path "src/lib.rs" [22-32] -> "/home/u/proj/src/lib.rs" process file +0
+path "tests/test_api.py" @27:0 [59-76] -> "/home/u/proj/tests/test_api.py" process file +0
+path "/home/u/proj/src/main.rs" @14:20 [100-124] -> "/home/u/proj/src/main.rs" absolute file +0
+path "src/server/mod.rs" @3:5 [216-233] -> "/home/u/proj/src/server/mod.rs" process file +0
+path "/etc/hosts" [259-269] -> "/etc/hosts" absolute file +0
+path "~/.bashrc" [290-299] -> "/home/u/.bashrc" home file +0
+url "https://example.com/docs" [314-338]
+path "Cargo.toml" [386-396] -> "/home/u/proj/Cargo.toml" process file +0
+path "src/lib.rs" [408-418] -> "/home/u/proj/src/lib.rs" process file +0
+path "src/old.rs" [430-440] -> "/home/u/proj/src/old.rs" process missing +0
+path "/home/u/proj/README.md" [480-502] -> "/home/u/proj/README.md" absolute file +0
+path "/var/log/syslog" [546-561] -> "/var/log/syslog" absolute file +0
+# width 120
+path "src/lib.rs" [22-32] -> "/home/u/proj/src/lib.rs" process file +0
+path "tests/test_api.py" @27:0 [59-76] -> "/home/u/proj/tests/test_api.py" process file +0
+path "/home/u/proj/src/main.rs" @14:20 [100-124] -> "/home/u/proj/src/main.rs" absolute file +0
+path "src/server/mod.rs" @3:5 [216-233] -> "/home/u/proj/src/server/mod.rs" process file +0
+path "/etc/hosts" [259-269] -> "/etc/hosts" absolute file +0
+path "~/.bashrc" [290-299] -> "/home/u/.bashrc" home file +0
+url "https://example.com/docs" [314-338]
+path "Cargo.toml" [386-396] -> "/home/u/proj/Cargo.toml" process file +0
+path "src/lib.rs" [408-418] -> "/home/u/proj/src/lib.rs" process file +0
+path "src/old.rs" [430-440] -> "/home/u/proj/src/old.rs" process missing +0
+path "/home/u/proj/README.md" [480-502] -> "/home/u/proj/README.md" absolute file +0
+path "/var/log/syslog" [546-561] -> "/var/log/syslog" absolute file +0

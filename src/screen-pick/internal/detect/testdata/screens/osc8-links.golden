@@ -1,0 +1,33 @@
+# width 0
+url "the docs" [35-43]
+path "src/main.rs" @14:0 [99-110] -> "/home/u/proj/src/main.rs" absolute file +0
+path "/etc/hosts" [148-158] -> "/etc/hosts" absolute file +0
+path "README.md" [225-234] -> "/home/u/proj/README.md" absolute file +0
+path "notes" [288-293] -> "/home/u/My Documents/notes.txt" absolute file +0
+url "#42" [347-350]
+url "https://example.com/plain" [371-396]
+url "mail ann" [478-486]
+path "Cargo.toml" [597-607] -> "/home/u/proj/Cargo.toml" process file +0
+path "src/lib.rs" [627-637] -> "/home/u/proj/src/lib.rs" process file +0
+# width 40
+url "the docs" [35-43]
+path "src/main.rs" @14:0 [99-110] -> "/home/u/proj/src/main.rs" absolute file +0
+path "/etc/hosts" [148-158] -> "/etc/hosts" absolute file +0
+path "README.md" [225-234] -> "/home/u/proj/README.md" absolute file +0
+path "notes" [288-293] -> "/home/u/My Documents/notes.txt" absolute file +0
+url "#42" [347-350]
+url "https://example.com/plain" [371-396]
+url "mail ann" [478-486]
+path "Cargo.toml" [597-607] -> "/home/u/proj/Cargo.toml" process file +0
+path "src/lib.rs" [627-637] -> "/home/u/proj/src/lib.rs" process file +0
+# width 120
+url "the docs" [35-43]
+path "src/main.rs" @14:0 [99-110] -> "/home/u/proj/src/main.rs" absolute file +0
+path "/etc/hosts" [148-158] -> "/etc/hosts" absolute file +0
+path "README.md" [225-234] -> "/home/u/proj/README.md" absolute file +0
+path "notes" [288-293] -> "/home/u/My Documents/notes.txt" absolute file +0
+url "#42" [347-350]
+url "https://example.com/plain" [371-396]
+url "mail ann" [478-486]
+path "Cargo.toml" [597-607] -> "/home/u/proj/Cargo.toml" process file +0
+path "src/lib.rs" [627-637] -> "/home/u/proj/src/lib.rs" process file +0

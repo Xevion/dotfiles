@@ -4,6 +4,9 @@ package lookup
 
 import (
 	"context"
+	"errors"
+	"io/fs"
+	"os"
 	"path"
 	"path/filepath"
 	"slices"
@@ -30,15 +33,39 @@ type Result struct {
 	Source resolve.Source
 	Root   string
 	Rank   int
+	IsDir  bool
 	Err    error
 }
 
-// Searcher finds files by path suffix. Nil functions use the index package.
+// Searcher finds files by path suffix. Nil functions use the index package and
+// the real disk.
 type Searcher struct {
+	// Stat confirms each hit is still on disk and tells files from folders.
+	Stat func(string) (fs.FileInfo, error)
 	// Roots are checkouts to index, most trusted first.
 	Roots []string
 	Load  func(ctx context.Context, root string) ([]string, error)
 	Walk  func(ctx context.Context, roots []string, query string, found func(string)) error
+}
+
+func (s *Searcher) stat(p string) (fs.FileInfo, error) {
+	if s.Stat != nil {
+		return s.Stat(p)
+	}
+	return os.Stat(p)
+}
+
+// confirm stats a hit to tell files from folders. A stat that timed out leaves
+// the hit in: the file is listed, and only the mount is not answering.
+func (s *Searcher) confirm(p string) (isDir, ok bool) {
+	fi, err := s.stat(p)
+	switch {
+	case err == nil:
+		return fi.IsDir(), true
+	case errors.Is(err, resolve.ErrSlow):
+		return false, true
+	}
+	return false, false
 }
 
 func (s *Searcher) load(ctx context.Context, root string) ([]string, error) {
@@ -55,34 +82,62 @@ func (s *Searcher) walk(ctx context.Context, roots []string, query string, found
 	return index.Walk(ctx, roots, query, found)
 }
 
-// Index loads every root's index concurrently and streams matches for each
-// query. The channel closes once all roots are done or ctx ends.
+// maxLoaders bounds how many checkouts load at once.
+const maxLoaders = 4
+
+// Index loads the roots' indexes, a few at a time and most trusted first, and
+// streams matches for each query. The channel closes once all roots are done
+// or ctx ends.
 func (s *Searcher) Index(ctx context.Context, queries []Query) <-chan Result {
 	out := make(chan Result)
 	send := sender(ctx, out)
 	var wg sync.WaitGroup
-	for rank, root := range s.Roots {
+	next := make(chan int)
+	for range min(maxLoaders, len(s.Roots)) {
 		wg.Go(func() {
-			paths, err := s.load(ctx, root)
-			if err != nil {
-				send(Result{Root: root, Rank: rank, Err: err})
-				return
-			}
-			ix := index.New(paths)
-			for _, q := range queries {
-				for _, rel := range ix.Match(q.Text) {
-					if !send(Result{ID: q.ID, Path: filepath.Join(root, rel), Source: resolve.SourceIndex, Root: root, Rank: rank}) {
-						return
-					}
-				}
+			for rank := range next {
+				s.indexRoot(ctx, rank, queries, send)
 			}
 		})
 	}
+	go func() {
+		defer close(next)
+		for rank := range s.Roots {
+			select {
+			case next <- rank:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 	go func() {
 		wg.Wait()
 		close(out)
 	}()
 	return out
+}
+
+// indexRoot streams one checkout's matches for every query.
+func (s *Searcher) indexRoot(ctx context.Context, rank int, queries []Query, send func(Result) bool) {
+	root := s.Roots[rank]
+	paths, err := s.load(ctx, root)
+	if err != nil {
+		send(Result{Root: root, Rank: rank, Err: err})
+		return
+	}
+	ix := index.New(paths)
+	for _, q := range queries {
+		for _, rel := range ix.Match(q.Text) {
+			p := filepath.Join(root, rel)
+			isDir, ok := s.confirm(p)
+			if !ok {
+				continue
+			}
+			if !send(Result{ID: q.ID, Path: p, Source: resolve.SourceIndex, Root: root, Rank: rank, IsDir: isDir}) {
+				return
+			}
+		}
+	}
 }
 
 // Deep walks roots for one query, streaming each hit. The channel closes when
@@ -99,8 +154,11 @@ func (s *Searcher) Deep(ctx context.Context, q Query, roots []string) <-chan Res
 			dup := seen[p]
 			seen[p] = true
 			mu.Unlock()
-			if !dup {
-				send(Result{ID: q.ID, Path: p, Source: resolve.SourceSearch})
+			if dup {
+				return
+			}
+			if isDir, ok := s.confirm(p); ok {
+				send(Result{ID: q.ID, Path: p, Source: resolve.SourceSearch, IsDir: isDir})
 			}
 		})
 		if err != nil {
@@ -188,32 +246,56 @@ func Roots(r *resolve.Resolver, ms []detect.Match) []string {
 	return roots
 }
 
+// Key identifies a match by what it is, so state kept about it survives a
+// rescan that reorders or drops its neighbours.
+type Key struct {
+	Start int
+	Text  string
+}
+
+// KeyOf is the identity of m.
+func KeyOf(m detect.Match) Key { return Key{m.Start, m.Text} }
+
+// ranked remembers which index root supplied a match's best path. It only
+// applies while that path is still the best one: a rescan that resolves the
+// match some other way leaves a rank that describes nothing.
+type ranked struct {
+	path   string
+	source resolve.Source
+	rank   int
+}
+
 // Merger folds streamed results into resolutions. Direct-check results stay
 // best; among index results the most trusted root wins. A disk search only
 // adds alternatives once something was found, since its walk order says
 // nothing about which copy was meant.
 type Merger struct {
-	rank map[int]int
+	rank map[Key]ranked
 }
 
-// Apply records r against res, reporting whether res changed.
-func (m *Merger) Apply(id int, res *resolve.Resolution, r Result) bool {
+// ApplyMatch records r against mt, reporting whether its resolution changed.
+func (m *Merger) ApplyMatch(mt *detect.Match, r Result) bool {
+	return m.apply(KeyOf(*mt), &mt.Resolution, r)
+}
+
+func (m *Merger) apply(key Key, res *resolve.Resolution, r Result) bool {
 	if r.Err != nil || r.Path == res.Path || slices.ContainsFunc(res.Alternatives, func(c resolve.Candidate) bool { return c.Path == r.Path }) {
 		return false
 	}
 	if m.rank == nil {
-		m.rank = map[int]int{}
+		m.rank = map[Key]ranked{}
 	}
 	found := resolve.Candidate{Path: r.Path, Source: r.Source}
-	best, searched := m.rank[id]
+	best, searched := m.rank[key]
+	searched = searched && res.Exists && best.path == res.Path && best.source == res.Source
 	switch {
 	case !res.Exists:
-		*res = resolve.Resolution{Path: r.Path, Source: r.Source, Exists: true}
-		m.rank[id] = r.Rank
-	case searched && r.Source == resolve.SourceIndex && r.Rank < best:
+		*res = resolve.Resolution{Path: r.Path, Source: r.Source, Exists: true, IsDir: r.IsDir}
+		m.rank[key] = ranked{r.Path, r.Source, r.Rank}
+	case searched && r.Source == resolve.SourceIndex && r.Rank < best.rank:
 		res.Alternatives = slices.Insert(res.Alternatives, 0, resolve.Candidate{Path: res.Path, Source: res.Source})
-		res.Path, res.Source = r.Path, r.Source
-		m.rank[id] = r.Rank
+		res.Path, res.Source, res.IsDir = r.Path, r.Source, r.IsDir
+		m.rank[key] = ranked{r.Path, r.Source, r.Rank}
 	default:
 		res.Alternatives = append(res.Alternatives, found)
 	}

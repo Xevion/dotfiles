@@ -1,0 +1,63 @@
+# width 0
+path "naïve.txt" [5-15] -> "/home/u/proj/naïve.txt" process missing +0
+path "日本.txt" [17-27] -> "/home/u/proj/日本.txt" process missing +0
+path "été.txt" [29-38] -> "/home/u/proj/été.txt" process file +0
+path "ä.txt" [40-46] -> "/home/u/proj/ä.txt" process file +0
+path "2026.png" [78-86] -> "/home/u/proj/2026.png" process missing +0
+path "/tmp/naïve.txt" [93-108] -> "/tmp/naïve.txt" absolute file +0
+path "/tmp/日本.txt" [109-124] -> "/tmp/日本.txt" absolute file +0
+path "日本/メモ.md" [130-146] -> "/home/u/proj/日本/メモ.md" process missing +0
+path "~/docs/ノート.md" [147-166] -> "/home/u/docs/ノート.md" home missing +0
+path "/home/u/proj/été.txt" [192-214] -> "/home/u/proj/été.txt" absolute file +0
+path "/tmp/日本.txt" [241-256] -> "/tmp/日本.txt" absolute file +0
+url "https://例え.jp/パス" [300-324]
+url "https://xn--r8jz45g.jp/" [329-352]
+path "/home/u/proj/README.md" [379-401] -> "/home/u/proj/README.md" absolute file +0
+path "/etc/hosts" [414-424] -> "/etc/hosts" absolute file +0
+host "café.example.com" [435-452]
+url "münchen.de/stadt" [457-474]
+path "/var/log/syslog" [508-523] -> "/var/log/syslog" absolute file +0
+path "/nope/missing.log" [528-545] -> "/nope/missing.log" absolute missing +0
+path "src/lib.rs" [559-569] -> "/home/u/proj/src/lib.rs" process file +0
+# width 40
+path "naïve.txt" [5-15] -> "/home/u/proj/naïve.txt" process missing +0
+path "日本.txt" [17-27] -> "/home/u/proj/日本.txt" process missing +0
+path "été.txt" [29-38] -> "/home/u/proj/été.txt" process file +0
+path "ä.txt" [40-46] -> "/home/u/proj/ä.txt" process file +0
+path "2026.png" [78-86] -> "/home/u/proj/2026.png" process missing +0
+path "/tmp/naïve.txt" [93-108] -> "/tmp/naïve.txt" absolute file +0
+path "/tmp/日本.txt" [109-124] -> "/tmp/日本.txt" absolute file +0
+path "日本/メモ.md" [130-146] -> "/home/u/proj/日本/メモ.md" process missing +0
+path "~/docs/ノート.md" [147-166] -> "/home/u/docs/ノート.md" home missing +0
+path "/home/u/proj/été.txt" [192-214] -> "/home/u/proj/été.txt" absolute file +0
+path "/tmp/日本.txt" [241-256] -> "/tmp/日本.txt" absolute file +0
+url "https://例え.jp/パス" [300-324]
+url "https://xn--r8jz45g.jp/" [329-352]
+path "/home/u/proj/README.md" [379-401] -> "/home/u/proj/README.md" absolute file +0
+path "/etc/hosts" [414-424] -> "/etc/hosts" absolute file +0
+host "café.example.com" [435-452]
+url "münchen.de/stadt" [457-474]
+path "/var/log/syslog" [508-523] -> "/var/log/syslog" absolute file +0
+path "/nope/missing.log" [528-545] -> "/nope/missing.log" absolute missing +0
+path "src/lib.rs" [559-569] -> "/home/u/proj/src/lib.rs" process file +0
+# width 120
+path "naïve.txt" [5-15] -> "/home/u/proj/naïve.txt" process missing +0
+path "日本.txt" [17-27] -> "/home/u/proj/日本.txt" process missing +0
+path "été.txt" [29-38] -> "/home/u/proj/été.txt" process file +0
+path "ä.txt" [40-46] -> "/home/u/proj/ä.txt" process file +0
+path "2026.png" [78-86] -> "/home/u/proj/2026.png" process missing +0
+path "/tmp/naïve.txt" [93-108] -> "/tmp/naïve.txt" absolute file +0
+path "/tmp/日本.txt" [109-124] -> "/tmp/日本.txt" absolute file +0
+path "日本/メモ.md" [130-146] -> "/home/u/proj/日本/メモ.md" process missing +0
+path "~/docs/ノート.md" [147-166] -> "/home/u/docs/ノート.md" home missing +0
+path "/home/u/proj/été.txt" [192-214] -> "/home/u/proj/été.txt" absolute file +0
+path "/tmp/日本.txt" [241-256] -> "/tmp/日本.txt" absolute file +0
+url "https://例え.jp/パス" [300-324]
+url "https://xn--r8jz45g.jp/" [329-352]
+path "/home/u/proj/README.md" [379-401] -> "/home/u/proj/README.md" absolute file +0
+path "/etc/hosts" [414-424] -> "/etc/hosts" absolute file +0
+host "café.example.com" [435-452]
+url "münchen.de/stadt" [457-474]
+path "/var/log/syslog" [508-523] -> "/var/log/syslog" absolute file +0
+path "/nope/missing.log" [528-545] -> "/nope/missing.log" absolute missing +0
+path "src/lib.rs" [559-569] -> "/home/u/proj/src/lib.rs" process file +0

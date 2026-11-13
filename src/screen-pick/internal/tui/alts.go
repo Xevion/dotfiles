@@ -51,6 +51,7 @@ func sourceOrder(s resolve.Source) int {
 
 func (m *Model) openAlts() {
 	m.mode = alts
+	m.queued = nil
 	m.altFilter = ""
 	m.altCursor = 0
 	m.refreshAlts()
@@ -89,22 +90,24 @@ func (m *Model) refreshAlts() {
 	}
 }
 
-func (m *Model) altsKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m *Model) altsKey(k tea.KeyPressMsg) tea.Cmd {
 	switch k.String() {
 	case "esc":
 		if m.altFilter != "" {
 			m.altFilter = ""
 			m.refreshAlts()
-			return m, nil
+			return nil
 		}
 		m.mode = menu
 	case "up", "ctrl+p", "shift+tab":
 		m.altCursor = max(m.altCursor-1, 0)
 	case "down", "ctrl+n", "tab":
 		m.altCursor = min(m.altCursor+1, max(len(m.altItems)-1, 0))
+	case "pgup", "pgdown", "ctrl+u", "ctrl+d", "home", "end":
+		m.altCursor = jump(k.String(), m.altCursor, len(m.altItems), m.page(m.altRows, 8))
 	case "enter":
 		if m.altCursor < len(m.altItems) {
-			m.choose(m.altItems[m.altCursor])
+			return m.choose(m.altItems[m.altCursor])
 		}
 	case "backspace":
 		m.altFilter = trimLast(m.altFilter)
@@ -115,19 +118,21 @@ func (m *Model) altsKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.refreshAlts()
 		}
 	}
-	return m, nil
+	return nil
 }
 
 // choose acts on copy i from now until the menu closes; 0 is the best
 // reading, which clears any earlier pick.
-func (m *Model) choose(i int) {
+func (m *Model) choose(i int) tea.Cmd {
 	m.mode = menu
 	m.act = 0
 	m.choice = nil
+	m.actions, m.actReady, m.queued = nil, false, nil
+	check := false
 	if i > 0 {
 		c := m.altList[i]
-		fi, err := m.backend.Stat(c.Path)
-		m.choice = &resolve.Resolution{Path: c.Path, Source: c.Source, Exists: err == nil, IsDir: err == nil && fi.IsDir()}
+		m.choice = &resolve.Resolution{Path: c.Path, Source: c.Source, Exists: true}
+		check = true
 	}
-	m.actions = m.backend.Actions(m.target())
+	return m.loadActions(check)
 }

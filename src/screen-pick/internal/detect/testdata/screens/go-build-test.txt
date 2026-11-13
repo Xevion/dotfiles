@@ -1,0 +1,28 @@
+$ go build ./...
+# example.com/proj/internal/db
+internal/db/db.go:27:15: undefined: sqlx
+internal/db/db.go:41:2: declared and not used: rows
+cmd/app/main.go:9:2: "os" imported and not used
+$ go test ./...
+?   	example.com/proj/cmd/app	[no test files]
+--- FAIL: TestOpen (0.01s)
+    db_test.go:33: open /home/u/proj/testdata/app.db: no such file or directory
+    db_test.go:34: got nil, want non-nil
+FAIL
+FAIL	example.com/proj/internal/db	0.012s
+ok  	example.com/proj/internal/util	(cached)
+panic: runtime error: index out of range [3] with length 3
+
+goroutine 1 [running]:
+main.parse(...)
+	/home/u/proj/cmd/app/main.go:58
+main.main()
+	/home/u/proj/cmd/app/main.go:21 +0x1d4
+exit status 2
+FAIL	example.com/proj/cmd/app	0.004s
+$ go vet ./...
+# example.com/proj/internal/util
+internal/util/util.go:12:2: fmt.Printf format %d has arg s of wrong type string
+$ gofmt -l .
+cmd/app/main.go
+internal/db/db.go

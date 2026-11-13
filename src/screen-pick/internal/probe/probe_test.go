@@ -3,6 +3,7 @@ package probe
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -98,4 +99,60 @@ func TestPrefixesOnDisk(t *testing.T) {
 	if diff := cmp.Diff(want, PrefixesOnDisk(home)); diff != "" {
 		t.Errorf("(-want +got):\n%s", diff)
 	}
+}
+
+// Steam installs under other roots (Debian's package, Flatpak); the same
+// install reached through a symlink must still count once.
+func TestPrefixesOnDiskFindsOtherSteamInstalls(t *testing.T) {
+	home := t.TempDir()
+	mk := func(p string) {
+		if err := os.MkdirAll(filepath.Join(home, p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk(".local/share/Steam/steamapps/compatdata/100/pfx/dosdevices")
+	mk(".var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/compatdata/400/pfx/dosdevices")
+	mk(".debian-steam/steamapps/compatdata/500/pfx/dosdevices")
+	if err := os.MkdirAll(filepath.Join(home, ".steam"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(home, ".debian-steam"), filepath.Join(home, ".steam/steam")); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		filepath.Join(home, ".local/share/Steam/steamapps/compatdata/100/pfx"),
+		filepath.Join(home, ".var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/compatdata/400/pfx"),
+		filepath.Join(home, ".debian-steam/steamapps/compatdata/500/pfx"),
+	}
+	got := PrefixesOnDisk(home)
+	slices.Sort(got)
+	slices.Sort(want)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want +got):\n%s", diff)
+	}
+}
+
+func FuzzSteamLibraries(f *testing.F) {
+	f.Add(`"path"		"/a b"`)
+	f.Add(`"path" "D:\\Lib\"x"`)
+	f.Fuzz(func(t *testing.T, vdf string) {
+		out := steamLibraries([]byte(vdf))
+		seen := map[string]bool{}
+		for _, p := range out {
+			if seen[p] {
+				t.Fatalf("duplicate library %q in %q", p, out)
+			}
+			seen[p] = true
+		}
+	})
+}
+
+func FuzzParseKittyLS(f *testing.F) {
+	f.Add([]byte(kittyLSOutput), 1970)
+	f.Add([]byte(`[{"tabs":null}]`), 0)
+	f.Fuzz(func(t *testing.T, data []byte, id int) {
+		if w, err := parseKittyLS(data, id); err == nil && w.ID != id {
+			t.Fatalf("returned window %d for id %d", w.ID, id)
+		}
+	})
 }

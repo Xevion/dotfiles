@@ -1,0 +1,21 @@
+$ ssh -i ~/.ssh/id_ed25519 deploy@bastion.example.com
+The authenticity of host 'bastion.example.com (203.0.113.7)' can't be established.
+ED25519 key fingerprint is SHA256:Qm1xYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo.
+Warning: Permanently added 'bastion.example.com' (ED25519) to the list of known hosts.
+deploy@bastion:~$ ip -br addr
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+eth0             UP             192.168.1.20/24 fe80::1c2d:3eff:fe4f:5a6b/64
+docker0          DOWN           172.17.0.1/16
+deploy@bastion:~$ ss -tlnp
+State   Recv-Q  Send-Q   Local Address:Port    Peer Address:Port  Process
+LISTEN  0       128            0.0.0.0:22           0.0.0.0:*      users:(("sshd",pid=812,fd=3))
+LISTEN  0       511          127.0.0.1:8080         0.0.0.0:*      users:(("nginx",pid=1204,fd=6))
+LISTEN  0       128               [::]:22              [::]:*      users:(("sshd",pid=812,fd=4))
+deploy@bastion:~$ git clone git@github.com:example/proj.git
+Cloning into 'proj'...
+deploy@bastion:~$ git remote -v
+origin	git@github.com:example/proj.git (fetch)
+origin	https://github.com/example/proj.git (push)
+deploy@bastion:~$ ping -c1 10.0.0.1
+64 bytes from 10.0.0.1: icmp_seq=1 ttl=64 time=0.412 ms
+deploy@bastion:~$ scp app.log deploy@bastion.example.com:/var/log/app.log

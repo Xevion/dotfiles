@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/charlievieth/fastwalk"
@@ -30,16 +31,21 @@ func Git(ctx context.Context, root string) ([]string, error) {
 			paths = append(paths, p)
 		}
 	}
-	return paths, nil
+	// An unmerged path is listed once per stage, on adjacent lines.
+	return slices.Compact(paths), nil
 }
 
-// skipDirs are directory names a walk never enters: VCS internals, build
-// output and caches, which are large and never what was printed.
+// skipDirs are directory names a walk never enters unless the query names
+// them: VCS internals, build output and caches are large and rarely what was
+// printed.
 var skipDirs = map[string]bool{
 	".git": true, ".hg": true, "node_modules": true, "target": true, ".cache": true,
 	"__pycache__": true, ".venv": true, ".npm": true, ".rustup": true, ".cargo": true,
-	"proc": true, "sys": true,
 }
+
+// kernelDirs are the top-level virtual trees: endless, and never what was
+// printed.
+var kernelDirs = map[string]bool{"/proc": true, "/sys": true}
 
 // Walk searches roots for entries whose path ends with query, calling found
 // for each (possibly concurrently) until ctx is done or the roots are covered.
@@ -49,6 +55,10 @@ func Walk(ctx context.Context, roots []string, query string, found func(string))
 		return nil
 	}
 	base := q[len(q)-1]
+	named := map[string]bool{}
+	for _, c := range q {
+		named[c] = true
+	}
 	conf := fastwalk.DefaultConfig.Copy()
 	for _, root := range roots {
 		err := fastwalk.Walk(conf, root, func(p string, d fs.DirEntry, err error) error {
@@ -58,7 +68,7 @@ func Walk(ctx context.Context, roots []string, query string, found func(string))
 			if err != nil {
 				return nil
 			}
-			if d.IsDir() && p != root && skipDirs[d.Name()] {
+			if d.IsDir() && p != root && (skipDirs[d.Name()] && !named[d.Name()] || kernelDirs[p]) {
 				return filepath.SkipDir
 			}
 			if d.Name() == base && suffixMatches(strings.Split(p, "/"), q) {

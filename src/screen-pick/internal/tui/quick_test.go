@@ -10,6 +10,7 @@ import (
 
 	"screenpick/internal/detect"
 	"screenpick/internal/fakefs"
+	"screenpick/internal/preview"
 	"screenpick/internal/resolve"
 )
 
@@ -76,5 +77,79 @@ func TestLateQuickResultIsIgnored(t *testing.T) {
 	m.Update(quickMsg{textual()})
 	if len(m.matches) != 0 {
 		t.Errorf("a stale quick result replaced the refined one: %d matches", len(m.matches))
+	}
+}
+
+// A path whose check timed out is not known to be missing: nothing on screen
+// may say "not found" about it, though a clean miss still does.
+func TestTimedOutPathIsDrawnUnknownNotMissing(t *testing.T) {
+	m, _ := newQuick(t, func(context.Context) []detect.Match { return nil })
+	ms := textual()
+	var paths []int
+	for i := range ms {
+		if ms[i].Kind == detect.KindPath {
+			ms[i].Unknown = true
+			paths = append(paths, i)
+		}
+	}
+	m.Update(quickMsg{ms})
+
+	if got := m.place(ms[paths[0]]); got != "not checked" {
+		t.Errorf("place of a timed-out path = %q", got)
+	}
+	if ic, _ := m.icon(ms[paths[0]]); ic == iconMissing {
+		t.Error("a timed-out path must not get the missing icon")
+	}
+	if !strings.Contains(ansi.Strip(strings.Join(m.infoLines(ms[paths[0]], 60), "\n")), "could not check") {
+		t.Error("the details should say the check could not be made")
+	}
+
+	m.mode, m.origin = List, List
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 20})
+	frame := ansi.Strip(m.View().Content)
+	rows := strings.Split(frame, "\n")
+	for _, row := range rows[:len(rows)-1] {
+		if strings.Contains(row, "not found") {
+			t.Errorf("a list row says not found for a path that timed out: %q", row)
+		}
+	}
+
+	ms[paths[0]].Unknown = false
+	m.Update(refinedMsg{ms})
+	if got := m.place(m.matches[paths[0]]); got != "not found" {
+		t.Errorf("a clean miss reads not found, got %q", got)
+	}
+}
+
+type lateRepo struct {
+	*fakeBackend
+	found bool
+}
+
+func (l *lateRepo) Preview(_ context.Context, m detect.Match, rows int) preview.Preview {
+	if m.Kind == detect.KindSHA && !l.found {
+		return preview.Preview{Note: "not a commit in any repository this window uses"}
+	}
+	return preview.Text("commit "+m.Text, rows)
+}
+
+// A commit looked up before the rescans know the window's checkouts reads as
+// unknown; the answer must be asked again once they land.
+func TestCommitPreviewIsReadAgainAfterARescan(t *testing.T) {
+	m, f := newTest(t, List)
+	l := &lateRepo{fakeBackend: f}
+	m.backend = l
+	m.setMatches(append(m.matches, detect.Match{Kind: detect.KindSHA, Start: 0, End: 7, Text: "abc1234"}))
+	_, cmd := m.Update(tea.WindowSizeMsg{Width: 140, Height: 30})
+	drain(m, cmd)
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "not a commit") {
+		t.Fatalf("fixture: the first read should say the commit is unknown:\n%s", view)
+	}
+
+	l.found = true
+	_, cmd = m.Update(refinedMsg{m.matches})
+	drain(m, cmd)
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "commit abc1234") {
+		t.Errorf("the commit should be read again after the rescan:\n%s", view)
 	}
 }

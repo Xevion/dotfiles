@@ -18,21 +18,34 @@ type row struct {
 	start, end int // byte range in text, excluding the newline and markers
 }
 
+// newGrid splits text into the rows the screen had. A row ends at a newline or
+// a carriage return (kitty's wrap marker, which also ends the rows of a soft
+// wrapped line), and a terminator at the very end opens no further row.
 func newGrid(text string) *grid {
 	g := &grid{text: text}
 	start := 0
-	for i := 0; i <= len(text); i++ {
-		if i < len(text) && text[i] != '\n' {
+	for i := 0; i < len(text); i++ {
+		if text[i] != '\n' && text[i] != '\r' {
 			continue
 		}
-		end := i
-		for end > start && (text[end-1] == '\r' || text[end-1] == 0) {
-			end--
+		g.rows = append(g.rows, row{start, trimNul(text, start, i)})
+		if text[i] == '\r' && i+1 < len(text) && text[i+1] == '\n' {
+			i++
 		}
-		g.rows = append(g.rows, row{start, end})
 		start = i + 1
 	}
+	if start < len(text) || len(g.rows) == 0 {
+		g.rows = append(g.rows, row{start, trimNul(text, start, len(text))})
+	}
 	return g
+}
+
+// trimNul drops the NUL wrap markers the hints kitten leaves at a row's end.
+func trimNul(text string, start, end int) int {
+	for end > start && text[end-1] == 0 {
+		end--
+	}
+	return end
 }
 
 // line returns row r's visible text.
@@ -66,6 +79,13 @@ func (g *grid) pieces(start, end int) []piece {
 		}
 	}
 	return out
+}
+
+// visibleFrom reports whether any of [start,end) is drawn on row first or
+// below.
+func (g *grid) visibleFrom(first, start, end int) bool {
+	ps := g.pieces(start, end)
+	return len(ps) > 0 && ps[len(ps)-1].row >= first
 }
 
 // padRight pads s with spaces to n cells.

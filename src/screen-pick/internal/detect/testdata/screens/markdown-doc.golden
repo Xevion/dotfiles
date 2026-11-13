@@ -1,0 +1,51 @@
+# width 0
+path "docs/guide.md" [38-51] -> "/home/u/proj/docs/guide.md" process file +0
+path "CONTRIBUTING.md" [72-87] -> "/home/u/proj/CONTRIBUTING.md" process missing +0
+path "~/.config/app/app.conf" [154-176] -> "/home/u/.config/app/app.conf" home file +0
+path "/etc/app.conf" [203-216] -> "/etc/app.conf" absolute missing +0
+url "https://example.com/proj" [243-267]
+url "https://github.com/example/proj/issues?q=is%3Aopen" [279-329]
+url "https://docs.example.com/proj/latest" [338-374]
+url "mailto:ann@example.com" [385-407]
+path "src/main.rs" [451-462] -> "/home/u/proj/src/main.rs" process file +0
+path "src/lib.rs" [483-493] -> "/home/u/proj/src/lib.rs" process file +0
+path "Cargo.toml" [510-520] -> "/home/u/proj/Cargo.toml" process file +0
+path "README.md" [550-559] -> "/home/u/proj/README.md" process file +0
+path "src/server/mod.rs" [602-619] -> "/home/u/proj/src/server/mod.rs" process file +0
+url "http://localhost:3000/" [649-671]
+url "example.com/docs/intro" [689-711]
+sha "9c8d7e6" [755-762]
+# width 40
+path "docs/guide.md" [38-51] -> "/home/u/proj/docs/guide.md" process file +0
+path "CONTRIBUTING.md" [72-87] -> "/home/u/proj/CONTRIBUTING.md" process missing +0
+path "~/.config/app/app.conf" [154-176] -> "/home/u/.config/app/app.conf" home file +0
+path "/etc/app.conf" [203-216] -> "/etc/app.conf" absolute missing +0
+url "https://example.com/proj" [243-267]
+url "https://github.com/example/proj/issues?q=is%3Aopen" [279-329]
+url "https://docs.example.com/proj/latest" [338-374]
+url "mailto:ann@example.com" [385-407]
+path "src/main.rs" [451-462] -> "/home/u/proj/src/main.rs" process file +0
+path "src/lib.rs" [483-493] -> "/home/u/proj/src/lib.rs" process file +0
+path "Cargo.toml" [510-520] -> "/home/u/proj/Cargo.toml" process file +0
+path "README.md" [550-559] -> "/home/u/proj/README.md" process file +0
+path "src/server/mod.rs" [602-619] -> "/home/u/proj/src/server/mod.rs" process file +0
+url "http://localhost:3000/" [649-671]
+url "example.com/docs/intro" [689-711]
+sha "9c8d7e6" [755-762]
+# width 120
+path "docs/guide.md" [38-51] -> "/home/u/proj/docs/guide.md" process file +0
+path "CONTRIBUTING.md" [72-87] -> "/home/u/proj/CONTRIBUTING.md" process missing +0
+path "~/.config/app/app.conf" [154-176] -> "/home/u/.config/app/app.conf" home file +0
+path "/etc/app.conf" [203-216] -> "/etc/app.conf" absolute missing +0
+url "https://example.com/proj" [243-267]
+url "https://github.com/example/proj/issues?q=is%3Aopen" [279-329]
+url "https://docs.example.com/proj/latest" [338-374]
+url "mailto:ann@example.com" [385-407]
+path "src/main.rs" [451-462] -> "/home/u/proj/src/main.rs" process file +0
+path "src/lib.rs" [483-493] -> "/home/u/proj/src/lib.rs" process file +0
+path "Cargo.toml" [510-520] -> "/home/u/proj/Cargo.toml" process file +0
+path "README.md" [550-559] -> "/home/u/proj/README.md" process file +0
+path "src/server/mod.rs" [602-619] -> "/home/u/proj/src/server/mod.rs" process file +0
+url "http://localhost:3000/" [649-671]
+url "example.com/docs/intro" [689-711]
+sha "9c8d7e6" [755-762]

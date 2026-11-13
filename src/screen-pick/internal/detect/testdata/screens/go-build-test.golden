@@ -1,0 +1,54 @@
+# width 0
+url "example.com/proj/internal/db" [19-47]
+path "internal/db/db.go" @27:15 [48-65] -> "/home/u/proj/internal/db/db.go" process file +0
+path "internal/db/db.go" @41:2 [89-106] -> "/home/u/proj/internal/db/db.go" process file +0
+path "cmd/app/main.go" @9:2 [141-156] -> "/home/u/proj/cmd/app/main.go" process file +0
+url "example.com/proj/cmd/app" [210-234]
+path "db_test.go" @33:0 [282-292] -> "/home/u/proj/db_test.go" process missing +0
+path "/home/u/proj/testdata/app.db" [302-330] -> "/home/u/proj/testdata/app.db" absolute missing +0
+path "db_test.go" @34:0 [362-372] -> "/home/u/proj/db_test.go" process missing +0
+url "example.com/proj/internal/db" [409-437]
+url "example.com/proj/internal/util" [450-480]
+path "/home/u/proj/cmd/app/main.go" @58:0 [590-618] -> "/home/u/proj/cmd/app/main.go" absolute file +0
+path "/home/u/proj/cmd/app/main.go" @21:0 [635-663] -> "/home/u/proj/cmd/app/main.go" absolute file +0
+url "example.com/proj/cmd/app" [693-717]
+url "example.com/proj/internal/util" [742-772]
+path "internal/util/util.go" @12:2 [773-794] -> "/home/u/proj/internal/util/util.go" process file +0
+path "cmd/app/main.go" [866-881] -> "/home/u/proj/cmd/app/main.go" process file +0
+path "internal/db/db.go" [882-899] -> "/home/u/proj/internal/db/db.go" process file +0
+# width 40
+url "example.com/proj/internal/db" [19-47]
+path "internal/db/db.go" @27:15 [48-65] -> "/home/u/proj/internal/db/db.go" process file +0
+path "internal/db/db.go" @41:2 [89-106] -> "/home/u/proj/internal/db/db.go" process file +0
+path "cmd/app/main.go" @9:2 [141-156] -> "/home/u/proj/cmd/app/main.go" process file +0
+url "example.com/proj/cmd/app" [210-234]
+path "db_test.go" @33:0 [282-292] -> "/home/u/proj/db_test.go" process missing +0
+path "/home/u/proj/testdata/app.db" [302-330] -> "/home/u/proj/testdata/app.db" absolute missing +0
+path "db_test.go" @34:0 [362-372] -> "/home/u/proj/db_test.go" process missing +0
+url "example.com/proj/internal/db" [409-437]
+url "example.com/proj/internal/util" [450-480]
+path "/home/u/proj/cmd/app/main.go" @58:0 [590-618] -> "/home/u/proj/cmd/app/main.go" absolute file +0
+path "/home/u/proj/cmd/app/main.go" @21:0 [635-663] -> "/home/u/proj/cmd/app/main.go" absolute file +0
+url "example.com/proj/cmd/app" [693-717]
+url "example.com/proj/internal/util" [742-772]
+path "internal/util/util.go" @12:2 [773-794] -> "/home/u/proj/internal/util/util.go" process file +0
+path "cmd/app/main.go" [866-881] -> "/home/u/proj/cmd/app/main.go" process file +0
+path "internal/db/db.go" [882-899] -> "/home/u/proj/internal/db/db.go" process file +0
+# width 120
+url "example.com/proj/internal/db" [19-47]
+path "internal/db/db.go" @27:15 [48-65] -> "/home/u/proj/internal/db/db.go" process file +0
+path "internal/db/db.go" @41:2 [89-106] -> "/home/u/proj/internal/db/db.go" process file +0
+path "cmd/app/main.go" @9:2 [141-156] -> "/home/u/proj/cmd/app/main.go" process file +0
+url "example.com/proj/cmd/app" [210-234]
+path "db_test.go" @33:0 [282-292] -> "/home/u/proj/db_test.go" process missing +0
+path "/home/u/proj/testdata/app.db" [302-330] -> "/home/u/proj/testdata/app.db" absolute missing +0
+path "db_test.go" @34:0 [362-372] -> "/home/u/proj/db_test.go" process missing +0
+url "example.com/proj/internal/db" [409-437]
+url "example.com/proj/internal/util" [450-480]
+path "/home/u/proj/cmd/app/main.go" @58:0 [590-618] -> "/home/u/proj/cmd/app/main.go" absolute file +0
+path "/home/u/proj/cmd/app/main.go" @21:0 [635-663] -> "/home/u/proj/cmd/app/main.go" absolute file +0
+url "example.com/proj/cmd/app" [693-717]
+url "example.com/proj/internal/util" [742-772]
+path "internal/util/util.go" @12:2 [773-794] -> "/home/u/proj/internal/util/util.go" process file +0
+path "cmd/app/main.go" [866-881] -> "/home/u/proj/cmd/app/main.go" process file +0
+path "internal/db/db.go" [882-899] -> "/home/u/proj/internal/db/db.go" process file +0

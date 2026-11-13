@@ -1,0 +1,15 @@
+# width 0
+path "/home/u/proj" [26-38] -> "/home/u/proj" absolute dir +0
+path "src/main.rs" @14:20 [99-110] -> "/home/u/proj/src/main.rs" screen file +0
+path "src/lib.rs" @42:9 [305-315] -> "/home/u/proj/src/lib.rs" screen file +0
+path "src/server/mod.rs" @3:5 [634-651] -> "/home/u/proj/src/server/mod.rs" screen file +0
+# width 40
+path "/home/u/proj" [26-38] -> "/home/u/proj" absolute dir +0
+path "src/main.rs" @14:20 [99-110] -> "/home/u/proj/src/main.rs" screen file +0
+path "src/lib.rs" @42:9 [305-315] -> "/home/u/proj/src/lib.rs" screen file +0
+path "src/server/mod.rs" @3:5 [634-651] -> "/home/u/proj/src/server/mod.rs" screen file +0
+# width 120
+path "/home/u/proj" [26-38] -> "/home/u/proj" absolute dir +0
+path "src/main.rs" @14:20 [99-110] -> "/home/u/proj/src/main.rs" screen file +0
+path "src/lib.rs" @42:9 [305-315] -> "/home/u/proj/src/lib.rs" screen file +0
+path "src/server/mod.rs" @3:5 [634-651] -> "/home/u/proj/src/server/mod.rs" screen file +0

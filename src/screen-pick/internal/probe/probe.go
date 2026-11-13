@@ -176,6 +176,14 @@ func steamLibraries(vdf []byte) []string {
 	return out
 }
 
+// steamRoots are where a Steam install lives, by how it was installed: the
+// upstream bootstrap, the symlink distro packages leave, and Flatpak.
+var steamRoots = []string{
+	".local/share/Steam",
+	".steam/steam",
+	".var/app/com.valvesoftware.Steam/.local/share/Steam",
+}
+
 // PrefixesOnDisk finds Wine prefixes under home: ~/.wine, then every Proton
 // prefix in each Steam library. Only directories holding dosdevices count.
 func PrefixesOnDisk(home string) []string {
@@ -187,9 +195,13 @@ func PrefixesOnDisk(home string) []string {
 	if p := filepath.Join(home, ".wine"); isPrefix(p) {
 		out = append(out, p)
 	}
-	libs := []string{filepath.Join(home, ".local/share/Steam")}
-	if vdf, err := os.ReadFile(filepath.Join(home, ".local/share/Steam/steamapps/libraryfolders.vdf")); err == nil {
-		libs = append(libs, steamLibraries(vdf)...)
+	var libs []string
+	for _, root := range steamRoots {
+		root = filepath.Join(home, root)
+		libs = append(libs, root)
+		if vdf, err := os.ReadFile(filepath.Join(root, "steamapps/libraryfolders.vdf")); err == nil {
+			libs = append(libs, steamLibraries(vdf)...)
+		}
 	}
 	seen := map[string]bool{}
 	for _, lib := range libs {

@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -80,6 +79,9 @@ type Resolution struct {
 	IsDir  bool
 	// Expanded marks a path reached by widening abbreviated components.
 	Expanded bool
+	// Unknown marks a missing path that is not known to be missing: a check on
+	// the way timed out, or sat under a mount that did.
+	Unknown bool
 	// Alternatives are other existing readings, best first.
 	Alternatives []Candidate
 }
@@ -191,6 +193,31 @@ func (r *Resolver) readDir(p string) ([]fs.DirEntry, error) {
 	return entries, err
 }
 
+// maxLinkHops bounds how many symlinks isDir follows, which also ends loops.
+const maxLinkHops = 16
+
+// isDir reports whether p, whose Lstat is fi, is a directory or a symlink
+// that leads to one.
+func (r *Resolver) isDir(p string, fi fs.FileInfo) bool {
+	for range maxLinkHops {
+		if fi.Mode()&fs.ModeSymlink == 0 {
+			return fi.IsDir()
+		}
+		target, err := r.env.Readlink(p)
+		if err != nil {
+			return false
+		}
+		if !path.IsAbs(target) {
+			target = path.Join(path.Dir(p), target)
+		}
+		p = path.Clean(target)
+		if fi, err = r.Lstat(p); err != nil {
+			return false
+		}
+	}
+	return false
+}
+
 func (r *Resolver) exists(p string) bool {
 	_, err := r.Lstat(p)
 	return err == nil
@@ -219,6 +246,12 @@ func (r *Resolver) ProjectRoot(dir string) string {
 // bases. screen lists directories shown above the token, nearest first; they
 // outrank the static bases.
 func (r *Resolver) Resolve(token string, screen []string) Resolution {
+	return r.ResolveDecoded(decode.Decode(token), screen)
+}
+
+// ResolveDecoded is Resolve for a token whose decode.Decode readings are
+// already in hand.
+func (r *Resolver) ResolveDecoded(variants []string, screen []string) Resolution {
 	bases := r.basesWith(screen)
 	var res Resolution
 	placed := false
@@ -230,16 +263,18 @@ func (r *Resolver) Resolve(token string, screen []string) Resolution {
 		seen[c.Path] = true
 		fi, err := r.Lstat(c.Path)
 		if err != nil {
+			if !res.Exists && err == ErrSlow {
+				res.Unknown = true
+			}
 			return
 		}
 		if !res.Exists {
-			res = Resolution{Path: c.Path, Source: c.Source, Exists: true, IsDir: fi.IsDir(), Expanded: expanded}
+			res = Resolution{Path: c.Path, Source: c.Source, Exists: true, IsDir: r.isDir(c.Path, fi), Expanded: expanded}
 		} else {
 			res.Alternatives = append(res.Alternatives, c)
 		}
 	}
 
-	variants := decode.Decode(token)
 	for _, v := range variants {
 		for _, c := range r.locate(v, bases) {
 			if !placed {
@@ -263,24 +298,38 @@ func (r *Resolver) basesWith(screen []string) []Base {
 	if len(screen) == 0 {
 		return r.static
 	}
-	seen := map[string]bool{}
 	out := make([]Base, 0, len(screen)+len(r.static))
 	for _, d := range screen {
-		if !seen[d] {
-			seen[d] = true
+		if !slices.ContainsFunc(out, func(b Base) bool { return b.Dir == d }) {
 			out = append(out, Base{d, SourceScreen})
 		}
 	}
+	n := len(out)
 	for _, b := range r.static {
-		if !seen[b.Dir] {
-			seen[b.Dir] = true
+		if !slices.ContainsFunc(out[:n], func(o Base) bool { return o.Dir == b.Dir }) {
 			out = append(out, b)
 		}
 	}
 	return out
 }
 
-var envVarRoot = regexp.MustCompile(`^\$(?:\{\w+\}|[A-Za-z_]\w*)`)
+// hasEnvVarRoot reports a $NAME or ${NAME} at the start of v.
+func hasEnvVarRoot(v string) bool {
+	if len(v) < 2 || v[0] != '$' {
+		return false
+	}
+	isWord := func(c byte) bool {
+		return c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
+	}
+	if v[1] == '{' {
+		i := 2
+		for i < len(v) && isWord(v[i]) {
+			i++
+		}
+		return i > 2 && i < len(v) && v[i] == '}'
+	}
+	return !(v[1] >= '0' && v[1] <= '9') && isWord(v[1])
+}
 
 // locate lists where a decoded token could live, best first.
 func (r *Resolver) locate(v string, bases []Base) []Candidate {
@@ -315,7 +364,7 @@ func (r *Resolver) locate(v string, bases []Base) []Candidate {
 			return nil
 		}
 		return []Candidate{{path.Join(path.Dir(r.env.Home), name, rest), SourceAbsolute}}
-	case envVarRoot.MatchString(v):
+	case hasEnvVarRoot(v):
 		missing := false
 		p := os.Expand(v, func(k string) string {
 			val := r.env.Getenv(k)

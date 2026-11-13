@@ -5,12 +5,14 @@ package filetype
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
 	"os"
 	"path"
 	"strings"
+	"syscall"
 	"unicode/utf8"
 )
 
@@ -40,13 +42,22 @@ type Type struct {
 // HeadSize is how much of a file Sniff looks at.
 const HeadSize = 8192
 
-// Head reads the start of the file at p.
+// ErrNotRegular is what Head returns for a path that is not a regular file.
+var ErrNotRegular = errors.New("not a regular file")
+
+// Head reads the start of the regular file at p. Anything else (a FIFO, a
+// device) is refused: opening a pipe for reading waits for a writer.
 func Head(p string) ([]byte, error) {
-	f, err := os.Open(p)
+	f, err := os.OpenFile(p, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
+	if fi, err := f.Stat(); err != nil {
+		return nil, err
+	} else if !fi.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s: %w", p, ErrNotRegular)
+	}
 	buf := make([]byte, HeadSize)
 	n, err := io.ReadFull(f, buf)
 	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
@@ -61,7 +72,7 @@ func Sniff(name string, head []byte) Type {
 	switch {
 	case bytes.HasPrefix(head, []byte("\x7fELF")):
 		return Type{Executable, "application/x-executable"}
-	case bytes.HasPrefix(head, []byte("MZ")):
+	case bytes.HasPrefix(head, []byte("MZ")) && bytes.IndexByte(head[:min(len(head), 64)], 0) >= 0:
 		return Type{WindowsExe, "application/vnd.microsoft.portable-executable"}
 	case len(head) == 0:
 		return Type{Text, "text/plain"}
@@ -69,8 +80,11 @@ func Sniff(name string, head []byte) Type {
 	mt, _, _ := strings.Cut(http.DetectContentType(head), ";")
 	switch {
 	case strings.HasPrefix(mt, "text/"):
-		if byExt := mimeByName(name); byExt != "" && !strings.HasPrefix(byExt, "text/") && ByName(name) != Text {
-			return Type{ByName(name), byExt}
+		// Only formats written in text (SVG, PostScript) outrank their content.
+		if byExt := mimeByName(name); byExt != "" && !strings.HasPrefix(byExt, "text/") {
+			if c := ByName(name); c == Image || c == Document {
+				return Type{c, byExt}
+			}
 		}
 		return Type{Text, mt}
 	case strings.HasPrefix(mt, "image/"):

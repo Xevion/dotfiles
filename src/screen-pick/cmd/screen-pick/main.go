@@ -8,10 +8,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"text/tabwriter"
 	"time"
@@ -33,41 +35,82 @@ func main() {
 	}
 }
 
-func run(args []string) error {
+type options struct {
+	verb      string
+	windowID  int
+	width     int
+	full      bool
+	withIndex bool
+	asJSON    bool
+}
+
+var verbs = []string{"hints", "list", "scan"}
+
+// parseArgs reads the verb and its flags, rejecting the flags the verb does not
+// take before any input is read.
+func parseArgs(args []string, out io.Writer) (options, error) {
 	if len(args) == 0 {
-		return usage()
+		return options{}, usage()
 	}
-	verb, args := args[0], args[1:]
-	fs := flag.NewFlagSet(verb, flag.ContinueOnError)
-	windowID := fs.Int("window-id", 0, "kitty window the screen came from")
-	width := fs.Int("width", 0, "screen width in cells (default: the terminal's)")
-	full := fs.Bool("full", false, "scan: probe kitty and /proc as the picker does")
-	withIndex := fs.Bool("index", false, "scan: also search git indexes for unresolved paths")
-	asJSON := fs.Bool("json", false, "scan: print JSON")
-	if err := fs.Parse(args); err != nil {
+	var o options
+	o.verb = args[0]
+	if !slices.Contains(verbs, o.verb) {
+		return options{}, fmt.Errorf("unknown verb %q: %w", o.verb, usage())
+	}
+	fs := flag.NewFlagSet(o.verb, flag.ContinueOnError)
+	fs.SetOutput(out)
+	fs.IntVar(&o.windowID, "window-id", 0, "kitty window the screen came from")
+	fs.IntVar(&o.width, "width", 0, "screen width in cells (default: the terminal's)")
+	fs.BoolVar(&o.full, "full", false, "scan: probe kitty and /proc as the picker does")
+	fs.BoolVar(&o.withIndex, "index", false, "scan: also search git indexes for unresolved paths")
+	fs.BoolVar(&o.asJSON, "json", false, "scan: print JSON")
+	if err := fs.Parse(args[1:]); err != nil {
+		return options{}, err
+	}
+	var scanOnly string
+	fs.Visit(func(f *flag.Flag) {
+		if o.verb != "scan" && slices.Contains([]string{"full", "index", "json"}, f.Name) {
+			scanOnly = f.Name
+		}
+	})
+	switch {
+	case scanOnly != "":
+		return options{}, fmt.Errorf("-%s only applies to scan: %w", scanOnly, usage())
+	case fs.NArg() > 0:
+		return options{}, fmt.Errorf("unexpected argument %q: %w", fs.Arg(0), usage())
+	case o.windowID < 0 || o.width < 0:
+		return options{}, fmt.Errorf("-window-id and -width must not be negative")
+	}
+	return o, nil
+}
+
+func run(args []string) error {
+	o, err := parseArgs(args, os.Stderr)
+	if errors.Is(err, flag.ErrHelp) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 	text, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return fmt.Errorf("read screen: %w", err)
 	}
-	if *width == 0 {
+	if o.width == 0 {
 		if w, _, err := term.GetSize(os.Stdout.Fd()); err == nil {
-			*width = w
+			o.width = w
 		}
 	}
 
-	switch verb {
+	switch o.verb {
 	case "hints", "list":
 		mode := tui.Hints
-		if verb == "list" {
+		if o.verb == "list" {
 			mode = tui.List
 		}
-		return pick(string(text), mode, *width, *windowID)
-	case "scan":
-		return scan(string(text), *width, *windowID, *full, *withIndex, *asJSON)
+		return pick(string(text), mode, o.width, o.windowID)
 	}
-	return usage()
+	return scan(string(text), o.width, o.windowID, o.full, o.withIndex, o.asJSON)
 }
 
 func usage() error {
@@ -76,6 +119,7 @@ func usage() error {
 
 func pick(text string, mode tui.Mode, width, windowID int) error {
 	s := newSession(text, width, windowID)
+	defer s.cancel()
 	m := tui.New(tui.Config{
 		Mode:    mode,
 		Screen:  text,
@@ -93,6 +137,8 @@ func pick(text string, mode tui.Mode, width, windowID int) error {
 type scanRow struct {
 	Kind   string   `json:"kind"`
 	Text   string   `json:"text"`
+	Start  int      `json:"start"`
+	End    int      `json:"end"`
 	Line   int      `json:"line,omitempty"`
 	Col    int      `json:"col,omitempty"`
 	Path   string   `json:"path,omitempty"`
@@ -116,7 +162,7 @@ func scan(text string, width, windowID int, full, withIndex, asJSON bool) error 
 		var merger lookup.Merger
 		for res := range s.Index(ctx, lookup.Queries(ms)) {
 			if res.Err == nil {
-				merger.Apply(res.ID, &ms[res.ID].Resolution, res)
+				merger.ApplyMatch(&ms[res.ID], res)
 			}
 		}
 	}
@@ -124,7 +170,7 @@ func scan(text string, width, windowID int, full, withIndex, asJSON bool) error 
 
 	rows := make([]scanRow, len(ms))
 	for i, m := range ms {
-		rows[i] = scanRow{Kind: m.Kind.String(), Text: m.Text, Line: m.Line, Col: m.Col, Path: m.Path, Exists: m.Exists}
+		rows[i] = scanRow{Kind: m.Kind.String(), Text: m.Text, Start: m.Start, End: m.End, Line: m.Line, Col: m.Col, Path: m.Path, Exists: m.Exists}
 		if m.Kind == detect.KindPath && m.Source != 0 {
 			rows[i].Source = m.Source.String()
 		}

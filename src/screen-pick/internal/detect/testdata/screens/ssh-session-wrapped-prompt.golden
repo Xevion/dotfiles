@@ -1,0 +1,66 @@
+# width 0
+path "~/proj" [9-15] -> "/home/u/proj" home dir +0
+path "src/server/" [24-35] -> "/home/u/proj/src/server" process dir +0
+path "handler.rs" [80-90] -> "/home/u/proj/handler.rs" process missing +0
+path "mod.rs" [126-132] -> "/home/u/proj/mod.rs" process missing +0
+path "~/proj" [142-148] -> "/home/u/proj" home dir +0
+path "src/server/mod.rs" [154-171] -> "/home/u/proj/src/server/mod.rs" process file +0
+path "~/proj" [198-204] -> "/home/u/proj" home dir +0
+path "/home/u/other" [209-222] -> "/home/u/other" absolute dir +0
+path "/home/u/other" [232-245] -> "/home/u/other" absolute dir +0
+path "README.md" [251-260] -> "/home/u/other/README.md" screen file +1
+path "/home/u/other" [278-291] -> "/home/u/other" absolute dir +0
+path "~/proj/sub/deep" [296-311] -> "/home/u/proj/sub/deep" home dir +0
+path "~/proj/sub/deep" [321-336] -> "/home/u/proj/sub/deep" home dir +0
+path "ls ../../src/main.rs" [338-358] -> "/home/u/proj/src/main.rs" process file +0
+path "../../src/main.rs" [359-376] -> "/home/u/proj/src/main.rs" screen file +0
+path "~/proj/sub/deep" [386-401] -> "/home/u/proj/sub/deep" home dir +0
+path "~/proj/sub/deep" [415-430] -> "/home/u/proj/sub/deep" home dir +0
+path "/home/u/proj/.gitignore" [437-460] -> "/home/u/proj/.gitignore" absolute file +0
+path "~/proj/sub/deep" [470-485] -> "/home/u/proj/sub/deep" home dir +0
+path "~/p/s/lib.rs" [487-499] -> "/home/u/proj/src/lib.rs" home file +0 expanded
+path "/home/u/p/s/lib.rs" [506-524] -> "/home/u/proj/src/lib.rs" absolute file +0 expanded
+# width 40
+path "~/proj" [9-15] -> "/home/u/proj" home dir +0
+path "src/server/" [24-35] -> "/home/u/proj/src/server" process dir +0
+path "handler.rs" [80-90] -> "/home/u/proj/handler.rs" process missing +0
+path "mod.rs" [126-132] -> "/home/u/proj/mod.rs" process missing +0
+path "~/proj" [142-148] -> "/home/u/proj" home dir +0
+path "src/server/mod.rs" [154-171] -> "/home/u/proj/src/server/mod.rs" process file +0
+path "~/proj" [198-204] -> "/home/u/proj" home dir +0
+path "/home/u/other" [209-222] -> "/home/u/other" absolute dir +0
+path "/home/u/other" [232-245] -> "/home/u/other" absolute dir +0
+path "README.md" [251-260] -> "/home/u/other/README.md" screen file +1
+path "/home/u/other" [278-291] -> "/home/u/other" absolute dir +0
+path "~/proj/sub/deep" [296-311] -> "/home/u/proj/sub/deep" home dir +0
+path "~/proj/sub/deep" [321-336] -> "/home/u/proj/sub/deep" home dir +0
+path "ls ../../src/main.rs" [338-358] -> "/home/u/proj/src/main.rs" process file +0
+path "../../src/main.rs" [359-376] -> "/home/u/proj/src/main.rs" screen file +0
+path "~/proj/sub/deep" [386-401] -> "/home/u/proj/sub/deep" home dir +0
+path "~/proj/sub/deep" [415-430] -> "/home/u/proj/sub/deep" home dir +0
+path "/home/u/proj/.gitignore" [437-460] -> "/home/u/proj/.gitignore" absolute file +0
+path "~/proj/sub/deep" [470-485] -> "/home/u/proj/sub/deep" home dir +0
+path "~/p/s/lib.rs" [487-499] -> "/home/u/proj/src/lib.rs" home file +0 expanded
+path "/home/u/p/s/lib.rs" [506-524] -> "/home/u/proj/src/lib.rs" absolute file +0 expanded
+# width 120
+path "~/proj" [9-15] -> "/home/u/proj" home dir +0
+path "src/server/" [24-35] -> "/home/u/proj/src/server" process dir +0
+path "handler.rs" [80-90] -> "/home/u/proj/handler.rs" process missing +0
+path "mod.rs" [126-132] -> "/home/u/proj/mod.rs" process missing +0
+path "~/proj" [142-148] -> "/home/u/proj" home dir +0
+path "src/server/mod.rs" [154-171] -> "/home/u/proj/src/server/mod.rs" process file +0
+path "~/proj" [198-204] -> "/home/u/proj" home dir +0
+path "/home/u/other" [209-222] -> "/home/u/other" absolute dir +0
+path "/home/u/other" [232-245] -> "/home/u/other" absolute dir +0
+path "README.md" [251-260] -> "/home/u/other/README.md" screen file +1
+path "/home/u/other" [278-291] -> "/home/u/other" absolute dir +0
+path "~/proj/sub/deep" [296-311] -> "/home/u/proj/sub/deep" home dir +0
+path "~/proj/sub/deep" [321-336] -> "/home/u/proj/sub/deep" home dir +0
+path "ls ../../src/main.rs" [338-358] -> "/home/u/proj/src/main.rs" process file +0
+path "../../src/main.rs" [359-376] -> "/home/u/proj/src/main.rs" screen file +0
+path "~/proj/sub/deep" [386-401] -> "/home/u/proj/sub/deep" home dir +0
+path "~/proj/sub/deep" [415-430] -> "/home/u/proj/sub/deep" home dir +0
+path "/home/u/proj/.gitignore" [437-460] -> "/home/u/proj/.gitignore" absolute file +0
+path "~/proj/sub/deep" [470-485] -> "/home/u/proj/sub/deep" home dir +0
+path "~/p/s/lib.rs" [487-499] -> "/home/u/proj/src/lib.rs" home file +0 expanded
+path "/home/u/p/s/lib.rs" [506-524] -> "/home/u/proj/src/lib.rs" absolute file +0 expanded

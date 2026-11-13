@@ -1,0 +1,24 @@
+C:\Users\u> dir
+ Volume in drive C has no label.
+ Directory of C:\Users\u\proj
+
+10/27/2026  12:01 PM    <DIR>          .
+10/27/2026  12:01 PM    <DIR>          src
+10/26/2026  02:02 PM             1,204 Cargo.toml
+C:\Users\u> type C:\Users\u\proj\Cargo.toml
+C:\Users\u> notepad "C:\Program Files\App\app.log"
+C:\Users\u> cd %USERPROFILE%\proj
+PS C:\Users\u\proj> Get-Content .\src\main.rs
+Get-Content : Cannot find path 'C:\Users\u\proj\src\missing.rs' because it does not exist.
+At line:1 char:1
+At C:\Users\u\proj\run.ps1:12 char:5
+\\server\share\docs\report.pdf
+\\?\C:\very\long\path\file.txt
+"C:\\Users\\u\\Desktop\\notes.txt"
+D:\Data\file.bin and Z:\home\u\x.html
+C:/Users/u/AppData/Local/Vendor/run.log
+%APPDATA%\Vendor\settings.json
+\\wsl$\Ubuntu\home\u\proj\README.md
+C:\temp\new.txt: access denied
+E:\
+c:\windows\win.ini

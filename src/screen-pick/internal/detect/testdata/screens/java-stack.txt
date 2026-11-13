@@ -1,0 +1,17 @@
+Exception in thread "main" java.lang.IllegalStateException: no config
+	at com.example.proj.Config.load(Config.java:42)
+	at com.example.proj.Main.main(Main.java:17)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: java.io.FileNotFoundException: /home/u/proj/app.properties (No such file or directory)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	... 5 more
+src/main/kotlin/App.kt:12:5: error: unresolved reference: foo
+e: file:///home/u/proj/src/main/kotlin/App.kt:12:5 Unresolved reference: foo
+> Task :compileKotlin FAILED
+FAILURE: Build failed with an exception.
+* What went wrong:
+Execution failed for task ':compileKotlin'.
+* Try:
+> Run with --stacktrace option to get the stack trace.
+BUILD FAILED in 2s

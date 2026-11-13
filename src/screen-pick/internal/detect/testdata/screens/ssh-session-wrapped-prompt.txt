@@ -1,0 +1,17 @@
+u@devbox:~/proj$ ls -la src/server/
+total 12
+-rw-r--r-- 1 u u  120 Oct 27 12:00 handler.rs
+-rw-r--r-- 1 u u   88 Oct 27 12:00 mod.rs
+u@devbox:~/proj$ cat src/server/mod.rs
+pub mod handler;
+u@devbox:~/proj$ cd /home/u/other
+u@devbox:/home/u/other$ cat README.md
+# other
+u@devbox:/home/u/other$ cd ~/proj/sub/deep
+u@devbox:~/proj/sub/deep$ ls ../../src/main.rs
+../../src/main.rs
+u@devbox:~/proj/sub/deep$ ^C
+u@devbox:~/proj/sub/deep$ nano /home/u/proj/.gitignore
+u@devbox:~/proj/sub/deep$ ~/p/s/lib.rs
+bash: /home/u/p/s/lib.rs: No such file or directory
+u@devbox:~/p/s$

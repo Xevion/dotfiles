@@ -1,0 +1,21 @@
+# width 0
+path "Config.java" @42:0 [103-114] -> "/home/u/proj/Config.java" process missing +0
+path "Main.java" @17:0 [150-159] -> "/home/u/proj/Main.java" process missing +0
+path "Thread.java" @840:0 [282-293] -> "/home/u/proj/Thread.java" process missing +0
+path "/home/u/proj/app.properties" [341-368] -> "/home/u/proj/app.properties" absolute file +0
+path "src/main/kotlin/App.kt" @12:5 [468-490] -> "/home/u/proj/src/main/kotlin/App.kt" process file +0
+path "file:///home/u/proj/src/main/kotlin/App.kt:12:5" [533-580] -> "/home/u/proj/src/main/kotlin/App.kt:12:5" absolute missing +0
+# width 40
+path "Config.java" @42:0 [103-114] -> "/home/u/proj/Config.java" process missing +0
+path "Main.java" @17:0 [150-159] -> "/home/u/proj/Main.java" process missing +0
+path "Thread.java" @840:0 [282-293] -> "/home/u/proj/Thread.java" process missing +0
+path "/home/u/proj/app.properties" [341-368] -> "/home/u/proj/app.properties" absolute file +0
+path "src/main/kotlin/App.kt" @12:5 [468-490] -> "/home/u/proj/src/main/kotlin/App.kt" process file +0
+path "file:///home/u/proj/src/main/kotlin/App.kt:12:5" [533-580] -> "/home/u/proj/src/main/kotlin/App.kt:12:5" absolute missing +0
+# width 120
+path "Config.java" @42:0 [103-114] -> "/home/u/proj/Config.java" process missing +0
+path "Main.java" @17:0 [150-159] -> "/home/u/proj/Main.java" process missing +0
+path "Thread.java" @840:0 [282-293] -> "/home/u/proj/Thread.java" process missing +0
+path "/home/u/proj/app.properties" [341-368] -> "/home/u/proj/app.properties" absolute file +0
+path "src/main/kotlin/App.kt" @12:5 [468-490] -> "/home/u/proj/src/main/kotlin/App.kt" process file +0
+path "file:///home/u/proj/src/main/kotlin/App.kt:12:5" [533-580] -> "/home/u/proj/src/main/kotlin/App.kt:12:5" absolute missing +0

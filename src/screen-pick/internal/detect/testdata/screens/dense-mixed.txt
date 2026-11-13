@@ -1,0 +1,21 @@
+visit example.com or http://localhost:3000/ then edit src/main.rs:12:4 (see Cargo.toml)
+e.g. foo.bar(), self.name, os.path.join(a, b), std::io::Result, a.b.c.d
+version 1.2.3, v0.48.2, 3.14, $0.64, 12:34:56, aa:bb:cc:dd:ee:ff, 0x1f2e3d4c
+user@host.com, git@github.com:example/proj.git, ssh://git@example.com:2222/repo
+10.0.0.1:8080 192.168.1.0/24 [::1]:3000 fe80::1 2001:db8::ff00:42:8329
+commit 9c8d7e6 and 3f2a1b49c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3 and 550e8400-e29b-41d4-a716-446655440000
+**/*.ts src/*.rs 1/2 and/or TCP/IP n/a
+"/home/u/My Documents/notes.txt" '/home/u/No Such/x.txt'
+--output=/tmp/out.bin KEY=~/.bashrc path=/var/log/syslog;
+diff --git a/src/main.rs b/src/main.rs
+tests/test_x.py::test_foo PASSED
+at Object.<anonymous> (/app/index.js:5:3)
+foo.c(12): error C2065
+File "/usr/lib/python3.12/os.py", line 10, in <module>
+Wrote /tmp/build-cache/5b090f6779e3.log∴ done
+README.md CLAUDE.md package.json b.d.ts a.tar.gz
+git push origin HEAD:refs/heads/feature/x-1
+import com.example.proj.Config
+https://docs.rs/serde/1.0.195/serde/ and docs.rs/serde
+localhost:5432 devbox:3000 id:12345 port:8080
+~/.config/app/app.conf ~root/x.txt ~user/proj/main.rs $HOME/.bashrc ${HOME}/.bashrc

@@ -2,9 +2,8 @@ package detect
 
 import (
 	"cmp"
-	"regexp"
 	"slices"
-	"strconv"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -30,17 +29,78 @@ type cand struct {
 	res        resolve.Resolution
 }
 
-// scanner holds one pass over cleaned text.
+// scanner holds one resolution pass over a lexed screen.
 type scanner struct {
 	s string
 	r *resolve.Resolver
+	// dec holds decode.Decode of each span's text, parallel to the spans.
+	dec [][]string
 	// dirs are existing directories named in the text, in text order.
 	dirs []screenDir
+	// memo keeps resolutions by token and by how many screen directories sit
+	// above it, which is all a resolution depends on.
+	memo map[memoKey]resolve.Resolution
+}
+
+type memoKey struct {
+	token string
+	above int
 }
 
 type screenDir struct {
 	pos int
 	dir string
+}
+
+// fileRef is a candidate that names a local file through a file:// URL, whose
+// resolution waits for a Resolver.
+type fileRef struct {
+	idx  int
+	path string
+}
+
+// Lexed is the part of a scan that does not depend on the disk: the cleaned
+// text, its path spans and every link, URL, host and commit candidate. It is
+// immutable, so one Lexed can be resolved against several Resolvers, also
+// concurrently.
+type Lexed struct {
+	s     string
+	offs  *offsets
+	spans []span
+	// dec holds decode.Decode of each span's text, parallel to spans.
+	dec   [][]string
+	cands []cand
+	files []fileRef
+}
+
+// Lex runs the resolver-independent half of a scan. width is as in ScanWidth.
+func Lex(text string, width int) *Lexed {
+	s, offs, links := clean(text, width)
+	l := &Lexed{s: s, offs: offs, spans: pathSpans(s)}
+	l.dec = make([][]string, len(l.spans))
+	arena := make([]string, 0, len(l.spans)+len(l.spans)/4)
+	for i, sp := range l.spans {
+		n := len(arena)
+		arena = decode.AppendDecode(arena, s[sp.start:sp.end])
+		l.dec[i] = arena[n:len(arena):len(arena)]
+	}
+	for _, lk := range links {
+		if p, ok := fileURLPath(lk.target); ok {
+			l.cands = append(l.cands, cand{KindPath, lk.start, lk.end, tierLink, resolve.Resolution{}})
+			l.files = append(l.files, fileRef{len(l.cands) - 1, p})
+		} else {
+			l.cands = append(l.cands, cand{KindURL, lk.start, lk.end, tierLink, resolve.Resolution{}})
+		}
+	}
+	urls, files := urlCands(s)
+	base := len(l.cands)
+	l.cands = append(l.cands, urls...)
+	for _, f := range files {
+		l.files = append(l.files, fileRef{base + f.idx, f.path})
+	}
+	l.cands = append(l.cands, hostCands(s)...)
+	l.cands = append(l.cands, shaCands(s)...)
+	return l
 }
 
 // Scan returns every target in text, in screen order. Paths are resolved
@@ -52,20 +112,23 @@ func Scan(text string, r *resolve.Resolver) []Match {
 // ScanWidth is Scan for a screen width columns wide, which lets it tell real
 // line wraps from rows a full-screen program merely drew next to each other.
 func ScanWidth(text string, r *resolve.Resolver, width int) []Match {
-	s, offs, links := clean(text, width)
-	sc := &scanner{s: s, r: r}
-	spans := pathSpans(s)
-	sc.findDirs(spans)
+	return Lex(text, width).Resolve(r)
+}
 
-	var cands []cand
-	for _, l := range links {
-		cands = append(cands, sc.linkCand(l))
+// Resolve places the lexed paths with r and returns every target, in screen
+// order.
+func (l *Lexed) Resolve(r *resolve.Resolver) []Match {
+	s := l.s
+	sc := &scanner{s: s, r: r, dec: l.dec, memo: map[memoKey]resolve.Resolution{}}
+	sc.findDirs(l.spans)
+
+	cands := make([]cand, len(l.cands), len(l.cands)+len(l.spans))
+	copy(cands, l.cands)
+	for _, f := range l.files {
+		cands[f.idx].res = sc.resolve(f.path, nil, cands[f.idx].start)
 	}
-	cands = append(cands, sc.urlCands()...)
-	cands = append(cands, hostCands(s)...)
-	cands = append(cands, shaCands(s)...)
-	for _, sp := range spans {
-		if c, ok := sc.pathCand(sp); ok {
+	for i, sp := range l.spans {
+		if c, ok := sc.pathCand(sp, l.dec[i]); ok {
 			cands = append(cands, c)
 		}
 	}
@@ -75,8 +138,8 @@ func ScanWidth(text string, r *resolve.Resolver, width int) []Match {
 	for _, c := range picked {
 		m := Match{
 			Kind:       c.kind,
-			Start:      offs[c.start],
-			End:        offs[c.end-1] + 1,
+			Start:      l.offs.at(c.start),
+			End:        l.offs.at(c.end-1) + 1,
 			Text:       s[c.start:c.end],
 			Resolution: c.res,
 		}
@@ -97,26 +160,29 @@ func pick(cands []cand) []cand {
 			cmp.Compare(a.start, b.start),
 		)
 	})
+	// picked stays sorted by start and disjoint, so the first entry ending
+	// after c starts is the only one c could overlap.
 	var picked []cand
 	for _, c := range cands {
-		if !slices.ContainsFunc(picked, func(p cand) bool { return c.start < p.end && p.start < c.end }) {
-			picked = append(picked, c)
+		i := sort.Search(len(picked), func(i int) bool { return picked[i].end > c.start })
+		if i < len(picked) && picked[i].start < c.end {
+			continue
 		}
+		picked = slices.Insert(picked, i, c)
 	}
-	slices.SortFunc(picked, func(a, b cand) int { return cmp.Compare(a.start, b.start) })
 	return picked
 }
 
 // findDirs records existing directories whose rooted paths appear in the
 // text, as bases for relative paths further down.
 func (sc *scanner) findDirs(spans []span) {
-	for _, sp := range spans {
+	for i, sp := range spans {
 		t := sc.s[sp.start:sp.end]
-		d := decode.Decode(t)[0]
+		d := sc.dec[i][0]
 		if sp.pre >= 0 || !strings.HasPrefix(d, "/") && !strings.HasPrefix(d, "~") && !strings.HasPrefix(d, "$") {
 			continue
 		}
-		if res := sc.r.Resolve(t, nil); res.Exists && res.IsDir {
+		if res := sc.lookup(t, sc.dec[i], 0, nil); res.Exists && res.IsDir {
 			sc.dirs = append(sc.dirs, screenDir{sp.start, res.Path})
 		}
 	}
@@ -124,19 +190,39 @@ func (sc *scanner) findDirs(spans []span) {
 }
 
 // resolve resolves t with the directories named above pos, nearest first.
-func (sc *scanner) resolve(t string, pos int) resolve.Resolution {
+// variants are t's decode.Decode readings, or nil to compute them.
+func (sc *scanner) resolve(t string, variants []string, pos int) resolve.Resolution {
+	k := sort.Search(len(sc.dirs), func(i int) bool { return sc.dirs[i].pos >= pos })
 	var above []string
-	for i := len(sc.dirs) - 1; i >= 0; i-- {
-		if sc.dirs[i].pos < pos {
-			above = append(above, sc.dirs[i].dir)
+	if k > 0 {
+		above = make([]string, k)
+		for i := range above {
+			above[i] = sc.dirs[k-1-i].dir
 		}
 	}
-	return sc.r.Resolve(t, above)
+	return sc.lookup(t, variants, k, above)
 }
 
-func (sc *scanner) pathCand(sp span) (cand, bool) {
+// lookup is the memoized Resolver call: the screen directories above are
+// fixed by their count, so equal tokens with equal counts resolve alike.
+func (sc *scanner) lookup(t string, variants []string, k int, above []string) resolve.Resolution {
+	key := memoKey{t, k}
+	if res, ok := sc.memo[key]; ok {
+		res.Alternatives = slices.Clone(res.Alternatives)
+		return res
+	}
+	if variants == nil {
+		variants = decode.Decode(t)
+	}
+	res := sc.r.ResolveDecoded(variants, above)
+	sc.memo[key] = res
+	res.Alternatives = slices.Clone(res.Alternatives)
+	return res
+}
+
+func (sc *scanner) pathCand(sp span, dec []string) (cand, bool) {
 	t := sc.s[sp.start:sp.end]
-	d := decode.Decode(t)[0]
+	d := dec[0]
 	// Roots and dot-directories alone (/, ./, ~) are never worth offering.
 	if !strings.ContainsFunc(d, unicode.IsLetter) {
 		return cand{}, false
@@ -144,7 +230,7 @@ func (sc *scanner) pathCand(sp span) (cand, bool) {
 	if sp.pre >= 0 && !sc.interiorPlausible(sp, d) {
 		return cand{}, false
 	}
-	res := sc.resolve(t, sp.start)
+	res := sc.resolve(t, dec, sp.start)
 	if res.Exists {
 		// A bare word naming a directory is too often just a word.
 		if res.IsDir && !strings.ContainsAny(d, `/\`) {
@@ -152,7 +238,7 @@ func (sc *scanner) pathCand(sp span) (cand, bool) {
 		}
 		return cand{KindPath, sp.start, sp.end, tierPathExists, res}, true
 	}
-	if sp.strict || !looksLikePath(t) || isCall(sc.s, sp, t) {
+	if sp.strict || !looksLikeDecoded(t, d) || isCall(sc.s, sp, t) {
 		return cand{}, false
 	}
 	return cand{KindPath, sp.start, sp.end, tierPathShape, res}, true
@@ -168,7 +254,7 @@ func (sc *scanner) interiorPlausible(sp span, d string) bool {
 		return false
 	}
 	prefix := sc.s[sp.pre:sp.start]
-	if res := sc.resolve(prefix, sp.pre); res.Exists && res.IsDir {
+	if res := sc.resolve(prefix, nil, sp.pre); res.Exists && res.IsDir {
 		return false
 	}
 	// A prefix of plain directory names in front of a path-shaped word is that
@@ -190,12 +276,6 @@ func isCall(s string, sp span, t string) bool {
 }
 
 var (
-	pathRoot   = regexp.MustCompile(`^(?:/|~[+-]?/|\./|\.\./|\$(?:\{\w+\}|[A-Za-z_]\w*)/)`)
-	windowsVar = regexp.MustCompile(`^%\w+%[\\/].`)
-	extPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]{0,8}$`)
-	// Forms after a path: :12:4, (12,4), #L12C4, `", line 12`, ` on line 12`,
-	// and the -12- of a grep context line.
-	locationRe   = regexp.MustCompile(`^(?::(\d+)(?::(\d+))?|\((\d+)(?:,\s*(\d+))?\)|#L(\d+)(?:C(\d+))?|["']?(?:,\s*| on\s+|:)line\s+(\d+)|-(\d+)-(?:\D|$)|\|(\d+)(?: col (\d+))?\|)`)
 	knownExtList = strings.Fields(`
 		rs go py pyi js mjs cjs ts tsx jsx mts cts json jsonc json5 yaml yml toml ini cfg conf
 		md mdx txt log csv tsv xml html htm css scss sass less svg png jpg jpeg gif webp ico bmp
@@ -218,13 +298,18 @@ var (
 
 // looksLikePath judges a token that is not on disk by its shape alone.
 func looksLikePath(raw string) bool {
+	return looksLikeDecoded(raw, decode.Decode(raw)[0])
+}
+
+// looksLikeDecoded is looksLikePath for a raw token whose first decoded
+// reading d is already known.
+func looksLikeDecoded(raw, d string) bool {
 	if raw == "" {
 		return false
 	}
 	if c := raw[0]; c < utf8.RuneSelf && !isAlnum(c) && strings.IndexByte(`._~$%\/`, c) < 0 {
 		return false
 	}
-	d := decode.Decode(raw)[0]
 	if !strings.ContainsFunc(d, unicode.IsLetter) || strings.Contains(d, "*") {
 		return false
 	}
@@ -239,7 +324,7 @@ func looksLikePath(raw string) bool {
 		return len(d) > 3
 	case strings.HasPrefix(d, `\\`):
 		return strings.Count(d, `\`) >= 3
-	case windowsVar.MatchString(d):
+	case isWindowsVar(d):
 		return true
 	}
 	comps := strings.FieldsFunc(d, func(c rune) bool { return c == '/' || c == '\\' })
@@ -247,14 +332,14 @@ func looksLikePath(raw string) bool {
 		return false
 	}
 	last := comps[len(comps)-1]
-	if userRoot.MatchString(d) {
+	if isUserRoot(d) {
 		// ~user/proj could be prose in a way ~/proj could not.
 		return ext(last) != "" || len(comps) >= 3
 	}
-	if root := pathRoot.FindString(d); root != "" {
+	if n := pathRootLen(d); n > 0 {
 		// Every root but / counts as a component: ~/proj reads as a path,
 		// /proj could be prose.
-		if root == "/" {
+		if n == 1 {
 			return ext(last) != "" || len(comps) >= 2
 		}
 		return ext(last) != "" || len(comps) >= 2 && last != "..." && last != "."
@@ -272,30 +357,12 @@ func ext(name string) string {
 		return ""
 	}
 	e := name[i+1:]
-	if !extPattern.MatchString(e) || e != strings.ToLower(e) && e != strings.ToUpper(e) {
+	if !isExtName(e) || e != strings.ToLower(e) && e != strings.ToUpper(e) {
 		return ""
 	}
 	return e
 }
 
-func location(rest string) (int, int) {
-	m := locationRe.FindStringSubmatch(rest)
-	if m == nil {
-		return 0, 0
-	}
-	line, col := cmp.Or(m[1], m[3], m[5], m[7], m[8], m[9]), cmp.Or(m[2], m[4], m[6], m[10])
-	l, _ := strconv.Atoi(line)
-	c, _ := strconv.Atoi(col)
-	return l, c
-}
-
 func isAlnum(c byte) bool { return isASCIILetter(c) || c >= '0' && c <= '9' }
 
 func isWordByte(c byte) bool { return isAlnum(c) || c == '_' }
-
-func (sc *scanner) linkCand(l link) cand {
-	if p, ok := fileURLPath(l.target); ok {
-		return cand{KindPath, l.start, l.end, tierLink, sc.resolve(p, l.start)}
-	}
-	return cand{KindURL, l.start, l.end, tierLink, resolve.Resolution{}}
-}

@@ -1,0 +1,42 @@
+# width 0
+path "src/main.rs" [21-32] -> "/home/u/proj/src/main.rs" process file +0
+path "fallback.toml" [104-117] -> "/home/u/proj/fallback.toml" process missing +0
+path "src/lib.rs" [122-132] -> "/home/u/proj/src/lib.rs" process file +0
+path "./src/main.rs" @31:0 [266-279] -> "/home/u/proj/src/main.rs" process file +0
+path "./src/server/mod.rs" @7:0 [311-330] -> "/home/u/proj/src/server/mod.rs" process file +0
+path "./tests/test_api.py" @12:0 [365-384] -> "/home/u/proj/tests/test_api.py" process file +0
+path "src/main.rs" @12:4 [426-437] -> "/home/u/proj/src/main.rs" process file +0
+path "cmd/app/main.go" @19:6 [455-470] -> "/home/u/proj/cmd/app/main.go" process file +0
+path "src/main.rs" [506-517] -> "/home/u/proj/src/main.rs" process file +0
+path "src/main.rs" @13:0 [518-529] -> "/home/u/proj/src/main.rs" process file +0
+path "src/main.rs" @14:0 [563-574] -> "/home/u/proj/src/main.rs" process file +0
+path "src/main.rs" @15:0 [604-615] -> "/home/u/proj/src/main.rs" process file +0
+path "/var/log/syslog" [650-665] -> "/var/log/syslog" absolute file +0
+# width 40
+path "src/main.rs" [21-32] -> "/home/u/proj/src/main.rs" process file +0
+path "fallback.toml" [104-117] -> "/home/u/proj/fallback.toml" process missing +0
+path "src/lib.rs" [122-132] -> "/home/u/proj/src/lib.rs" process file +0
+path "./src/main.rs" @31:0 [266-279] -> "/home/u/proj/src/main.rs" process file +0
+path "./src/server/mod.rs" @7:0 [311-330] -> "/home/u/proj/src/server/mod.rs" process file +0
+path "./tests/test_api.py" @12:0 [365-384] -> "/home/u/proj/tests/test_api.py" process file +0
+path "src/main.rs" @12:4 [426-437] -> "/home/u/proj/src/main.rs" process file +0
+path "cmd/app/main.go" @19:6 [455-470] -> "/home/u/proj/cmd/app/main.go" process file +0
+path "src/main.rs" [506-517] -> "/home/u/proj/src/main.rs" process file +0
+path "src/main.rs" @13:0 [518-529] -> "/home/u/proj/src/main.rs" process file +0
+path "src/main.rs" @14:0 [563-574] -> "/home/u/proj/src/main.rs" process file +0
+path "src/main.rs" @15:0 [604-615] -> "/home/u/proj/src/main.rs" process file +0
+path "/var/log/syslog" [650-665] -> "/var/log/syslog" absolute file +0
+# width 120
+path "src/main.rs" [21-32] -> "/home/u/proj/src/main.rs" process file +0
+path "fallback.toml" [104-117] -> "/home/u/proj/fallback.toml" process missing +0
+path "src/lib.rs" [122-132] -> "/home/u/proj/src/lib.rs" process file +0
+path "./src/main.rs" @31:0 [266-279] -> "/home/u/proj/src/main.rs" process file +0
+path "./src/server/mod.rs" @7:0 [311-330] -> "/home/u/proj/src/server/mod.rs" process file +0
+path "./tests/test_api.py" @12:0 [365-384] -> "/home/u/proj/tests/test_api.py" process file +0
+path "src/main.rs" @12:4 [426-437] -> "/home/u/proj/src/main.rs" process file +0
+path "cmd/app/main.go" @19:6 [455-470] -> "/home/u/proj/cmd/app/main.go" process file +0
+path "src/main.rs" [506-517] -> "/home/u/proj/src/main.rs" process file +0
+path "src/main.rs" @13:0 [518-529] -> "/home/u/proj/src/main.rs" process file +0
+path "src/main.rs" @14:0 [563-574] -> "/home/u/proj/src/main.rs" process file +0
+path "src/main.rs" @15:0 [604-615] -> "/home/u/proj/src/main.rs" process file +0
+path "/var/log/syslog" [650-665] -> "/var/log/syslog" absolute file +0

@@ -208,6 +208,9 @@
     - [x] Type-aware actions (no editor for binaries; Wine, IDA, Ghidra), repo root tab and `git log`, `git show` run in the checkout that has the commit
     - [x] Picking among copies is per-menu and never rewrites the match; a disk search only adds copies
     - [ ] Check the overlay inside real kitty: `KITTY_LISTEN_ON` reaching it, `@active-kitty-window-id` substitution
+    - [ ] Resolve cost for many distinct directory spans on one screen is still quadratic (`resolve.basesWith`, per-call `above` copy); 70 ms at 16 KB
+    - [ ] "open in browser" hands any URL scheme to `xdg-open`; decide whether to limit it to http(s) and label the rest separately
+    - [ ] OSC 8 links act on the visible label, not the link target (unreachable with the current binding, which captures no formatting)
     - [ ] Retire `screen_paths.py` and the `kitty-paths` shim once the new pickers have been lived with
 - [ ] Add Alacritty config (if used)
 - [ ] Document terminal color schemes

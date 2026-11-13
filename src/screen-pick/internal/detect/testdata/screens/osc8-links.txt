@@ -1,0 +1,13 @@
+See ]8;;https://example.com/docs\the docs]8;;\ for more.
+]8;;file:///home/u/proj/src/main.rs\src/main.rs]8;;\:14
+]8;id=7;file:///etc/hosts/etc/hosts]8;; is the hosts file
+]8;;file://devbox/home/u/proj/README.md\README.md]8;;\
+]8;;file:///home/u/My%20Documents/notes.txt\notes]8;;\
+]8;;https://github.com/example/proj/pull/42\#42]8;;\ merged
+plain https://example.com/plain link here
+]0;window title with /tmp/x.txtprompt$ 
+]8;;mailto:ann@example.com\mail ann]8;;\
+unterminated ]8;;https://example.com/open and then text /etc/hosts
+]8;;\closing later
+]133;A$ cat Cargo.toml
+P1$r0m\after dcs src/lib.rs

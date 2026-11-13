@@ -3,8 +3,13 @@ package lookup
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io/fs"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/goleak"
@@ -24,12 +29,16 @@ func collect(ch <-chan Result) []Result {
 	return out
 }
 
+// disk backs the files the fake indexes below list.
+var disk = fakefs.New("/p/src/main.rs", "/p/README.md", "/q/crates/x/src/main.rs", "/p/pkg/")
+
 func TestIndex(t *testing.T) {
 	indexes := map[string][]string{
 		"/p": {"src/main.rs", "README.md"},
 		"/q": {"crates/x/src/main.rs"},
 	}
 	s := &Searcher{
+		Stat:  disk.Lstat,
 		Roots: []string{"/p", "/q", "/broken"},
 		Load: func(_ context.Context, root string) ([]string, error) {
 			if paths, ok := indexes[root]; ok {
@@ -74,8 +83,116 @@ func TestIndexCancelled(t *testing.T) {
 	}
 }
 
+// An index lists what git tracks, including files deleted since; those are
+// not copies the user could open.
+func TestIndexDropsFilesMissingFromDisk(t *testing.T) {
+	s := &Searcher{
+		Roots: []string{"/p"},
+		Stat:  disk.Lstat,
+		Load: func(context.Context, string) ([]string, error) {
+			return []string{"src/main.rs", "old/main.rs"}, nil
+		},
+	}
+	got := collect(s.Index(context.Background(), []Query{{ID: 1, Text: "main.rs"}}))
+	if len(got) != 1 || got[0].Path != "/p/src/main.rs" || got[0].IsDir {
+		t.Errorf("want only the file on disk, got %+v", got)
+	}
+}
+
+// A stat that timed out says the mount is slow, not that the file is gone.
+func TestIndexKeepsHitsItCouldNotCheck(t *testing.T) {
+	s := &Searcher{
+		Roots: []string{"/slow"},
+		Stat:  func(string) (fs.FileInfo, error) { return nil, resolve.ErrSlow },
+		Load:  func(context.Context, string) ([]string, error) { return []string{"src/main.rs"}, nil },
+	}
+	got := collect(s.Index(context.Background(), []Query{{ID: 1, Text: "main.rs"}}))
+	if len(got) != 1 || got[0].Path != "/slow/src/main.rs" {
+		t.Errorf("want the listed file kept, got %+v", got)
+	}
+}
+
+// A directory found by name must not be offered as a file.
+func TestDeepReportsDirectories(t *testing.T) {
+	s := &Searcher{
+		Stat: disk.Lstat,
+		Walk: func(_ context.Context, _ []string, _ string, found func(string)) error {
+			found("/p/pkg")
+			found("/p/README.md")
+			found("/p/gone")
+			return nil
+		},
+	}
+	got := collect(s.Deep(context.Background(), Query{ID: 2, Text: "x"}, []string{"/p"}))
+	slices.SortFunc(got, func(a, b Result) int { return strings.Compare(a.Path, b.Path) })
+	want := []Result{
+		{ID: 2, Path: "/p/README.md", Source: resolve.SourceSearch},
+		{ID: 2, Path: "/p/pkg", Source: resolve.SourceSearch, IsDir: true},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want +got):\n%s", diff)
+	}
+}
+
+// A screen listing many checkouts must not start a git process for each at
+// once, and the most trusted roots still go first.
+func TestIndexBoundsConcurrentLoads(t *testing.T) {
+	var roots []string
+	for i := range 40 {
+		roots = append(roots, fmt.Sprintf("/r%d", i))
+	}
+	var mu sync.Mutex
+	var active, peak int
+	var started []string
+	s := &Searcher{
+		Roots: roots,
+		Stat:  func(string) (fs.FileInfo, error) { return disk.Lstat("/p/README.md") },
+		Load: func(_ context.Context, root string) ([]string, error) {
+			mu.Lock()
+			active++
+			peak = max(peak, active)
+			started = append(started, root)
+			mu.Unlock()
+			time.Sleep(5 * time.Millisecond)
+			mu.Lock()
+			active--
+			mu.Unlock()
+			return []string{"x.rs"}, nil
+		},
+	}
+	got := collect(s.Index(context.Background(), []Query{{ID: 1, Text: "x.rs"}}))
+	if len(got) != len(roots) {
+		t.Errorf("got %d results, want %d", len(got), len(roots))
+	}
+	if peak > maxLoaders || peak < 2 {
+		t.Errorf("peak concurrent loads = %d, want between 2 and %d", peak, maxLoaders)
+	}
+	if !slices.Contains(started[:maxLoaders], "/r0") {
+		t.Errorf("most trusted root did not start first: %v", started[:maxLoaders])
+	}
+}
+
+// A walk blocked handing over a hit must end when the search is cancelled.
+func TestDeepCancelled(t *testing.T) {
+	s := &Searcher{
+		Stat: disk.Lstat,
+		Walk: func(ctx context.Context, _ []string, _ string, found func(string)) error {
+			found("/p/README.md")
+			found("/p/pkg")
+			<-ctx.Done()
+			return ctx.Err()
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	ch := s.Deep(ctx, Query{ID: 1, Text: "x"}, []string{"/p"})
+	<-ch
+	cancel()
+	for range ch {
+	}
+}
+
 func TestDeepDedupes(t *testing.T) {
-	s := &Searcher{Walk: func(_ context.Context, roots []string, q string, found func(string)) error {
+	s := &Searcher{Stat: func(string) (fs.FileInfo, error) { return disk.Lstat("/p/README.md") }, Walk: func(_ context.Context, roots []string, q string, found func(string)) error {
 		for range roots {
 			found("/home/u/proj/src/main.rs")
 		}
@@ -184,13 +301,55 @@ func TestMerger(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var m Merger
-			res := tc.start
+			mt := pathMatch("a.rs", 7)
+			mt.Resolution = tc.start
 			for _, r := range tc.results {
-				m.Apply(7, &res, r)
+				m.ApplyMatch(&mt, r)
 			}
-			if diff := cmp.Diff(tc.want, res); diff != "" {
+			if diff := cmp.Diff(tc.want, mt.Resolution); diff != "" {
 				t.Errorf("(-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func pathMatch(text string, start int) detect.Match {
+	return detect.Match{Kind: detect.KindPath, Text: text, Start: start, End: start + len(text)}
+}
+
+// A rescan can replace a match's resolution with a direct hit while the
+// merger still remembers the index rank of the one it replaced: that rank must
+// not let a later index result displace the direct hit.
+func TestMergerForgetsTheRankOfAReplacedResolution(t *testing.T) {
+	var m Merger
+	mt := pathMatch("a.rs", 10)
+	m.ApplyMatch(&mt, Result{Path: "/win/a.rs", Source: resolve.SourceIndex, Rank: 2})
+	if mt.Path != "/win/a.rs" {
+		t.Fatalf("first hit should resolve: %+v", mt.Resolution)
+	}
+	mt.Resolution = resolve.Resolution{Path: "/p/a.rs", Source: resolve.SourceProcess, Exists: true}
+	m.ApplyMatch(&mt, Result{Path: "/q/a.rs", Source: resolve.SourceIndex, Rank: 0})
+	want := resolve.Resolution{Path: "/p/a.rs", Source: resolve.SourceProcess, Exists: true,
+		Alternatives: []resolve.Candidate{{Path: "/q/a.rs", Source: resolve.SourceIndex}}}
+	if diff := cmp.Diff(want, mt.Resolution); diff != "" {
+		t.Errorf("a direct hit stays best (-want +got):\n%s", diff)
+	}
+}
+
+// Matches are identified by what they are, not by where they sit in a list that
+// a rescan may reorder or shrink.
+func TestMergerKeepsMatchesApart(t *testing.T) {
+	var m Merger
+	idx := resolve.SourceIndex
+	a, b := pathMatch("a.rs", 3), pathMatch("a.rs", 40)
+	m.ApplyMatch(&a, Result{Path: "/win/a.rs", Source: idx, Rank: 2})
+	m.ApplyMatch(&b, Result{Path: "/proc/a.rs", Source: idx, Rank: 0})
+	m.ApplyMatch(&b, Result{Path: "/mid/a.rs", Source: idx, Rank: 1})
+	m.ApplyMatch(&a, Result{Path: "/mid/a.rs", Source: idx, Rank: 1})
+	if b.Path != "/proc/a.rs" || len(b.Alternatives) != 1 {
+		t.Errorf("the second match's own rank 0 should hold: %+v", b.Resolution)
+	}
+	if a.Path != "/mid/a.rs" {
+		t.Errorf("rank 1 beats this match's own rank 2: %+v", a.Resolution)
 	}
 }

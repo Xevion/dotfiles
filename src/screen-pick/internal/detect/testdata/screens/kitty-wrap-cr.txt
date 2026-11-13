@@ -1,0 +1,12 @@
+$ cargo run --release -- --config /home/u/.config/app/ap
+p.conf --input /home/u/proj/src/server/handler.rs
+error: could not open file /home/u/proj/src/server/ha
+ndler.rs
+short row then soft marker
+continuation here /etc/hosts
+https://example.com/a/very/long/path/that/wraps/acro
+ss/the/screen?q=1&r=2#frag
+lone cr overwriterewritten /var/log/syslog
+src/main.rs:14:2
+0: error
+trailing marker at end

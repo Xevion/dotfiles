@@ -1,0 +1,21 @@
+$ npx tsc --noEmit
+web/src/App.tsx(12,5): error TS2322: Type 'string' is not assignable to type 'number'.
+web/src/App.tsx(30,17): error TS2339: Property 'nme' does not exist on type 'User'.
+web/src/index.ts(4,1): error TS1128: Declaration or statement expected.
+Found 3 errors in 2 files.
+
+Errors  Files
+     2  web/src/App.tsx:12
+     1  web/src/index.ts:4
+
+$ npx eslint web/src
+/home/u/proj/web/src/App.tsx
+   9:7   warning  'unused' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  12:5   error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  30:17  error    Missing return type on function               @typescript-eslint/explicit-function-return-type
+
+/home/u/proj/web/src/index.ts
+  4:1  error  Parsing error: Unexpected token
+
+✖ 4 problems (3 errors, 1 warning)
+  1 error and 0 warnings potentially fixable with the `--fix` option.

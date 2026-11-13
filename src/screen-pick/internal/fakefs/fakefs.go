@@ -96,20 +96,3 @@ func (f *FS) ReadDir(name string) ([]fs.DirEntry, error) {
 	}
 	return out, nil
 }
-
-// Files lists every regular file under root, relative to it and sorted, the
-// way `git ls-files` would.
-func (f *FS) Files(root string) []string {
-	prefix := strings.TrimSuffix(path.Clean(root), "/") + "/"
-	var out []string
-	for p, mode := range f.modes {
-		if !mode.IsRegular() {
-			continue
-		}
-		if rel, ok := strings.CutPrefix(p, prefix); ok {
-			out = append(out, rel)
-		}
-	}
-	slices.Sort(out)
-	return out
-}

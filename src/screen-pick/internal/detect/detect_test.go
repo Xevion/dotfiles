@@ -462,37 +462,3 @@ func TestScanWidth(t *testing.T) {
 		})
 	}
 }
-
-// screenFixture is a dense screen built from every scan case, the kind of
-// text the picker sees after a busy build or agent session.
-func screenFixture() string {
-	var b strings.Builder
-	for range 4 {
-		for _, tc := range scanCases {
-			b.WriteString(tc.in)
-			b.WriteByte('\n')
-		}
-	}
-	return b.String()
-}
-
-func BenchmarkScan(b *testing.B) {
-	text := screenFixture()
-	b.SetBytes(int64(len(text)))
-	b.Run("fresh resolver", func(b *testing.B) {
-		for b.Loop() {
-			Scan(text, resolve.New(testEnv()))
-		}
-	})
-	b.Run("clean only", func(b *testing.B) {
-		for b.Loop() {
-			clean(text, 0)
-		}
-	})
-	b.Run("spans only", func(b *testing.B) {
-		s, _, _ := clean(text, 0)
-		for b.Loop() {
-			pathSpans(s)
-		}
-	})
-}

@@ -1,0 +1,27 @@
+# width 0
+path "web/src/App.tsx" @12:5 [19-34] -> "/home/u/proj/web/src/App.tsx" process file +0
+path "web/src/App.tsx" @30:17 [106-121] -> "/home/u/proj/web/src/App.tsx" process file +0
+path "web/src/index.ts" @4:1 [190-206] -> "/home/u/proj/web/src/index.ts" process file +0
+path "web/src/App.tsx" @12:0 [312-327] -> "/home/u/proj/web/src/App.tsx" process file +0
+path "web/src/index.ts" @4:0 [339-355] -> "/home/u/proj/web/src/index.ts" process file +0
+path "web/src" [372-379] -> "/home/u/proj/web/src" process dir +0
+path "/home/u/proj/web/src/App.tsx" [380-408] -> "/home/u/proj/web/src/App.tsx" absolute file +0
+path "/home/u/proj/web/src/index.ts" [719-748] -> "/home/u/proj/web/src/index.ts" absolute file +0
+# width 40
+path "web/src/App.tsx" @12:5 [19-34] -> "/home/u/proj/web/src/App.tsx" process file +0
+path "web/src/App.tsx" @30:17 [106-121] -> "/home/u/proj/web/src/App.tsx" process file +0
+path "web/src/index.ts" @4:1 [190-206] -> "/home/u/proj/web/src/index.ts" process file +0
+path "web/src/App.tsx" @12:0 [312-327] -> "/home/u/proj/web/src/App.tsx" process file +0
+path "web/src/index.ts" @4:0 [339-355] -> "/home/u/proj/web/src/index.ts" process file +0
+path "web/src" [372-379] -> "/home/u/proj/web/src" process dir +0
+path "/home/u/proj/web/src/App.tsx" [380-408] -> "/home/u/proj/web/src/App.tsx" absolute file +0
+path "/home/u/proj/web/src/index.ts" [719-748] -> "/home/u/proj/web/src/index.ts" absolute file +0
+# width 120
+path "web/src/App.tsx" @12:5 [19-34] -> "/home/u/proj/web/src/App.tsx" process file +0
+path "web/src/App.tsx" @30:17 [106-121] -> "/home/u/proj/web/src/App.tsx" process file +0
+path "web/src/index.ts" @4:1 [190-206] -> "/home/u/proj/web/src/index.ts" process file +0
+path "web/src/App.tsx" @12:0 [312-327] -> "/home/u/proj/web/src/App.tsx" process file +0
+path "web/src/index.ts" @4:0 [339-355] -> "/home/u/proj/web/src/index.ts" process file +0
+path "web/src" [372-379] -> "/home/u/proj/web/src" process dir +0
+path "/home/u/proj/web/src/App.tsx" [380-408] -> "/home/u/proj/web/src/App.tsx" absolute file +0
+path "/home/u/proj/web/src/index.ts" [719-748] -> "/home/u/proj/web/src/index.ts" absolute file +0

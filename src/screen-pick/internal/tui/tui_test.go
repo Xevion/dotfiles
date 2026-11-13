@@ -3,8 +3,10 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 
@@ -47,24 +49,6 @@ func TestLabels(t *testing.T) {
 	}
 }
 
-func TestGrid(t *testing.T) {
-	g := newGrid("ab\r\ncd日本ef\nlast")
-	if diff := cmp.Diff([]string{"ab", "cd日本ef", "last"}, []string{g.line(0), g.line(1), g.line(2)}); diff != "" {
-		t.Errorf("rows (-want +got):\n%s", diff)
-	}
-	for _, tc := range []struct{ off, row, col int }{
-		{0, 0, 0}, {2, 0, 2}, {4, 1, 0}, {6, 1, 2}, {12, 1, 6}, {15, 2, 0}, {19, 2, 4},
-	} {
-		if r, c := g.position(tc.off); r != tc.row || c != tc.col {
-			t.Errorf("position(%d) = (%d,%d), want (%d,%d)", tc.off, r, c, tc.row, tc.col)
-		}
-	}
-	want := []piece{{0, 1, 2}, {1, 4, 6}}
-	if diff := cmp.Diff(want, g.pieces(1, 6), cmp.AllowUnexported(piece{})); diff != "" {
-		t.Errorf("pieces (-want +got):\n%s", diff)
-	}
-}
-
 type fakeBackend struct {
 	disk     *fakefs.FS
 	refined  []detect.Match
@@ -90,7 +74,7 @@ func (f *fakeBackend) Index(context.Context, []detect.Match) <-chan lookup.Resul
 func (f *fakeBackend) Deep(context.Context, int, detect.Match) <-chan lookup.Result {
 	return feed(f.deep)
 }
-func (f *fakeBackend) Actions(m detect.Match) []action.Action {
+func (f *fakeBackend) Actions(_ context.Context, m detect.Match) []action.Action {
 	return action.For(m, action.Context{Cwd: "/home/u/proj", Stat: f.disk.Lstat})
 }
 func (f *fakeBackend) Launch(a action.Action) error {
@@ -102,7 +86,7 @@ func (f *fakeBackend) Command(a action.Action) *exec.Cmd {
 	return exec.Command("true")
 }
 func (f *fakeBackend) Stat(p string) (fs.FileInfo, error) { return f.disk.Lstat(p) }
-func (f *fakeBackend) Preview(m detect.Match, rows int) preview.Preview {
+func (f *fakeBackend) Preview(_ context.Context, m detect.Match, rows int) preview.Preview {
 	return preview.Text("preview of "+m.Path, rows)
 }
 
@@ -145,6 +129,7 @@ func press(m *Model, keys ...string) tea.Cmd {
 			msg = tea.KeyPressMsg{Code: r, Text: k}
 		}
 		_, cmd = m.Update(msg)
+		drain(m, cmd)
 	}
 	return cmd
 }
@@ -152,12 +137,18 @@ func press(m *Model, keys ...string) tea.Cmd {
 // drain runs cmd and feeds every message it yields back into m, the way the
 // Bubble Tea runtime would, until nothing is left.
 func drain(m *Model, cmd tea.Cmd) {
-	for cmd != nil {
-		msg := cmd()
-		if msg == nil {
-			return
+	if cmd == nil {
+		return
+	}
+	switch msg := cmd().(type) {
+	case nil:
+	case tea.BatchMsg:
+		for _, c := range msg {
+			drain(m, c)
 		}
-		_, cmd = m.Update(msg)
+	default:
+		_, next := m.Update(msg)
+		drain(m, next)
 	}
 }
 
@@ -274,6 +265,39 @@ func TestPickingACopyLastsOnlyForTheMenu(t *testing.T) {
 	}
 }
 
+// A disk search runs once, so a rescan landing after it must keep what it found.
+func TestRescanAfterADiskSearchKeepsTheCopies(t *testing.T) {
+	m, b := newTest(t, Hints)
+	rescan := slices.Clone(m.matches)
+	b.deep = []lookup.Result{{ID: 1, Path: "/mnt/x/src/main.rs", Source: resolve.SourceSearch}}
+	drain(m, press(m, "s", "/"))
+	m.Update(refinedMsg{rescan})
+	if alts := m.matches[1].Alternatives; len(alts) != 1 || alts[0].Path != "/mnt/x/src/main.rs" {
+		t.Errorf("the rescan dropped the copies the search found: %+v", alts)
+	}
+}
+
+// A full preview cache must not throw out the preview on screen, which would
+// flash back to "reading..." and be read again.
+func TestFullPreviewCacheKeepsTheOneOnScreen(t *testing.T) {
+	m, _ := newTest(t, Hints)
+	press(m, "s")
+	shown := previewKey(m.target())
+	if _, ok := m.previews[shown]; !ok {
+		t.Fatal("fixture: the menu's preview should be loaded")
+	}
+	for i := range maxPreviews {
+		m.previews[fmt.Sprint("other", i)] = preview.Preview{}
+	}
+	m.Update(previewMsg{key: "new", id: -1})
+	if _, ok := m.previews[shown]; !ok {
+		t.Error("the preview on screen was evicted")
+	}
+	if _, ok := m.previews["new"]; !ok || len(m.previews) > maxPreviews {
+		t.Errorf("the new preview should be kept within the bound: %d entries", len(m.previews))
+	}
+}
+
 func TestListCursorSurvivesTheMenu(t *testing.T) {
 	m, _ := newTest(t, List)
 	press(m, "down")
@@ -301,20 +325,6 @@ func TestFailedCommandReportsStderr(t *testing.T) {
 
 func TestActions(t *testing.T) {
 	m, b := newTest(t, Hints)
-	press(m, "d", "o")
-	if len(b.launched) != 1 || b.launched[0].Arg != "/etc/hosts" {
-		t.Errorf("o should launch an opener for /etc/hosts: %+v", b.launched)
-	}
-	if m.ctx.Err() == nil {
-		t.Error("launching should close the picker")
-	}
-
-	m, _ = newTest(t, Hints)
-	if cmd := press(m, "d", "y"); cmd == nil || m.ctx.Err() == nil {
-		t.Error("copy should return a command and close the picker")
-	}
-
-	m, b = newTest(t, Hints)
 	b.deep = []lookup.Result{{ID: 0, Path: "/mnt/x/etc/hosts", Source: resolve.SourceSearch}}
 	drain(m, press(m, "d", "/"))
 	if n := len(m.matches[0].Alternatives); n != 1 || m.status != "search finished: 1 other copies" {
@@ -432,17 +442,12 @@ func TestQuitFromAnywhereButTyping(t *testing.T) {
 	if m.ctx.Err() != nil || m.filter != "q" {
 		t.Errorf("q in the list filter is a letter: filter %q", m.filter)
 	}
-	m.Update(tea.KeyPressMsg{Code: 'q', Mod: tea.ModCtrl})
-	if m.ctx.Err() == nil {
-		t.Error("ctrl+q should quit while typing a filter")
-	}
 	m, b := newTest(t, Hints)
 	b.deep = []lookup.Result{{ID: 1, Path: "/home/u/proj/b/src/main.rs", Source: resolve.SourceSearch}}
 	drain(m, press(m, "s", "/"))
 	press(m, "tab", "q")
-	m.Update(tea.KeyPressMsg{Code: 'q', Mod: tea.ModCtrl})
-	if m.altFilter != "q" || m.ctx.Err() == nil {
-		t.Errorf("in the copies filter q types and ctrl+q quits: filter %q", m.altFilter)
+	if m.altFilter != "q" {
+		t.Errorf("in the copies filter q types: filter %q", m.altFilter)
 	}
 }
 

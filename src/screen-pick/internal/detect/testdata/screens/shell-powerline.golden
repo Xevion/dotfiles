@@ -1,0 +1,75 @@
+# width 0
+path "~/proj" [4-10] -> "/home/u/proj" home dir +0
+path "src/main.rs" [332-343] -> "/home/u/proj/src/main.rs" screen file +0
+path "Cargo.toml" [357-367] -> "/home/u/proj/Cargo.toml" screen file +0
+path "src/server/mod.rs" [452-469] -> "/home/u/proj/src/server/mod.rs" screen file +0
+path "notes.txt" [471-480] -> "/home/u/proj/notes.txt" screen missing +0
+path "~/proj" [552-558] -> "/home/u/proj" home dir +0
+path "src/server" [629-639] -> "/home/u/proj/src/server" screen dir +0
+path "~/proj/src/server" [644-661] -> "/home/u/proj/src/server" home dir +0
+path "mod.rs" [721-727] -> "/home/u/proj/src/server/mod.rs" screen file +0
+path "handler.rs" [729-739] -> "/home/u/proj/src/server/handler.rs" screen file +0
+path "~/proj/src/server" [744-761] -> "/home/u/proj/src/server" home dir +0
+path "/etc/hosts" [822-832] -> "/etc/hosts" absolute file +0
+host "127.0.0.1" [833-842]
+host "localhost" [843-852]
+host "::1" [853-856]
+host "localhost" [857-866]
+host "192.168.1.20" [867-879]
+host "devbox.lan" [880-890]
+path "~/proj/src/server" [902-919] -> "/home/u/proj/src/server" home dir +0
+path "~/.bashrc" [980-989] -> "/home/u/.bashrc" home file +0
+path "~/proj/src/server" [994-1011] -> "/home/u/proj/src/server" home dir +0
+path "$HOME/.config/app/app.conf" [1073-1099] -> "/home/u/.config/app/app.conf" absolute file +0
+path "/home/u/.config/app/app.conf" [1100-1128] -> "/home/u/.config/app/app.conf" absolute file +0
+path "~/proj/src/server" [1133-1150] -> "/home/u/proj/src/server" home dir +0
+# width 40
+path "~/proj" [4-10] -> "/home/u/proj" home dir +0
+path "src/main.rs" [332-343] -> "/home/u/proj/src/main.rs" screen file +0
+path "Cargo.toml" [357-367] -> "/home/u/proj/Cargo.toml" screen file +0
+path "src/server/mod.rs" [452-469] -> "/home/u/proj/src/server/mod.rs" screen file +0
+path "notes.txt" [471-480] -> "/home/u/proj/notes.txt" screen missing +0
+path "~/proj" [552-558] -> "/home/u/proj" home dir +0
+path "src/server" [629-639] -> "/home/u/proj/src/server" screen dir +0
+path "~/proj/src/server" [644-661] -> "/home/u/proj/src/server" home dir +0
+path "mod.rs" [721-727] -> "/home/u/proj/src/server/mod.rs" screen file +0
+path "handler.rs" [729-739] -> "/home/u/proj/src/server/handler.rs" screen file +0
+path "~/proj/src/server" [744-761] -> "/home/u/proj/src/server" home dir +0
+path "/etc/hosts" [822-832] -> "/etc/hosts" absolute file +0
+host "127.0.0.1" [833-842]
+host "localhost" [843-852]
+host "::1" [853-856]
+host "localhost" [857-866]
+host "192.168.1.20" [867-879]
+host "devbox.lan" [880-890]
+path "~/proj/src/server" [902-919] -> "/home/u/proj/src/server" home dir +0
+path "~/.bashrc" [980-989] -> "/home/u/.bashrc" home file +0
+path "~/proj/src/server" [994-1011] -> "/home/u/proj/src/server" home dir +0
+path "$HOME/.config/app/app.conf" [1073-1099] -> "/home/u/.config/app/app.conf" absolute file +0
+path "/home/u/.config/app/app.conf" [1100-1128] -> "/home/u/.config/app/app.conf" absolute file +0
+path "~/proj/src/server" [1133-1150] -> "/home/u/proj/src/server" home dir +0
+# width 120
+path "~/proj" [4-10] -> "/home/u/proj" home dir +0
+path "src/main.rs" [332-343] -> "/home/u/proj/src/main.rs" screen file +0
+path "Cargo.toml" [357-367] -> "/home/u/proj/Cargo.toml" screen file +0
+path "src/server/mod.rs" [452-469] -> "/home/u/proj/src/server/mod.rs" screen file +0
+path "notes.txt" [471-480] -> "/home/u/proj/notes.txt" screen missing +0
+path "~/proj" [552-558] -> "/home/u/proj" home dir +0
+path "src/server" [629-639] -> "/home/u/proj/src/server" screen dir +0
+path "~/proj/src/server" [644-661] -> "/home/u/proj/src/server" home dir +0
+path "mod.rs" [721-727] -> "/home/u/proj/src/server/mod.rs" screen file +0
+path "handler.rs" [729-739] -> "/home/u/proj/src/server/handler.rs" screen file +0
+path "~/proj/src/server" [744-761] -> "/home/u/proj/src/server" home dir +0
+path "/etc/hosts" [822-832] -> "/etc/hosts" absolute file +0
+host "127.0.0.1" [833-842]
+host "localhost" [843-852]
+host "::1" [853-856]
+host "localhost" [857-866]
+host "192.168.1.20" [867-879]
+host "devbox.lan" [880-890]
+path "~/proj/src/server" [902-919] -> "/home/u/proj/src/server" home dir +0
+path "~/.bashrc" [980-989] -> "/home/u/.bashrc" home file +0
+path "~/proj/src/server" [994-1011] -> "/home/u/proj/src/server" home dir +0
+path "$HOME/.config/app/app.conf" [1073-1099] -> "/home/u/.config/app/app.conf" absolute file +0
+path "/home/u/.config/app/app.conf" [1100-1128] -> "/home/u/.config/app/app.conf" absolute file +0
+path "~/proj/src/server" [1133-1150] -> "/home/u/proj/src/server" home dir +0

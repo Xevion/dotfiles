@@ -3,23 +3,14 @@ package detect
 import (
 	"net"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
 	"screenpick/internal/resolve"
 )
-
-// opaqueRe finds the schemes that carry no "//", which a URL scan would miss.
-var opaqueRe = regexp.MustCompile("(?i)\\b(?:mailto|tel|sms|magnet|geo|urn|xmpp|sip|sips|bitcoin):[^\\s<>\"'`]+")
-
-// scpRe is user@host:path, where the host has a dot or the path names a repo.
-var scpRe = regexp.MustCompile(`\b[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[A-Za-z0-9._~/-]+`)
-
-// scpBareRe is host:path.git with no user, as git prints a remote.
-var scpBareRe = regexp.MustCompile(`\b(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}:[A-Za-z0-9._~/-]+\.git\b`)
 
 // bodyEnd returns where a URL body starting at i stops: at whitespace or a
 // character that wraps URLs in text and never belongs to one.
@@ -28,6 +19,54 @@ func bodyEnd(s string, i int) int {
 		i++
 	}
 	return i
+}
+
+// maxURL is the longest URL read from text. Finding where one ends costs a
+// scan of its length for every name inside it.
+const maxURL = 8192
+
+// urlEnds answers bodyEnd and cutAtSymbol for positions asked in increasing
+// order, keeping the last run so that a long word costs one scan rather than
+// one per name or scheme in it.
+type urlEnds struct {
+	s            string
+	runLo, runHi int
+	symLo, symHi int
+}
+
+func newURLEnds(s string) *urlEnds {
+	return &urlEnds{s: s, runHi: -1, symHi: -1}
+}
+
+// body is bodyEnd(u.s, i).
+func (u *urlEnds) body(i int) int {
+	if i < u.runLo || i > u.runHi {
+		u.runLo, u.runHi = i, bodyEnd(u.s, i)
+	}
+	return u.runHi
+}
+
+// symbol is cutAtSymbol(u.s, a, b).
+func (u *urlEnds) symbol(a, b int) int {
+	if a < u.symLo || a > u.symHi {
+		u.symLo, u.symHi = a, len(u.s)
+		for i, r := range u.s[a:] {
+			if r >= utf8.RuneSelf && !isWordRune(r) {
+				u.symHi = a + i
+				break
+			}
+		}
+	}
+	return min(u.symHi, b)
+}
+
+// pathEnd is pathEnd(u.s, a, i), or false for a URL longer than maxURL.
+func (u *urlEnds) pathEnd(a, i int) (int, bool) {
+	cut := u.symbol(i, u.body(i))
+	if cut-a > maxURL {
+		return 0, false
+	}
+	return trimURL(u.s, a, cut), true
 }
 
 // schemeStart returns where the scheme ending at the "://" at j begins, or -1
@@ -52,18 +91,20 @@ func schemeStart(s string, j int) int {
 	return start
 }
 
-func (sc *scanner) urlCands() []cand {
-	s := sc.s
-	var out []cand
+// urlCands finds URLs and remotes. A file:// URL comes back as a path
+// candidate with no resolution, listed in files by its index in out.
+func urlCands(s string) (out []cand, files []fileRef) {
 	add := func(a, b int) {
 		u := s[a:b]
 		if p, ok := fileURLPath(u); ok {
-			out = append(out, cand{KindPath, a, b, tierURL, sc.resolve(p, a)})
+			out = append(out, cand{KindPath, a, b, tierURL, resolve.Resolution{}})
+			files = append(files, fileRef{len(out) - 1, p})
 			return
 		}
 		out = append(out, cand{KindURL, a, b, tierURL, resolve.Resolution{}})
 	}
 
+	ends := newURLEnds(s)
 	for i := 0; i < len(s); {
 		j := strings.Index(s[i:], "://")
 		if j < 0 {
@@ -72,24 +113,43 @@ func (sc *scanner) urlCands() []cand {
 		j += i
 		i = j + 3
 		a := schemeStart(s, j)
-		end := bodyEnd(s, j+3)
-		if a < 0 || end == j+3 {
+		if a < 0 {
 			continue
 		}
-		b := trimURL(s, a, cutAtSymbol(s, a, end))
+		end := ends.body(j + 3)
+		if end == j+3 {
+			continue
+		}
+		cut := ends.symbol(a, end)
+		if cut-a > maxURL {
+			continue
+		}
+		b := trimURL(s, a, cut)
 		if b <= j+3 {
 			continue
 		}
 		add(a, b)
 		i = b
 	}
-	for _, m := range opaqueRe.FindAllStringIndex(s, -1) {
-		if b := trimURL(s, m[0], cutAtSymbol(s, m[0], m[1])); b > m[0] {
-			add(m[0], b)
+	// Schemes that carry no "//", which the scan above misses.
+	for pos := 0; ; {
+		ma, mb := nextOpaque(s, pos)
+		if ma < 0 {
+			break
+		}
+		pos = mb
+		if b := trimURL(s, ma, cutAtSymbol(s, ma, mb)); b > ma {
+			add(ma, b)
 		}
 	}
-	for _, m := range scpRe.FindAllStringIndex(s, -1) {
-		a, b := m[0], trimURL(s, m[0], m[1])
+	// user@host:path, where the host has a dot or the path names a repo.
+	for pos := 0; ; {
+		ma, mb := nextSCP(s, pos)
+		if ma < 0 {
+			break
+		}
+		pos = mb
+		a, b := ma, trimURL(s, ma, mb)
 		if a > 0 && strings.IndexByte("/:@", s[a-1]) >= 0 || b < len(s) && strings.IndexByte("$#%", s[b]) >= 0 {
 			continue
 		}
@@ -99,12 +159,18 @@ func (sc *scanner) urlCands() []cand {
 			out = append(out, cand{KindURL, a, b, tierURL, resolve.Resolution{}})
 		}
 	}
-	for _, m := range scpBareRe.FindAllStringIndex(s, -1) {
-		if m[0] == 0 || strings.IndexByte("/@:.-_", s[m[0]-1]) < 0 {
-			out = append(out, cand{KindURL, m[0], m[1], tierURL, resolve.Resolution{}})
+	// host:path.git with no user, as git prints a remote.
+	for pos := 0; ; {
+		ma, mb := nextSCPBare(s, pos)
+		if ma < 0 {
+			break
+		}
+		pos = mb
+		if ma == 0 || strings.IndexByte("/@:.-_", s[ma-1]) < 0 {
+			out = append(out, cand{KindURL, ma, mb, tierURL, resolve.Resolution{}})
 		}
 	}
-	return out
+	return out, files
 }
 
 // scpHost accepts a name with letters in it, and for a dotted name an
@@ -186,17 +252,6 @@ scan:
 	return b
 }
 
-var (
-	ipv4Re     = regexp.MustCompile(`\d{1,3}(?:\.\d{1,3}){3}`)
-	ipv6Br     = regexp.MustCompile(`\[([0-9A-Fa-f:.]+)\](?::\d{1,5})?`)
-	ipv6Re     = regexp.MustCompile(`[0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){2,7}(?:(?:\.\d{1,3}){3})?`)
-	nameLabel  = `[\p{L}\p{N}](?:[\p{L}\p{N}\p{M}-]*[\p{L}\p{N}\p{M}])?`
-	nameRe     = regexp.MustCompile(nameLabel + `(?:\.` + nameLabel + `)*`)
-	cidrSuffix = regexp.MustCompile(`^/\d{1,2}`)
-	// Abbreviated hashes run 7 to 16 digits; 32 is an MD5 or a machine ID.
-	shaRe = regexp.MustCompile(`\b(?:[0-9a-f]{40}|[0-9a-f]{7,16})\b`)
-)
-
 func wordSet(list string) map[string]bool {
 	m := map[string]bool{}
 	for _, w := range strings.Fields(list) {
@@ -206,7 +261,9 @@ func wordSet(list string) map[string]bool {
 }
 
 var (
-	allTLD = wordSet(tldList)
+	// allTLD is built on first use: the list is large and most screens never
+	// ask.
+	allTLD = sync.OnceValue(func() map[string]bool { return wordSet(tldList) })
 	// Names that only resolve inside a network, or nowhere: always hosts.
 	specialTLD = wordSet("local lan internal localhost test example invalid localdomain")
 	// bareTLD are the endings trusted on a name with nothing else around it
@@ -274,7 +331,7 @@ func tldCase(t string) string {
 }
 
 func isIANA(lower string) bool {
-	return allTLD[lower] || specialTLD[lower] || strings.HasPrefix(lower, "xn--")
+	return allTLD()[lower] || specialTLD[lower] || strings.HasPrefix(lower, "xn--")
 }
 
 func nonASCII(s string) bool {
@@ -385,12 +442,6 @@ func wordAfter(s string, b int) string {
 	return strings.ToLower(s[i:j])
 }
 
-// pathEnd returns where the URL path starting at the slash at i stops, for a
-// URL that began at a.
-func pathEnd(s string, a, i int) int {
-	return trimURL(s, a, cutAtSymbol(s, i, bodyEnd(s, i)))
-}
-
 // splitAuthority reads an optional :port after a name or address ending at b.
 // ok is false for a port that is not one, or that is really a location.
 func splitAuthority(s string, b int) (port string, end int, ok bool) {
@@ -422,9 +473,21 @@ func hostCands(s string) []cand {
 	var out []cand
 	add := func(a, b int) { out = append(out, cand{KindHost, a, b, tierHost, resolve.Resolution{}}) }
 	addURL := func(a, b int) { out = append(out, cand{KindURL, a, b, tierHost, resolve.Resolution{}}) }
+	ends := newURLEnds(s)
+	// addPathURL adds the URL whose path starts at the slash at i, unless it
+	// is longer than maxURL.
+	addPathURL := func(a, i int) {
+		if e, ok := ends.pathEnd(a, i); ok {
+			addURL(a, e)
+		}
+	}
 
-	for _, m := range ipv4Re.FindAllStringIndex(s, -1) {
-		a, b := m[0], m[1]
+	for pos := 0; ; {
+		a, b := nextIPv4(s, pos)
+		if a < 0 {
+			break
+		}
+		pos = b
 		if a > 0 && (isWordByte(s[a-1]) || s[a-1] == '.') || net.ParseIP(s[a:b]) == nil {
 			continue
 		}
@@ -433,10 +496,10 @@ func hostCands(s string) []cand {
 			continue
 		}
 		if end < len(s) && s[end] == '/' {
-			if cidr := cidrSuffix.FindString(s[end:]); port == "" && cidr != "" && hostEnds(s, end+len(cidr)) {
-				add(a, end+len(cidr))
+			if cidr := cidrLen(s[end:]); port == "" && cidr > 0 && hostEnds(s, end+cidr) {
+				add(a, end+cidr)
 			} else {
-				addURL(a, pathEnd(s, a, end))
+				addPathURL(a, end)
 			}
 			continue
 		}
@@ -444,21 +507,29 @@ func hostCands(s string) []cand {
 			add(a, end)
 		}
 	}
-	for _, m := range ipv6Br.FindAllStringSubmatchIndex(s, -1) {
-		a, b := m[0], m[1]
-		_, port, _ := strings.Cut(s[m[3]:b], "]:")
-		if net.ParseIP(s[m[2]:m[3]]) == nil || !validPort(port) || b < len(s) && isAlnum(s[b]) ||
+	for pos := 0; ; {
+		a, b, close := nextIPv6Br(s, pos)
+		if a < 0 {
+			break
+		}
+		pos = b
+		_, port, _ := strings.Cut(s[close:b], "]:")
+		if net.ParseIP(s[a+1:close]) == nil || !validPort(port) || b < len(s) && isAlnum(s[b]) ||
 			a > 0 && (isWordByte(s[a-1]) || s[a-1] == ')' || s[a-1] == ']') {
 			continue
 		}
 		if b < len(s) && s[b] == '/' {
-			addURL(a, pathEnd(s, a, b))
+			addPathURL(a, b)
 			continue
 		}
 		add(a, b)
 	}
-	for _, m := range ipv6Re.FindAllStringIndex(s, -1) {
-		a, b := m[0], m[1]
+	for pos := 0; ; {
+		a, b := nextIPv6(s, pos)
+		if a < 0 {
+			break
+		}
+		pos = b
 		t := s[a:b]
 		if a > 0 && (isWordByte(s[a-1]) || s[a-1] == ':' || s[a-1] == '.') ||
 			b < len(s) && (isWordByte(s[b]) || s[b] == ':') || indexed(s, a) {
@@ -469,12 +540,26 @@ func hostCands(s string) []cand {
 			add(a, b)
 		}
 	}
-	for _, m := range nameRe.FindAllStringIndex(s, -1) {
-		a, b, cutL, cutR := trimCJK(s, m[0], m[1])
+	for pos := 0; ; {
+		ma, mb, flags := nextName(s, pos)
+		if ma < 0 {
+			break
+		}
+		pos = mb
+		a, b, cutL, cutR := ma, mb, false, false
+		if flags&nameWide != 0 {
+			a, b, cutL, cutR = trimCJK(s, ma, mb)
+		}
 		if !cutL && !nameStarts(s, a) {
 			continue
 		}
-		labels := strings.Split(s[a:b], ".")
+		if flags == 0 && !(b-a == len("localhost") && strings.EqualFold(s[a:b], "localhost")) &&
+			!(b+1 < len(s) && s[b] == ':' && isDigit(s[b+1])) {
+			// A lone ASCII label is a host only as localhost or with a port.
+			continue
+		}
+		var buf [8]string
+		labels := splitLabels(buf[:0], s[a:b])
 		port, end, ok := splitAuthority(s, b)
 		if !ok || !cutR && !nameEnds(s, end) {
 			continue
@@ -485,13 +570,12 @@ func hostCands(s string) []cand {
 				continue
 			}
 			if end < len(s) && s[end] == '/' {
-				addURL(a, pathEnd(s, a, end))
+				addPathURL(a, end)
 			} else {
 				add(a, end)
 			}
 		case end < len(s) && s[end] == '/':
-			e := pathEnd(s, a, end)
-			if pathedName(labels) && (e > end+1 || bareName(s, a, b, labels)) && !fileLikePath(labels, s[end:e]) {
+			if e, ok := ends.pathEnd(a, end); ok && pathedName(labels) && (e > end+1 || bareName(s, a, b, labels)) && !fileLikePath(labels, s[end:e]) {
 				addURL(a, e)
 			}
 		case bareName(s, a, b, labels):
@@ -499,6 +583,19 @@ func hostCands(s string) []cand {
 		}
 	}
 	return out
+}
+
+// splitLabels is strings.Split(t, ".") into dst, which spares the allocation
+// when the labels fit.
+func splitLabels(dst []string, t string) []string {
+	for {
+		i := strings.IndexByte(t, '.')
+		if i < 0 {
+			return append(dst, t)
+		}
+		dst = append(dst, t[:i])
+		t = t[i+1:]
+	}
 }
 
 // portedName judges a name that carries a port. A dotted name needs a plausible
@@ -565,10 +662,10 @@ func bareName(s string, a, b int, labels []string) bool {
 		return len(labels[len(labels)-2]) > 1
 	case strings.HasPrefix(lower, "xn--") || bareTLD[lower] || homeArpa(labels):
 		return true
-	case nonASCII(lower) && allTLD[lower]:
+	case nonASCII(lower) && allTLD()[lower]:
 		return true
 	case len(labels) >= 3 && first == "www":
-		return allTLD[lower]
+		return allTLD()[lower]
 	}
 	return false
 }
@@ -609,8 +706,12 @@ func validPort(p string) bool {
 
 func shaCands(s string) []cand {
 	var out []cand
-	for _, m := range shaRe.FindAllStringIndex(s, -1) {
-		a, b := m[0], m[1]
+	for pos := 0; ; {
+		a, b := nextSHA(s, pos)
+		if a < 0 {
+			break
+		}
+		pos = b
 		t := s[a:b]
 		if !strings.ContainsAny(t, "0123456789") || !strings.ContainsAny(t, "abcdef") {
 			continue
