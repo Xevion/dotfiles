@@ -1,8 +1,17 @@
 ---
 name: scheduling
 category: architecture
-last_audited: 2026-04-10
+last_audited: 2026-11-12
 exemplars:
+  - repo: local/Applyhelm
+    path: store schedule (succeed, fail, defer, spread, backoff), due_boards, sweep module
+    note: "DB-persisted tiered schedule with jitter, a deferral outcome that is neither success nor failure, per-vendor drain loops under a global semaphore"
+  - repo: Xevion/banner
+    path: scraper worker retry_backoff
+    note: "Exponential backoff with equal jitter written as execute_at on the job row"
+  - repo: Xevion/xevion.dev
+    path: GitHubScheduler, sync health columns
+    note: "Poll health tracked apart from the data, ETag polls that cost no rate limit, typed RateLimited with retry_after"
   - repo: local/rekuma
     path: internal/scheduling/
     note: "Priority-queue scheduler package split (scheduler.go + worker.go + priority.go), DBBackoff, QueueThreshold backpressure, InjectJob for handler bypass"
@@ -26,6 +35,18 @@ Background job scheduling with priority-driven dispatch and activity-adaptive in
 - **Package split at scale**: once the scheduler grows past a single file, split into `scheduler.go` (tick loop + dispatch), `worker.go` (per-item processing), `priority.go` (scoring + tier → priority mapping). Keep the public surface narrow — the HTTP layer should only need `InjectJob(ctx, id)` for bypass and the lifecycle methods for startup/shutdown
 - **`QueueThreshold` backpressure gate**: skip dispatch when `len(workQueue) >= QueueThreshold`. Prevents runaway growth when workers can't keep up and lets the existing backlog drain before new items pile on. Pair with housekeeping metrics so the gate being active is observable
 - **Handler-bypass injection path (`InjectJob`)**: expose a synchronous path that pushes a single job directly into the work queue, bypassing the scheduler's next-tick wait. Used by HTTP handlers that must trigger immediate processing (pin/unpin, manual refresh). Must share the same `next_refresh_after` stamping to avoid duplicate-dispatch races with the tick loop
+
+## Persisted-State Scheduling
+
+An alternative to an in-memory priority queue: the schedule is a column, and the tick is a plain query (`WHERE enabled AND next_poll_at <= now ORDER BY next_poll_at, id LIMIT n`).
+
+- **Tiered, jittered intervals**: a success sets the tier (Hot or Cold from the count of open, not ruled-out items) and `next_poll_at` to now plus the tier interval with about 10% jitter. A failure uses exponential backoff, with a server `Retry-After` hint taking the maximum, capped at a maximum
+- **A deferral is a third outcome.** `Outcome::Deferred { until, reason }` moves only `next_poll_at`, adds up to 10% of the wait as jitter, and leaves health counters alone. It is produced when a host is blocked or its per-run request budget is spent, so a rate-limited host does not trip failure or disable logic. See [outbound-http-client](./outbound-http-client.md)
+- **Two-level concurrency**: per-vendor drain loops (`join_all` over vendors, each draining due rows in rounds with a `FuturesUnordered` capped at `per_vendor`) under one global `Semaphore(total)`. Each task acquires a slot first and re-checks the stop token after acquiring. A slow vendor never blocks the others, and the total stays bounded
+- **Retries with equal jitter** (half the capped delay plus a random amount up to half) guarantee a minimum spacing while de-synchronizing mass failures. Write the delay as `execute_at` on the job row instead of sleeping in the worker, and log warn while retries remain and error only on exhaustion
+- **Track poll health separately from the data.** A last-success timestamp and a latest-error column (cleared on success) let an admin UI tell a quiet repository from a broken sync. A failure records only the error and leaves the success time alone. Activity advances through `GREATEST(...)` so it never regresses. Invalidate stale heap entries by registry epoch, and poll unchanged resources with an ETag so a 304 costs no rate limit
+- **Leases instead of stamps**: a claim lease with a reclaim TTL and an attempts counter, rather than one-shot dispatch stamps. See [postgres-operations](./postgres-operations.md)
+- **Persisted schedules have no in-memory queue and no stamping.** Whether a concurrent sweep could double-poll was not established; check before assuming it cannot
 
 ## Browser Polling Engine
 

@@ -1,7 +1,7 @@
 ---
 name: typescript
 category: languages
-last_audited: 2026-04-03
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/banner
     path: web/src/lib/bindings/
@@ -60,11 +60,11 @@ type InstructionalMethod =
 
 ### Linting & Formatting
 
-- **Biome preferred** for new JS/TS projects as both formatter and linter. Standard config: VCS integration (`useIgnoreFile: true`), tab indentation, `noConsole` with `allow: ["assert", "error", "warn"]`, `noExcessiveCognitiveComplexity` at warning level. Biome replaces both Prettier and ESLint for pure TS projects
+- **Biome preferred** for new JS/TS projects as both formatter and linter. Standard config: VCS integration (`useIgnoreFile: true`), tab indentation, `noConsole` with `allow: ["assert", "error", "warn"]`, `noExcessiveCognitiveComplexity` at warning level. Biome-only is the relaxed default for simple pure-TS projects, and the choice is a trade-off, not a rule: Biome's Svelte linting gap is the main driver away from it today, and type-aware ESLint (below) costs maintenance but earns it on critical code
 - **Biome formatter + ESLint linter** for SvelteKit projects — Biome's Svelte linting support is incomplete. Use Biome for formatting (.ts, .json, .css) and ESLint with `svelte-eslint-parser` + `@xevion/ts-eslint-extra` for linting .svelte files. Prettier+ESLint is legacy but acceptable for existing projects
 - **Underscore prefix for intentionally-unused params**: configure ESLint's `no-unused-vars` (or `@typescript-eslint/no-unused-vars`) with `argsIgnorePattern: "^_"`, `varsIgnorePattern: "^_"`. Standard across all projects
 - **`--max-warnings 0` in lint scripts**: zero-tolerance warning policy. Combined with `--cache` for incremental speed. Prevents warnings from accumulating
-- **Type-aware ESLint** (`parserOptions: { project: "./tsconfig.json" }`): enables rules like `consistent-type-imports`, `no-floating-promises`, `no-misused-promises`. Slower startup but catches real bugs. Enable for mature projects; skip for rapid prototyping
+- **Type-aware ESLint** (`parserOptions: { project: "./tsconfig.json" }`): enables rules like `consistent-type-imports`, `no-floating-promises`, `no-misused-promises`. Slower startup but catches real bugs. Enable for mature projects and for Node or worker code where a forgotten `await` is costly (Applyhelm keeps Biome for formatting only and lints with type-aware ESLint); skip for rapid prototyping
 - **`svelte/no-navigation-without-resolve` disabled**: this rule conflicts with SPA routing patterns (Tauri, static adapters). Disable project-wide in Svelte projects that don't use server-side navigation resolution
 
 ## Open Questions

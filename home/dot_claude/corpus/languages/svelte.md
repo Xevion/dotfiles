@@ -1,7 +1,7 @@
 ---
 name: svelte
 category: languages
-last_audited: 2026-04-10
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/banner
     path: web/src/lib/
@@ -64,6 +64,10 @@ Svelte 5 runes exclusively — no legacy stores. Reactive state is explicit via 
 - **Debounced `$effect` pattern**: when reactive inputs must trigger a debounced side effect (not a derived value), use `$effect` with an outer timeout ref, list dependencies explicitly on separate lines, and return cleanup that clears the pending timeout. This is distinct from the anti-pattern of using `$effect` for pure derived state
 - **Browser API wiring via `$effect`**: for imperative browser APIs (IntersectionObserver, ResizeObserver) tied to reactive state, use `$effect` with a null-guard on the bound element ref and a boolean reactive gate. Return cleanup that calls the API's teardown method and clears any associated timers
 - **Theme flash prevention via `{@html}` inline script**: for static SvelteKit sites without SSR, inject an IIFE in `<svelte:head>` via `{@html}` that reads localStorage and toggles the dark class on `documentElement` before hydration. This is the client-only complement to `transformPageChunk`. Note: bypasses CSP nonces and runs on every SPA navigation
+- **Module-scoped state is shared by every request on the SSR server.** Module-level `$state` and caches are safe in the browser, but one module instance serves all requests there. Gate such state on `browser` (`const cached = browser ? cache.get(key) : undefined`) or move it into a per-tree context
+- **Class-based page controller with injected ports** (Applyhelm `PostingsController`): a plain class holds `$state.raw` arrays and `$derived` fields, takes its API and URL port in the constructor so stories and tests can swap them, and is started from an effect so server rendering makes no request. Keep runes inside the class and pure helpers (view, ranking, marks) in plain modules. `$state.raw` suits large immutable lists, where the version counter suits large mutated collections. See [state-management](../architecture/state-management.md)
+- **Framework-free core with a thin rune wrapper** (`debouncedField` over `FieldCore`): put the logic (commit parsed values, never the text; timers; equality) in a plain class that unit-tests without Svelte, and wrap it with a version-bump `$state` and one `$effect`. Preferred over a debounced `$effect` when the logic has edge cases
+- **One motion vocabulary module** (stashflare `motion.ts`): call sites pick a role (enter, panel fade), never a duration. It honours reduced motion centrally and skips `startViewTransition` outright rather than zeroing the CSS. Load-time transitions are no-ops until a post-mount ready flag. Persisted client state resolves in `onMount` to avoid hydration mismatch
 - **Component composition**: prefer bits-ui headless primitives, compose with Tailwind utility classes
 - **Type safety**: import types from auto-generated bindings (`$lib/bindings`), never hand-maintain TypeScript interfaces that mirror backend types
 
@@ -89,20 +93,20 @@ Svelte 5 runes exclusively — no legacy stores. Reactive state is explicit via 
 
 ### Adapter & Config
 
-- **`@xevion/svelte-adapter-bun`** as the default adapter for Bun-targeted deployments. Standard options: `out: "build"`, `serveAssets: false` (assets served by CDN/proxy). Use `@sveltejs/adapter-node` for Node.js targets, `@sveltejs/adapter-cloudflare` for Workers
+- **Pick the adapter by which process owns the runtime.** `@xevion/svelte-adapter-bun` for Bun-targeted deployments (options `out: "build"`, `serveAssets: false` when a CDN or proxy serves assets). `@sveltejs/adapter-node` when a compiled backend supervises the SSR child as a Node process (banner), `@sveltejs/adapter-cloudflare` for Workers
 - **`dynamicCompileOptions` for runes gating**: `runes: (filename) => !filename.includes('node_modules')` enables runes mode for project code while letting third-party Svelte components compile without runes. Transitional pattern — remove when the dependency ecosystem catches up to Svelte 5
 - **`@xevion/ts-eslint-extra`** custom ESLint parser: resolves `.svelte` named exports for type-aware linting. Used alongside `svelte-eslint-parser` in all SvelteKit projects with ESLint
 
 ### CSP (Content Security Policy)
 
-Start with `reportOnly` mode — observe violations without blocking. Directives include:
+Whether to start in `reportOnly` or enforce from the start is situational. Report-only suits retrofitting a site with unknown third-party scripts. Enforcing from day one suits a new project where every source is known, and has one advantage: report-only cannot flag a directive you forgot to write at all, and `frame-ancestors`, `base-uri` and `form-action` do not fall back to `default-src`, so write those explicitly. Either way, keep `report-uri` so violations stay visible (strongly advised). Note that `style-src 'unsafe-inline'` is ignored if any nonce is present. Directives include:
 - `script-src: 'self'` + analytics domains (PostHog)
 - `script-src-attr: 'unsafe-inline'` for inline event handlers
 - `img-src: 'self', 'data:'` + CDN domains (Cloudflare R2, Discord CDN, etc.)
 - `connect-src`: includes `ws://localhost:*` in dev for HMR
 - `report-uri: '/api/csp-report'` endpoint for violation collection
 
-Tighten from `reportOnly` to enforcing once the violation log is clean.
+When starting in `reportOnly`, tighten to enforcing once the violation log is clean.
 
 ## Anti-Patterns
 

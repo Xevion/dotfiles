@@ -1,7 +1,7 @@
 ---
 name: deterministic-simulation
 category: architecture
-last_audited: 2026-03-27
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/borde.rs
     path: crates/borders-core/src/game/
@@ -26,7 +26,11 @@ Reproducibility across clients. Game simulation must produce identical results g
 ### Rust
 
 - Use a `DeterministicRng` resource in Bevy ECS that derives per-context seeds
-- Manual update loop at fixed frame time (`Duration::from_millis(16)`) rather than Bevy's built-in runner, enabling WASM worker compatibility
+- **Enforce determinism with tooling, not only a seeded RNG.** Ban std `HashMap` and `HashSet` (randomly seeded, so iteration order varies per run) and transcendental float methods (use `libm`) through `clippy.toml`. Pin golden hashes of generated terrain in tests, and run a separate workflow that checks those goldens on Windows, macOS and headless Chrome on a weekly cron and before releases, because those runners cost more than Linux
+- **Float results that must be identical across machines**: use only per-lane IEEE operations, forbid FMA contraction and reassociated sums, and do not enable relaxed-SIMD, because its FMA rounds once or twice depending on the host. A division by a power of two may become a reciprocal multiply, and nothing else may. See [performance](../patterns/performance.md)
+- **Ids hash their text**, not a process-seeded hash, whenever any crate might enable a feature that seeds per process. Record each tick with a digest so replay pins the first diverging tick, and have the journal refuse to replay across a different boundary fingerprint or game build
+- **A search with unstable tie-breaks: attack the order, do not protect it.** Expose a `tieBreakSeed` to re-roll tie-breaks, treat a course that passes under only one seed as a coin flip, and do not accept "bit-identical plans" as the bar for a search change. Replay plans as literal per-tick input sequences, and check the physics model against recorded vanilla traces with a conformance oracle
+- Earlier form: a manual update loop at fixed frame time (`Duration::from_millis(16)`) rather than Bevy's built-in runner, for WASM worker compatibility. borde.rs now orders its schedule by named system sets and registers messages with bevy
 
 ## Anti-Patterns
 
@@ -36,5 +40,4 @@ Reproducibility across clients. Game simulation must produce identical results g
 
 ## Open Questions
 
-- Deterministic floating-point across architectures (IEEE 754 strictness)
-- Replay file format and versioning strategy
+- Replay file format and versioning strategy beyond a fingerprinted journal

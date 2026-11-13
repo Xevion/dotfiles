@@ -1,7 +1,7 @@
 ---
 name: css-styling
 category: languages
-last_audited: 2026-04-03
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/banner
     path: web/src/routes/layout.css
@@ -52,7 +52,7 @@ Tailwind utility-first. Design tokens as CSS custom properties. Minimal custom C
 }
 ```
 
-- **Dark mode via class strategy**: `.dark` class on `documentElement`, not `prefers-color-scheme` media query (allows user override)
+- **Dark mode via class strategy** when the site has a theme toggle: `.dark` class on `documentElement`, so users can override the OS setting. **No-toggle sites are the exception**: a site with no toggle may follow the OS setting directly through `prefers-color-scheme`. In PandaCSS, map the `dark` condition to the media query so every `_dark` token resolves with no JavaScript and no first-paint flash
 - **View Transitions API**: use for page navigation and theme-change animations. Named transition groups (`view-transition-name`) scope animations to specific elements. Data attributes on `:root` select directional keyframe variants
 - **oklch() relative color syntax**: use `oklch(from var(--token) l c h / alpha)` for alpha-only variants without hardcoding or repeating the color value. Useful for glass effects, hover states, and overlay backgrounds
 - **@custom-variant for dark mode with shadcn-ui**: declare `@custom-variant dark (&:is(.dark *));` in Tailwind v4 when using shadcn-ui's class-based dark mode. This replaces the default `prefers-color-scheme` detection with class-based toggling
@@ -63,6 +63,7 @@ Tailwind utility-first. Design tokens as CSS custom properties. Minimal custom C
 - **PandaCSS preferred for new SvelteKit projects**: define tokens in `panda.config.ts` using `oklch()`, with semantic aliases using `{ base: ..., _dark: ... }` condition variants. Same oklch + class-strategy dark mode philosophy as Tailwind v4, different implementation. Tailwind v4 (via `@tailwindcss/vite`) is acceptable for simpler projects or when PandaCSS adds unnecessary complexity
 - **PandaCSS dark mode**: use `_dark` semantic token conditions — equivalent to Tailwind's `dark:` variant. `.dark` class toggle on `documentElement` is the same activation mechanism as the Tailwind class strategy
 - **PandaCSS standard config conventions**: `outdir: 'styled-system'`, `preflight: true`, `include: ['./src/**/*.{js,ts,svelte}']`. Primary color with 11 oklch shades, neutral with 12 shades (including 850 for intermediate dark values). Standard semantic tokens: bg, fg, border (with strong variant), primary (with subtleFg), danger, success, warning, accent, info, tint. Standard breakpoints: 640/768/1024/1280px
+- **Design-system discipline on top of PandaCSS** (stashflare, bf4-emblems): one accent colour with a few foreground steps, a small fixed set of radii, and type only through `textStyles` (numerals tabular). Headless primitives (Ark UI) are always wrapped, one file per primitive, with recipes in separate files; features never import the raw primitive. No raw hex or font sizes in feature code, and `css()` arguments are static objects. A shared layout-scaffolding style file does not grow parallel form or label classes, because they drift from the tokens
 - **PandaCSS recipe pattern**: define component recipes (button, badge, toggle, etc.) as separate imports. Use `staticCss` to pre-generate variant combinations for SSR/static builds where dynamic class generation isn't available
 
 ## Anti-Patterns

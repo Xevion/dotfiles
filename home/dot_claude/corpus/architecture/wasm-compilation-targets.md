@@ -1,14 +1,17 @@
 ---
 name: wasm-compilation-targets
 category: architecture
-last_audited: 2026-04-03
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/Pac-Man
     path: pacman/src/platform/
     note: "Dual-target Rust (native + Emscripten WASM), platform-gated modules, extern C FFI"
   - repo: Xevion/borde.rs
-    path: crates/borders-wasm/ + Justfile
-    note: "wasm-bindgen target, three WASM Cargo profiles, mtime-based wasm-bindgen skip, cfg-gated deps"
+    path: workspace Cargo.toml (wasm-release package profiles), .cargo/config.toml, Justfile (wasm_cargo, test-wasm)
+    note: "One native-and-browser GPUI client crate; browser build on a pinned nightly with -Zbuild-std, atomics and shared memory, served cross-origin isolated. (Its earlier borders-wasm crate with wasm-bindgen and gloo-timers is gone)"
+  - repo: local/currents-render
+    path: web build recipes
+    note: "One wasm bundle per rendering backend selected by Cargo feature, glue wrapped in a factory so a failed backend can be instantiated again, wasm-bindgen pinned exactly in crate and toolchain"
   - repo: Xevion/WebSAM
     path: src/lib/inference/ + src/routes/wasm/
     note: "ONNX Runtime Web (consumer-side WASM), .ort pre-optimization, stable /wasm/ API route bypassing Vite hashing"
@@ -27,6 +30,9 @@ Write once, compile to multiple targets. Platform abstraction at the module boun
 - **Three-tier WASM Cargo profiles**: `wasm-dev` (opt-level 1, debug info), `wasm-release` (opt-level z, LTO, strip, panic=abort, wasm-opt -Oz), `wasm-debug` (opt-level 0, full debug). Each inherits from the appropriate base profile
 - **Mtime-based wasm-bindgen skip**: compare artifact timestamp before/after cargo build; skip wasm-bindgen when unchanged and pkg artifacts already exist. Avoids redundant postprocessing during incremental development
 - **wasm-opt postprocessing**: run `wasm-opt -Oz` with `--enable-bulk-memory --enable-threads` on release builds for additional size reduction beyond what rustc/LTO achieves
+- **WASM threads need a pinned nightly and cross-origin isolation.** Build with `-Zbuild-std`, `+atomics,+bulk-memory,+mutable-globals,+simd128` and `-C link-arg=--shared-memory`, and serve with the isolation headers so `SharedArrayBuffer` is available. Release profiles optimize only the hot crates per package, and `strip = "debuginfo"` keeps the name section for crash stacks
+- **Pin `wasm-bindgen` exactly in the crate and in the toolchain file**, with a comment that the two must match, and pin binaryen the same way
+- **One bundle per backend, selected by Cargo feature**, rather than one bundle with runtime switching. Emit the no-modules glue as a factory so a failed backend can be instantiated again for a fallback
 
 ## Language-Specific
 
@@ -50,4 +56,4 @@ Write once, compile to multiple targets. Platform abstraction at the module boun
 ## Open Questions
 
 - WASI adoption timeline and when it replaces Emscripten for server-side WASM
-- Shared memory and threads in WASM (atomics, SharedArrayBuffer requirements)
+- Moving off a pinned nightly for WASM threads once `-Zbuild-std` stabilizes

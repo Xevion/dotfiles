@@ -1,20 +1,29 @@
 ---
 name: dependency-management
 category: dx
-last_audited: 2026-04-10
+last_audited: 2026-11-12
 exemplars:
+  - repo: Xevion/advisory-action
+    path: action.yml + src/
+    note: "Advisory gate that scans the merge base in a detached worktree and judges a change only on what it introduces; scanner tier decides what may block; ignore file with reason and expiry; used in 16 workflows"
   - repo: local/inkwell
     path: renovate.json
     note: "Ecosystem grouping by manager and namespace, dependencyDashboard: false"
   - repo: Xevion/Pac-Man
     path: .github/renovate.json
     note: "allowedVersions blocks with inline rationale, minimumReleaseAge, pinGitHubActionDigests"
+  - repo: Xevion/xevion.dev
+    path: renovate.json
+    note: "One group for peer-coupled toolchain packages (vite, svelte, @sveltejs/**) including majors, paired with a CI step that exercises the dev-mode dependency path"
   - repo: Xevion/rustdoc-mcp
     path: deny.toml
-    note: "cargo-deny with 4 target triples, license allowlist, yanked=deny, unknown-registry=deny"
-  - repo: local/Applyhelm
-    path: renovate.json
-    note: "Full baseline config + patch-update automerge, 8 ecosystem groups (SvelteKit, WXT, UnoCSS, Bits UI, Biome, ESLint, LogTape, Rust, Docker, Actions)"
+    note: "cargo-deny with 4 target triples, license allowlist, unknown-registry=deny"
+  - repo: local/mc-seed-preview
+    path: deny.toml
+    note: "bans.multiple-versions = allow on a large graph, wildcards = deny"
+  - repo: local/assrip
+    path: deny.toml
+    note: "[[bans.deny]] with wrappers contains a copyleft crate to its named callers, license exception scoped to that one crate"
   - repo: local/toriix
     path: renovate.json + deny.toml
     note: "Git-HEAD dependency handling: Renovate opt-out with rationale for gpui/gpui_platform, deny.toml unknown-git=allow with explicit allowlist, transitive advisory ignore with upstream-fix-pending comments"
@@ -26,7 +35,23 @@ exemplars:
 
 Lock files always committed. Conservative updates. Audit discipline. Minimal dependency count — don't add deps for trivial functions.
 
+Automated update PRs and advisory audits are tools, not defaults. Across many projects they become a firehose: most advisories are for code paths the project never reaches, most ecosystems give too little detail to filter them out, and a gate that turns CI red on something that changed at the last second, with no bearing on the project, teaches people to ignore red. Renovate and Dependabot are not dropped, but a new project does not start with one by default; turn it on when the project has users, a release cadence, or a supply-chain reason.
+
 ## Conventions
+
+### Advisory gating (advisory-action)
+
+`Xevion/advisory-action` is the answer to the audit-as-merge-gate problem. Its rules generalize beyond the action:
+
+- **Judge a change on what it introduces.** Scan the merge base in a detached worktree and diff the advisory sets. What the repository is merely carrying is reported as a warning and fails nothing. The `resolved` output matters too: a security bump that clears four advisories should read differently from one that clears none
+- **What may block depends on what the scanner can prove.** Go (`govulncheck`) resolves vulnerable symbols against a call graph, so it can block on anything introduced. Rust (`cargo-audit`) has no reachability, but separates vulnerabilities from `unsound`, `unmaintained` and `yanked`, so only introduced vulnerabilities with a fix block. JavaScript audits (whichever manager the lockfile names, production dependencies only) have neither, so they report only
+- **An unknown baseline under-reports.** Without full history there is nothing to diff, so everything is reported as pre-existing and nothing blocks. Never fail a change that cannot be attributed
+- **Normalize output by shape, not by binary**, and raise an error on an unrecognised shape rather than parsing to nothing, so a package manager changing its output cannot quietly report a clean tree
+- **Report unscanned manifests.** A manifest with no lockfile above it is reported, since a repository that gitignores `Cargo.lock` would otherwise read as clean
+- **Ignore entries carry a reason and an expiry date**, in a committed file, so a suppression is revisited instead of becoming permanent
+- Pin the action by a moving major tag (`@v1`) rather than `@master`, so a change reaches your repositories when you move the tag, not when it is pushed
+
+### Update automation
 
 - **Renovate ecosystem grouping**: group by manager (gomod) and by tightly-coupled package namespaces (`@sveltejs/`, `@pandacss/`, `@biomejs/`) to reduce PR noise while keeping related updates atomic. For multi-language monorepos this is essential
 - **`allowedVersions` blocks with inline rationale**: when a major version upgrade requires migration work, block it explicitly in Renovate config with a `description` field explaining the blocker. This is a first-class pattern, not a workaround
@@ -78,7 +103,10 @@ Use `deny.toml` for license compliance, advisory scanning, and source restrictio
 - `licenses.confidence-threshold = 0.8` — reasonable SPDX detection threshold
 - `advisories.yanked = "warn"` — surface yanked crates without failing. `deny` looks prudent but gates CI on a fact about crates.io that no commit controls: a transitive crate yanked upstream turns every subsequent push red until someone bumps a lockfile they had no reason to touch. Observed on Xevion/byte-me, red for weeks on a yanked `spin` with no security content. Yanking is a publishing signal, not an advisory
 - `sources.unknown-registry = "deny"`, `sources.unknown-git = "deny"` — restrict to crates.io
-- `bans.multiple-versions = "warn"` — flag duplicate transitive versions without hard-failing
+- `bans.multiple-versions`: `warn` for small graphs so duplicate transitive versions are visible without failing. For large graphs (GPU, windowing, HTTP stacks) `allow` is reasonable: the warnings are unfixable and eight of them on every run train people to skip the output. Turn it on temporarily when pruning, and do not agonize over leaving it off on a big project
+- `bans.wildcards = "deny"`
+- **Contain a copyleft crate with `wrappers`**: a `[[bans.deny]]` entry with `wrappers = ["<the one caller>"]` stops a second dependency path from relicensing a permissively licensed workspace. Pair it with a license exception scoped to that one crate name, never a general allowance
+- **Every advisory `ignore` carries a reason** ("nothing here holds a private key"), not only an upstream-fix-pending note
 
 ### CI/Local Tool Version Synchronization
 
@@ -94,6 +122,15 @@ Pin CI-sensitive tools (especially Go linters like `golangci-lint`) to exact ver
 - **Advisory scans as a plain merge gate**: an audit is a function of the lockfile *and* the wall-clock date. The database moves daily and the lockfile does not, so a bare `cargo audit` / `npm audit` / `govulncheck` step fails commits that changed nothing, and every branch inherits whatever the base branch already carried. Red stops meaning anything and dependency PRs become unreadable. Diff the advisory set against the merge base instead, and gate only on what a change introduces. Observed across the fleet: Xevion/dynamic-preauth failed 15 of 15 runs on 9 advisories, none introduced by any commit
 - **Gating on signals the scanner cannot rank**: only `vulnerability`-class findings with a known fix are worth failing a build. `unmaintained`, `unsound` and `yanked` carry no severity and often no remedy, so gating on them produces permanent red. Report them; do not block on them
 
+### Peer-coupled toolchain packages
+
+Group packages that must move together (vite, svelte, `@sveltejs/**`) in one Renovate group that includes major versions, so the set moves as one. Pair it with a CI step that exercises the dev-mode dependency path, because a build-only check missed a dev-only break from a peer-incompatible major. Pin a plugin to its previous major with a stated reason while its peers catch up.
+
+### Cargo patches, vendoring and Git-sourced forks
+
+Keep vendored forks outside the workspace and the audit (`exclude = ["vendor"]`, `[patch.crates-io]`). This is the cost of depending on projects that move faster than their releases (GPUI is the current case); see [native-gpu-ui](../architecture/native-gpu-ui.md) for the open question.
+
 ## Open Questions
 
+- Whether a small project with no users should run any automated update PRs at all, and what the minimum useful setup is (a scheduled advisory report, or none)
 - Renovate vs Dependabot feature parity and selection criteria

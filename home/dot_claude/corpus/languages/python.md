@@ -1,7 +1,7 @@
 ---
 name: python
 category: languages
-last_audited: 2026-04-03
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: sidecar/
@@ -16,7 +16,7 @@ Type hints on every public and internal function. Untyped signatures lose the va
 
 Dataclasses over dicts for structured data. A `dict[str, object]` return type tells the caller nothing; a dataclass documents the contract at the call site and enables static analysis.
 
-Explicit over implicit: imports are absolute, `from __future__ import annotations` appears at the top of every file, and suppression comments always include the rule code (`# type: ignore[attr-defined]`, `# noqa: F401`). Bare `# type: ignore` or bare `# noqa` are rejected.
+Explicit over implicit: imports are absolute, `from __future__ import annotations` is used where the minimum Python needs it (see Type Annotations), and suppression comments always include the rule code (`# type: ignore[attr-defined]`, `# noqa: F401`). Bare `# type: ignore` or bare `# noqa` are rejected.
 
 Modern toolchain by default: **uv** for package management and virtual environments, **ruff** for formatting and linting in one pass, **basedpyright** for strict type checking. These replace the older pip/black/isort/mypy stack.
 
@@ -37,7 +37,7 @@ All checks are orchestrated by a single `just check` command (or equivalent proj
 
 ### Type Annotations
 
-Every file starts with `from __future__ import annotations`. This enables PEP 563 deferred evaluation, allowing forward references without quotes everywhere.
+Whether to start every file with `from __future__ import annotations` depends on the project. It enables deferred evaluation, allowing forward references without quotes, and it is needed to write `X | None` on older Pythons. A project with a modern minimum (local-web-fetch, Python 3.12) can leave it out entirely, with complete annotations everywhere.
 
 ```python
 from __future__ import annotations
@@ -110,7 +110,7 @@ When working with ML libraries or other poorly-typed third-party code, disable t
 
 ### pytest Conventions
 
-Tests live in a `tests/` directory. Shared fixtures go in `conftest.py`. Use `@pytest.mark.anyio` with `httpx.AsyncClient` and `ASGITransport` for async endpoint tests.
+Tests live in a `tests/` directory. Shared fixtures go in `conftest.py`. For async tests use either `@pytest.mark.anyio` or pytest-asyncio in auto mode (`asyncio_mode = "auto"`, so async tests need no marker), whichever the project already uses; pair with `httpx.AsyncClient` and `ASGITransport` for async endpoint tests. In offline tests, use strict HTTP fakes that raise on any unrouted request, and a root autouse fixture that fails the test if the code under test swallowed that error.
 
 Stub/fake implementations for unit tests must never pollute production registries. Create isolated instances:
 

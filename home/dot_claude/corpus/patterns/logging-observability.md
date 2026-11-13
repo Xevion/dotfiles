@@ -1,7 +1,7 @@
 ---
 name: logging-observability
 category: patterns
-last_audited: 2026-04-10
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/banner
     path: src/logging/
@@ -19,8 +19,17 @@ exemplars:
     path: internal/middleware/ + web/vite-plugin-json-logger.ts
     note: "Three-layer LOG_JSON coordination (Go + SvelteKit + Vite plugin), LevelTrace named constant"
   - repo: local/Applyhelm
-    path: crates/backend/src/logging.rs + packages/web/src/lib/logging.ts + entrypoint.ts
-    note: "Three-layer LOG_JSON across Rust tracing + SvelteKit LogTape + Bun entrypoint supervisor, console-logger preload"
+    path: crates/backend/src/logging.rs + packages/web/src/lib/logging.ts
+    note: "LOG_JSON across Rust tracing and SvelteKit LogTape"
+  - repo: local/local-web-fetch
+    path: log module (tool_call, event, redact)
+    note: "One structured event per tool call emitted on exit with outcome, timing and error; a ContextVar request id on every nested event; secret-named query values redacted at the emit point"
+  - repo: Xevion/borde.rs
+    path: borders-telemetry (client, store, retry, logs, exception)
+    note: "First-party client telemetry as a platform-neutral crate: UUIDv7 stamps, gzipped batches with retry, a queue persisted across launches (directory natively, localStorage in the browser), page-hide beacon, a privacy switch"
+  - repo: local/guard
+    path: logging module (decision_for, record)
+    note: "A decision label separate from the exit code so an abstain never reads as an allow; the write result discarded at one boundary"
   - repo: local/stashapp-rapid-tag
     path: vite-plugin-json-logger.ts
     note: "Standalone SvelteKit variant of coordinated LOG_JSON — customLogger + server.printUrls override + handleHotUpdate capture"
@@ -186,6 +195,14 @@ Log missing values explicitly rather than as empty strings. Empty string is ambi
 - In Rust: `Option<T>` fields in tracing: use `field = ?opt` for `Debug` formatting, which renders `Some(val)` / `None` explicitly
 - In Go: use a helper `slog.Any("field", maybeNilPtr)` — slog renders `nil` as the JSON `null`, which is unambiguous in structured output
 - In TypeScript: distinguish `undefined` (field absent) from `null` (field present but empty) — choose a consistent convention and document it in the sink
+
+## Wide Events, Telemetry and Decision Labels
+
+- **One structured event per unit of work, emitted on exit** through a context manager, carrying outcome, timing and error. A context-variable request id is attached to every nested event, and secret-named query values are redacted centrally at the emit point
+- **A decision label separate from the exit code**, so an abstain or skip never reads as success. Discard the log write result at one boundary function, so telemetry failure stays invisible to the caller
+- **First-party client telemetry is a separate, platform-neutral crate.** It stamps events with a UUIDv7 and timestamp at capture time, groups them into sessions, and sends gzipped batches with retry and backoff. The queue persists across launches (a directory natively, `localStorage` in the browser) with a maximum pending age and write-then-rename atomic writes, and a page-hide beacon flushes on close. A privacy switch and a `--telemetry` flag give consent control. Warn and error logs ship through a tracing layer, crashes go out as exceptions with stacks, and the panic hook path is allocation-safe. Event names live in one `strum` enum catalog
+- **A per-callsite token bucket** silences any site firing faster than once per 5 seconds after 16 hits, so per-frame instrumentation must be a span or edge-triggered, not a log line
+- **Analytics clients default to a minimal posture**: no autocapture, no session recording, no surveys, manual pageviews
 
 ## Anti-Patterns
 

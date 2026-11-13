@@ -1,7 +1,7 @@
 ---
 name: testing-quality
 category: patterns
-last_audited: 2026-04-10
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/banner
     path: tests/
@@ -11,7 +11,7 @@ exemplars:
     note: Go test factories with options-struct pattern, pgtestdb template cloning
   - repo: local/maestro
     path: common test module
-    note: Kotest DescribeSpec with property-based pathfinding tests, TestWorldBuilder spatial DSL
+    note: Kotest FreeSpec behavioural tests, TestWorldBuilder spatial DSL, scenario ledger with an XFAIL tier, @Probe questions
   - repo: Xevion/instant-upscale
     path: frontend/src/lib/pipeline/__tests__/
     note: Vitest recording sink setup, EngineTestHarness browser API mock factory
@@ -73,7 +73,11 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 - `cargo nextest` as the test runner (parallel, better output than `cargo test`)
 - `#[sqlx::test]` for database integration tests — each test gets a fresh `PgPool` with migrations applied. No manual setup/teardown
 - Builder pattern in `tests/helpers/` for test data construction
-- `assert2` crate: `assert!()` over `assert_eq!()`, `let_assert!()` for pattern matching, `check!()` for non-fatal assertions. Prefer `assert2` over `speculoos` — `speculoos` is verbose without providing the structural pattern-matching that `assert2::let_assert!` enables. For nested tree output (parse → scene → node), chain `let_assert!` steps into a readable traversal that fails fast on the first mismatch, with `check!()` for non-fatal leaf assertions
+- `assert2` crate: `assert!()` over `assert_eq!()`, `assert!(let PATTERN = expr)` for pattern matching (`let_assert!` is deprecated), `check!()` for non-fatal assertions, including `check!(let ..)`. Prefer `assert2` over `speculoos`. For nested tree output (parse → scene → node), chain `assert!(let ..)` steps into a readable traversal that fails fast on the first mismatch, with `check!()` for non-fatal leaf assertions. Enforce it with a `clippy.toml` `disallowed-macros` entry banning `assert_eq!`
+- **`rstest` named cases and parameter cross-products**: name cases (`#[case::absent(..)]`) so a failure names the scenario. For a pure policy function with several switches, a `#[values(false, true)]` cross-product checked against an oracle expression covers every combination. Where per-case setup is expensive, loop over a labelled table inside one test instead
+- **Snapshots with `insta`**: move a snapshot with `git mv` when a test or module is renamed, never accept-all. Name tests for the observable behavior they pin. Compare against an independent restatement of the expected value, never a copy of the code under test
+- **Strict fakes and fixtures at boundaries**: offline fakes raise on any unrouted request, and a root fixture fails the test if the code swallowed that error. Fixtures for account-shaped data use round placeholder values only
+- **Heavy work is not a unit test.** Tests whose cost is dominated by loading shared state (an install, a decoded index, a GPU device) belong in a purpose-built runner; see [heavy-check-runners](./heavy-check-runners.md). Keep nextest for the fast, hermetic, machine-independent tests
 - **proptest roundtrip + panic safety for protocol codecs**: pair `parse(serialize(x)) == x` roundtrip tests with a separate never-panics invariant over arbitrary byte slices. These two properties together ensure both correctness and robustness for any binary parser
 - **Nested test sub-modules**: `mod proptest_tests` inside `#[cfg(test)] mod tests` allows type-level organization without requiring separate files. Useful when a single module has both unit and property-based tests. The pattern extends beyond protocol codecs — any function with a sortedness, monotonicity, or other invariant can use rstest (parameterized unit cases) + proptest (property tests over arbitrary inputs) + assert2 all within a single nested sub-module structure
 - **Invariant-based tests for scoring/math functions over exact-value assertions**: for `posteriorMean`, `entropy`, scoring combinators, and other mathematical functions, prefer invariant tests (monotonicity: `posteriorMean(1,4) < posteriorMean(2,4)`; symmetry: `entropy(0.2) ≈ entropy(0.8)`; boundary behavior: `score(0) === FLOOR`, `score(1) === CEILING`) over pinning exact float outputs (`toBeCloseTo(0.2)`). Invariant tests survive algorithm tuning; exact-value tests break on every parameter change. Exact values are acceptable only for mathematical identities that won't change (e.g., `entropy(0.5) === 1`). For stochastic functions (Thompson sampling, Monte Carlo), assert statistical bounds on N trials (`expect(uncertainSelected).toBeGreaterThan(40)` in 100 trials) rather than deterministic equality
@@ -91,7 +95,7 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 - MSW for API mocking when backend is unavailable
 - Global Vitest `setupFiles` recording sink: configure logger once with recording sink, auto-clear via `beforeEach`, export query helpers by category/level for asserting on structured log output
 - EngineTestHarness factory for browser API mocking: single factory installs all global mocks (Worker, ResizeObserver, HTMLAudioElement), returns cleanup closure, each mock exposes typed `Controls` interface
-- CI compat env-var gate: `test.skipIf(!available)` locally, hard throw when `CI_COMPAT=1`. Prevents both false negatives (skipped in CI) and false positives (failing locally)
+- CI compat env-var gate: `test.skipIf(!available)` locally, hard throw when `CI_COMPAT=1`. Prevents both false negatives (skipped in CI) and false positives (failing locally). Where a missing prerequisite would let a run go green having checked nothing (a game install, a GPU), some projects instead fail and name the command that supplies it (mc-seed-preview, stardew-bot live trials). A heavy-check runner reports skips by name and count, with a required-environment switch that turns a skip into a failure
 - **`// @vitest-environment node` for real-network integration tests**: per-file environment override bypasses happy-dom's fake fetch to enable real HTTP calls. Distinct from the CI env-var gate — the gate is for tests that may be unavailable, while the environment override is for tests requiring real network semantics. Combine both when needed
 - **Behavioral invariant testing for math/scoring functions**: test ordering (at1 > at2 > at5), symmetry (ratio 2 ≈ ratio 0.5), bounds, and monotonicity properties rather than pinning exact float values. More resilient to algorithm tuning than spot-checking specific outputs
 - **Nested describe by input category**: group tests by input type rather than method under test, with explicit "should NOT" negative cases for parser edge coverage. Effective for type-detection, format-parsing, and other disambiguation logic
@@ -105,7 +109,9 @@ TDD when test infrastructure exists. Integration tests over mocks — hit real d
 
 ### Kotlin
 
-- Kotest DescribeSpec for nested scenario grouping in algorithm tests, `checkAll`/`Arb` for property-based testing. JUnit @Test and DescribeSpec coexist in same Gradle suite
+- Kotest `FreeSpec` (maestro: 92 spec files against 11 `DescribeSpec`, none using `checkAll`) with behavioural test names phrased as claims. JUnit @Test and Kotest specs coexist in the same Gradle suite
+- **A committed scenario ledger** (one JSONL row per scenario: status, ticks, expansions, plan hash) with an expected-failure tier where XFAIL counts as green and XPASS as red, so a stale tier fails the run. Run the same scenarios in a fast headless harness and a slow real-client harness, and treat a disagreement as the finding
+- **A `@Probe` annotation** marks throwaway questions put to the system under test: excluded from the normal suite, run through a dedicated recipe that prints output, with shared table and histogram helpers
 - TestWorldBuilder DSL for spatial fixtures: high-level spatial primitives (floor, wall, column) instead of coordinate arrays. Overwrite guard via `check()` on duplicate positions
 
 ## Anti-Patterns

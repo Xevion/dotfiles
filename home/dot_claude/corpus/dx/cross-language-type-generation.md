@@ -1,7 +1,7 @@
 ---
 name: cross-language-type-generation
 category: dx
-last_audited: 2026-04-10
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/instant-upscale
     path: crates/server/ + frontend/src/lib/bindings/
@@ -15,9 +15,12 @@ exemplars:
   - repo: local/inkwell
     path: tygo.yaml + web/src/lib/types.gen.ts
     note: "tygo type_mappings for pgx nullable types, dual codegen verification (sqlc + tygo) in CI"
-  - repo: local/Applyhelm
-    path: tempo.config.ts + packages/shared-types/bindings/
-    note: "Reference mtime-gated ts-rs preflight: tmpdir isolation, file-by-file Buffer.compare diff, stale cleanup, idempotent barrel generator, CI verify via runner.temp + diff -r"
+  - repo: Xevion/xevion.dev
+    path: tempo.config.ts (regenerateBindings, bindings:verify, bindings:schema-sync), pm schema snapshot
+    note: "Regenerate into a tmpdir, copy only changed files and prune deleted ones, verify with a separate git-diff task; the reverse direction too: the TipTap schema is dumped to a committed JSON snapshot that the Rust side include_str!s and tests against"
+  - repo: local/stardew-bot
+    path: sdv-native build script (csbindgen fingerprint), sdv-control protocol constant, bridge EnumDriftTests
+    note: "Generated C# bindings paired with a runtime fingerprint and a struct-size table, plus a test that parses the Rust enum source and compares names and values"
 ---
 
 # Cross-Language Type Generation
@@ -29,7 +32,13 @@ Generated types are the single source of truth for API contracts. Backend define
 ## Conventions
 
 - **CI verification via regen+diff**: regenerate bindings in CI and `git diff --exit-code` the output. Stale generated files are a build failure, not a warning
-- **mtime-gated auto-regen preflight with tmpdir isolation**: rather than regenerating bindings manually or in a pre-commit hook, wire the regen into a typed build-tool preflight (`tempo.config.ts`, `scripts/bindings.ts`) that compares source mtime to artifact mtime. When source is newer: create a tmpdir, set `TS_RS_EXPORT_DIR` to the tmpdir, run `cargo test export_bindings`, diff the tmpdir against the committed output file-by-file via `Buffer.compare`, clean up files that no longer exist in the new output, and write only the changed files back. Tmpdir isolation prevents partial regeneration from corrupting the workspace on failure. Pair with an idempotent barrel generator (skip write when content unchanged) to avoid spurious git diffs on re-run. CI runs the same preflight with `TS_RS_EXPORT_DIR=$RUNNER_TEMP/bindings` and then `diff -r` against the committed output — catches drift without depending on a pre-commit hook being installed
+- **Staleness-gated auto-regen with tmpdir isolation**: rather than regenerating bindings manually or in a pre-commit hook, wire the regen into a typed build-tool task (a tempo task with `inputs` and `outputs`, or `scripts/bindings.ts`) that compares source to artifact. When the source is newer: create a tmpdir, set `TS_RS_EXPORT_DIR` to the tmpdir, run `cargo test export_bindings`, diff the tmpdir against the committed output file-by-file via `Buffer.compare`, clean up files that no longer exist in the new output, and write only the changed files back. Tmpdir isolation prevents partial regeneration from corrupting the workspace on failure. Pair with an idempotent barrel generator (skip write when content unchanged) to avoid spurious git diffs on re-run. CI runs the same preflight with `TS_RS_EXPORT_DIR=$RUNNER_TEMP/bindings` and then `diff -r` against the committed output — catches drift without depending on a pre-commit hook being installed
+
+- **Pair generated bindings with a runtime fingerprint** when two sides are built by different tools at different times. The build script hashes the generated layout with comments stripped (xxh3), both sides report it, and a mismatch refuses the load and names the older side by file modification time. Add a table of `size_of` for the boundary structs so compiler disagreement is caught even when the fingerprint matches. A hand-bumped version number is the weaker form
+- **Drift between enums on two sides is tested by source text**: a test parses the Rust enum source and compares names and values with the other language's enum. A round trip over a variants list is a tautology and is not drift protection
+- **When the schema authority is the frontend library** (a rich-text editor's extension set), dump it to a committed JSON snapshot. The backend `include_str!`s the snapshot and tests its own allow-list against it, and a check task regenerates it and diffs in CI. This is the reverse direction from ts-rs
+- **Wire names never move.** Renaming a serialized field breaks consumers with no type error, so a project without generated bindings keeps one shared JSON envelope and treats wire names as frozen
+- **A project can drop generated bindings along with the client that needed them** (borde.rs removed ts-rs when the TypeScript client went away)
 
 ## Language-Specific
 

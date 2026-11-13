@@ -1,7 +1,7 @@
 ---
 name: state-management
 category: architecture
-last_audited: 2026-04-03
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/glint
     path: frontend/src/lib/stores/ + components/data-view/
@@ -49,6 +49,11 @@ Reactivity through signals/runes, not manual subscription. Clear boundary betwee
 - **Stale-request-ID concurrency control**: for async operations dispatched to Web Workers or external services, track a module-level integer counter. Each async call captures the ID at launch and compares against the current counter on resolution — stale results are discarded. This is the "optimistic concurrency via version counter" pattern applied to async calls rather than UI renders
 - **Single-inflight + drain-latest for pointer tracking**: maintain one in-flight slot and one pending-latest slot. If a call is in flight, store only the most recent input; on completion, drain the pending slot if populated. Discards all intermediate inputs — "latest-wins" with zero backlog. Suitable for hover-decode, mouse-move inference, and similar pointer-tracking workloads
 
+- **Optimistic update with a per-entity mark queue** (Applyhelm `PostingsController`): each entity carries `{confirmed, desired, inFlight, generation}`. A flush sends one request at a time and re-sends while `desired !== confirmed`, so rapid toggles coalesce. On failure it reverts from `desired` to `confirmed`, adjusting counts only if the list generation is unchanged. A `removed` map keeps rows taken out of the list so a rollback can restore them at their index
+- **Abort-based stale-result guard**: a `Latest` helper owns one `AbortController`. `run(task(signal), apply)` aborts the previous call and applies the result only if this call was not aborted. The fetch is truly cancelled, and there is no module-level counter. A `Loadable<T>` union (`idle | loading | error | ready`) carries the status
+- **Server push for invalidation without a query library**: a database trigger raises a notification on every row change (whoever wrote it), a spawned listener forwards it to a broadcast channel, and handlers expose it as server-sent events that the page consumes. No subscribers is the normal idle state, not an error. Server-sent events are also the option for completion notices; see [device-code-auth-flow](../patterns/device-code-auth-flow.md)
+- **Immediate-mode UIs** (egui, GPUI) keep each frame read-only: derived views sit in a memo keyed by a revision counter that every edit bumps, so a search narrows in the frame it is typed. See [native-gpu-ui](./native-gpu-ui.md)
+
 ### React
 
 - **Custom hook as page-scoped state factory**: a custom hook (e.g., `useLookup`) that encapsulates co-located state, derived values (debounce, type detection), side effects, and async actions is the React equivalent of the Svelte `createCursorList()` factory. Returns a stable interface to the page component, keeping pages thin and making state logic independently testable. Use `useRef` for values that shouldn't trigger re-renders (e.g., repeatable URLs), `useDebouncedValue` for reactive throttling
@@ -67,4 +72,3 @@ Reactivity through signals/runes, not manual subscription. Clear boundary betwee
 ## Open Questions
 
 - Server-only vs shared state boundaries in SvelteKit
-- Optimistic updates and rollback patterns

@@ -1,7 +1,7 @@
 ---
 name: cli-tool-design
 category: dx
-last_audited: 2026-04-03
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/tempo
     path: src/cli.ts
@@ -64,7 +64,10 @@ const logger = env.isCI && env.provider === "github"
 
 ### Rust
 
-Use `clap` derive macros for argument parsing — the derive API keeps argument definitions colocated with the struct fields that receive them. Use `colored` or `owo-colors` for terminal output (prefer `owo-colors` for zero-allocation formatting). Use `indicatif` for progress bars and spinners. Use `anyhow` for error propagation in binaries; `thiserror` for library error types that callers might match on.
+Use `clap` derive macros for argument parsing — the derive API keeps argument definitions colocated with the struct fields that receive them. Use `colored` or `owo-colors` for terminal output (prefer `owo-colors` for zero-allocation formatting). Use `indicatif` for progress bars and spinners. Use snafu for errors in binaries and libraries alike (see [rust](../languages/rust.md)).
+
+- **Map each error type to a sysexits status** through a small `Exit` trait implemented beside the error (missing name to 69/66, corrupt data to 65, unavailable service to 69, unauthorized to 77, else 1). A single `finish` function prints the whole chain once (`snafu::Report`, or `miette` for rich output) and returns the status, falling back to 1 when the code does not fit a byte. Wrapper variants pass the wrapped code through. A script can then tell a mistyped name from a corrupt file from an unreachable service without reading the message. An unresolved name lists what exists instead of a bare "not found"
+- **Stdout carries only data.** Tables or JSON go to stdout; all status and progress goes to stderr, so every command stays pipeable. On the JSON path, a failure is emitted as a JSON object with `error`, `code` and `help` fields, not a text diagnostic
 
 - **Global flags via clap `global = true`**: declare global flags (`--verbose`, `--quiet`, `--config`) with `global = true` on the top-level `Cli` struct. Clap handles positional extraction automatically — the idiomatic Rust equivalent of the TypeScript global flag pre-pass. Use `ArgAction::Count` for `-v`/-vv`/-vvv` verbosity patterns
 

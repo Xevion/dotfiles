@@ -1,7 +1,7 @@
 ---
 name: ai-assisted-dev
 category: dx
-last_audited: 2026-04-10
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/banner
     path: CLAUDE.md
@@ -29,7 +29,19 @@ exemplars:
     note: "Reference CLAUDE.md: session startup checklist, Always Do / Never Do tables with tool-specific anti-patterns, per-subsystem scaffolding caveats, Linear workflow integration"
   - repo: local/game-hacking
     path: CLAUDE.md + docs/agent-architecture.md
-    note: "Anti-hallucination rules for numeric domains (hex math banned, evidence-first, read-before-write), multi-agent role taxonomy, four-tier confidence KB"
+    note: "Anti-hallucination rules for numeric domains (hex math banned, evidence-first, read-before-write), task-based agents, one findings doc per subject with a status line"
+  - repo: local/kk-engine
+    path: CLAUDE.md
+    note: "Rules written with the incident that caused them (generality test, spread alarm, subagent reports are leads, state the mechanism before designing), always open the rendered images"
+  - repo: local/stashflare
+    path: CLAUDE.md + DECISIONS.md + TASKS.md
+    note: "Three git-excluded notes: constraints only, settled facts and measurements one line each, open work"
+  - repo: local/idakit
+    path: CLAUDE.md (Testing, Today's limits are temporary)
+    note: "Hard never-rules on specific test entry points and env vars, each with the reason the shortcut silently under-tests"
+  - repo: local/ferrite-uefi
+    path: CLAUDE.md (Machines and safety)
+    note: "Machine-safety envelope for the agent: interfaces off limits, no reboots, sudo blocked, agent-only helpers in a git-ignored tools directory"
   - repo: local/toriix
     path: CLAUDE.md
     note: "Niche-framework orientation — gpui concepts documented with API patterns + component-adoption priority table to prevent stale-pattern generation"
@@ -70,6 +82,13 @@ CLAUDE.md as project context — the single document that orients an AI agent in
 - **Per-subsystem scaffolding-status caveats**: in a project where subsystems are at different maturity levels, mark each stack description with an explicit "scaffolding only — check `src/` before assuming a feature exists" caveat. Prevents agents from citing documented-but-not-implemented features as if they were in place. Example: "Backend: Axum, SQLx, Argon2 sessions, apalis jobs — **Note: backend is at scaffolding stage (health route + session store only)**; check `crates/backend/src/` before assuming a feature exists"
 - **Anti-hallucination rules for numeric domains**: for projects involving addresses, offsets, hex arithmetic, or other numeric values where LLM errors are silent and consequential, add an explicit Anti-Hallucination section to CLAUDE.md. Core rules: (1) ban in-head hex/address arithmetic — always use a tool; (2) require evidence citations for numeric claims; (3) mandate read-before-write at memory/state boundaries; (4) tool results are authoritative over agent predictions; (5) typed tools for mutations, not shell. Most projects don't need this — it's specifically for RE, memory injection, low-level systems work, and anywhere an LLM arithmetic error produces a silent catastrophic failure. See [ai-assisted-reverse-engineering-loop](../patterns/ai-assisted-reverse-engineering-loop.md)
 - **Niche-framework orientation in CLAUDE.md**: when a project uses a framework or library outside the LLM's reliable training data (e.g., gpui, obscure Rust game engines, brand-new library releases), document the framework's core concepts and API patterns directly in CLAUDE.md so agents don't generate stale patterns from memory. Include a "components/APIs to keep custom" vs "components to adopt from upstream" table to guide upgrade decisions. Link to upstream docs but don't rely on the agent reading them — inline the must-know patterns
+
+- **Constraints only in CLAUDE.md**: split agent notes by role. CLAUDE.md holds rules; a decisions file holds settled calls and measured facts one line each; a tasks file holds open work. The test: if an entry does not constrain what an agent may do, it does not belong in CLAUDE.md. Keep all three out of git when they are agent-facing
+- **Write rules with the incident behind them.** A rule that carries its cause ("a rule built on a subagent's claim about one object name that was an empty marker in all 654 prefabs") is followed and revisited more reliably than a bare one. Useful standing rules: a generality test (a name that mentions one garment is special-casing), a spread alarm (stop at the second unrelated file touched, and do not report success past it), "a subagent report is a lead, not evidence", and "state the mechanism before designing"
+- **Pin the test entry points.** Document hard never-rules on specific commands and env vars (never set the test-database variable, never use `-E` filters, never run bare `cargo nextest`), each with the reason the shortcut silently under-tests. Say that today's limits are temporary, so agents do not encode current limits (headless, 64-bit, x86) into public types
+- **State the agent's safety envelope** where the project touches real machines: which hosts and interfaces are off limits, which paths are the agent's own, what needs the human (root commands), and where agent-only helper scripts live
+- **For rendering work, the agent must look at the output.** Pixel percentages and triangle counts are proxies; open the changed images before reporting on a render. See [visual-regression-testing](../patterns/visual-regression-testing.md)
+- **Voice rules for generated prose**: hedging is the default failure of generated text, so state claims at full strength, and ban present-tense state narration in code comments (Applyhelm)
 
 ## Anti-Patterns
 

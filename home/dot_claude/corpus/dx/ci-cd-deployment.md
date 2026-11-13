@@ -1,11 +1,11 @@
 ---
 name: ci-cd-deployment
 category: dx
-last_audited: 2026-04-10
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/banner
-    path: .github/workflows/
-    note: 6-job parallel CI, cargo-chef Docker builds, release-please gated on CI
+    path: .github/workflows/ + Dockerfile
+    note: "6-job parallel CI, cargo-chef Docker builds, release-please gated on CI, binary executed in the runtime stage as a build gate"
   - repo: Xevion/doujin-ocr-summary
     path: .github/workflows/ci.yml + Dockerfile
     note: 5-job parallel CI with codegen verification, multi-stage Go Docker build
@@ -18,9 +18,12 @@ exemplars:
   - repo: Xevion/xevion.dev
     path: .github/workflows/ci.yml
     note: "5-job parallel CI with binding-verification, security job (cargo-audit + zizmor + Trivy SARIF)"
-  - repo: local/Applyhelm
-    path: .github/workflows/ci.yml
-    note: "7-job parallel split (quality-backend/frontend/extension + bindings-check + typos + security + zizmor), SHA-pinned, docker gated on quality jobs"
+  - repo: local/borde.rs
+    path: .github/workflows (quality cross-lint job, determinism workflow)
+    note: "Cross-lint matrix (cargo-xwin for Windows, cargo-zigbuild for macOS), costly-runner determinism goldens on a weekly cron and before releases"
+  - repo: local/currents-render
+    path: CI test job
+    note: "GPU tests on lavapipe with WGPU_BACKEND=vulkan forced; toolchain channel read from rust-toolchain.toml"
   - repo: local/toriix
     path: .github/workflows/ci.yml
     note: "Vendor patch-apply-in-every-job pattern for submodule-with-in-tree-patches dependency"
@@ -55,6 +58,13 @@ RUN cargo build --release
 - **Go Docker builds with `go mod download` as cached layer**: analogous to cargo-chef. Use UPX for binary compression. Match runtime base image to the actual entrypoint runtime (e.g. Bun, not Alpine) when the final binary is not standalone
 - **`zizmor` workflow security scanning**: run `zizmorcore/zizmor-action` in a dedicated job with `security-events: write` permission for SARIF upload. Catches misuse of untrusted input (`pull_request_target` without sanitization), excessive permissions (`permissions: write-all`), missing SHA pins in workflow files themselves, and shell injection via `${{ }}` interpolation into `run:` blocks. The check is cheap (~30s on typical workflows) and catches a class of supply-chain errors that cargo-deny and npm-audit don't see. Pair with Dependabot's `github-actions` ecosystem to keep the action versions themselves pinned
 - **Vendor patch-apply in every job** (for dependencies maintained as submodules with in-tree patches): when a project carries patches against a git submodule dependency (e.g., `vendor/gpui-component/` with `patches/*.patch`), every CI job that compiles must apply the patches *before* the compile step. Patches do not survive `actions/checkout` — each job needs its own `cd vendor/submodule && git apply ../../patches/*.patch` step. Extract to a composite action (`.github/actions/apply-vendor-patches/action.yml`) to avoid copy-paste drift when the dependency setup evolves
+
+- **Gate the build on executing the artifact in the final runtime stage.** Running the binary in the runtime image resolves every symbol at build time, so an ABI or library mismatch fails the build. Pair it with an atomic rollout (`helm --atomic`) to catch startup failures the gate cannot see
+- **One local gate that mirrors CI.** A single `check` recipe covers fmt, actionlint, zizmor, clippy, cross-target clippy for crates without native deps, a content-hash-cached clang-tidy, hermetic docs and a README that must match the crate docs. A floating `ubuntu-latest` canary leg with `continue-on-error` catches runner drift early, and a `repro-ci` recipe reproduces a CI failure in a stock distro container. Heavy sanitizer, coverage and mutation recipes stay advisory, outside `check`
+- **Put costly runners on a schedule.** Windows and macOS runners bill at multiples of Linux, so run only the checks that need them (cross-platform determinism goldens, headless Chrome) on a weekly cron and before releases
+- **Read the toolchain from `rust-toolchain.toml`** instead of an env var that CI ignores, so CI installs onto the pin
+- **Gate secrets through a repo variable**, since secrets cannot gate a job-level `if`
+- Advisory scanning on pull requests should judge a change on what it introduces; see [dependency-management](./dependency-management.md)
 
 ## Anti-Patterns
 

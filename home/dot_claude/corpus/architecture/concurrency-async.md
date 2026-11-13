@@ -1,11 +1,11 @@
 ---
 name: concurrency-async
 category: architecture
-last_audited: 2026-04-10
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/banner
-    path: src/services/
-    note: Service trait + ServiceManager with broadcast/mpsc, nested select! cancellation
+    path: runtime module (Service trait, ServiceManager, SsrService)
+    note: "Service trait + ServiceManager with broadcast/mpsc, nested select! cancellation; the Node SSR child process is itself a Service; TS SingleFlight in the web api client"
   - repo: Xevion/instant-upscale
     path: crates/common/shutdown module
     note: ShutdownTracker/ShutdownToken RAII pair with atomic drain counter
@@ -36,9 +36,18 @@ exemplars:
   - repo: local/game-hacking
     path: crates/ac/external/src/daemon.rs
     note: "Raw OS thread force-shutdown watchdog surviving tokio runtime teardown; top-level select! racing signals + cancel token + accept"
-  - repo: local/Applyhelm
-    path: entrypoint.ts
-    note: "Bun Promise.race supervisor over Rust backend + SvelteKit, coordinated exit via monitor(proc)"
+  - repo: local/bf4-emblems
+    path: ingest writer and pool modules
+    note: "Write coalescing through one writer task, N worker futures with a refill queue, per-item claim release, pass-wide abort only for shared-resource errors"
+  - repo: local/steamlib
+    path: managed transport (Shared::publish, Supervised, Link/Dial traits)
+    note: "A pair of watch channels written only through one publish method; reconnect policy tested against scripted fakes under paused tokio time"
+  - repo: local/guard
+    path: executor (run_captured, tap threads)
+    note: "No async runtime: OS threads, std::io::pipe and waitpid for a short-lived startup-budgeted process"
+  - repo: local/cargo-sweep-ng
+    path: sweep-engine removal module
+    note: "Pool sized to keep a filesystem busy (4 to 8 threads), dead worker reported as a failure, platform injected through a start_on constructor"
 ---
 
 # Concurrency & Async
@@ -100,9 +109,18 @@ pub async fn shutdown(self, timeout: Duration) -> bool {
 - **Rayon two-phase write-then-verify**: separate `par_chunks_mut` write and `par_chunks` verify sweeps for cache-bypassed parallel memory access. Rayon's join barrier guarantees sfence visibility before the verify phase begins
 - **Raw OS thread force-shutdown watchdog**: when `tokio`'s runtime `Drop` would block on uncancellable `spawn_blocking` tasks (GLFW event loops, GPU render loops, OpenGL overlays that own their own thread), spawn a raw `std::thread` watchdog *before* awaiting async tasks. The watchdog sleeps to a deadline then calls `std::process::exit(1)`. On entry, reset SIGINT/SIGTERM handlers to `SIG_DFL` so any subsequent Ctrl+C bypasses Rust's signal handling and kills immediately. This avoids a hang on runtime drop while preserving a grace period for clean async shutdown. Pair with `wait()` only on the async task set — not the blocking workers — because the blocking workers can't be cancelled cleanly
 
+- **A child-process supervisor is a `Service`.** It races `child.wait()` against the shutdown broadcast. An unexpected child exit is returned as `Err` so the manager triggers a full shutdown (the platform replaces the container) instead of restarting in place. On shutdown the child gets SIGTERM, a bounded grace period, then SIGKILL, with `kill_on_drop(true)` as the backstop. See [graceful-shutdown](../patterns/graceful-shutdown.md)
+- **N worker futures for bounded fan-out over independent items**, not a task per item. Each worker holds one item; a refill future feeds a bounded queue. A failure releases only that item's claim. Reserve a pass-wide abort for errors about the shared resource (a blocked egress), never one item's failure. An earlier drain that aborted on the first `Err` produced six pass aborts against two clean completions
+- **Coalesce writes through one writer task.** Producers send completions into a bounded channel; one task flushes on a wall-clock window, so producers never await the database for completions. Mark an item finished only after what it discovered has landed. The select drains ready input before checking the window, and on cancellation the writer closes the channel and drains. Flush errors are logged, not propagated, because leases return the items. See [postgres-operations](./postgres-operations.md)
+- **Two channels that must agree are written through one method.** A pair of `watch` channels (state and detail) is updated only inside a single `publish` that calls `send_replace` on both, so they cannot diverge
+- **Supervise a reconnecting session through two small traits** (a live link and a dialer), so reconnect policy runs against scripted fakes under paused tokio time. Classify failures as pure functions and test them with rstest tables
+- **Size a pool to the device, not the core count.** Filesystem-bound work waits on I/O, so a pool of 4 to 8 threads keeps the disk busy. A dead worker thread is a reported failure, not a hang
+- **No async runtime for a short-lived process.** A process with two or three pipe copiers and a `waitpid` is simpler with OS threads and `std::io::pipe`, and an async runtime is startup weight without benefit
+
 ### TypeScript
 
-- **`Promise.race` for multi-process lifecycle management**: race child process `.exited` promises as the equivalent of Rust's top-level `select!`. Any process exit triggers cleanup of all others before the supervisor exits with the original code. Suitable for single-container multi-process supervisors (e.g., entrypoint.ts orchestrating Rust + Bun)
+- **`Promise.race` for multi-process lifecycle management**: race child process `.exited` promises as the equivalent of Rust's top-level `select!`. Any process exit triggers cleanup of all others before the supervisor exits with the original code. Suitable for single-container multi-process supervisors orchestrating a Rust binary and a JS server. A compiled backend that owns the child process directly (see the supervisor `Service` above) is the alternative
+- **Singleflight with no cache.** Entries are deleted in `.finally` the moment they settle, so only simultaneous callers share work and no answer is ever held. A synchronous throw before the first await never reaches the map. Key coalescers per fetch function (a `WeakMap`), because a SvelteKit load's `fetch` must register its own dependency. Share only bare GETs; anything with a method or body bypasses it, and so does SSR
 
 ### Go
 

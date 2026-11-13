@@ -1,7 +1,7 @@
 ---
 name: build-time-codegen
 category: dx
-last_audited: 2026-04-03
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/Pac-Man
     path: pacman/build.rs
@@ -28,7 +28,7 @@ Treat codegen as a build step. Generated files are build artifacts, not source c
 
 ## Conventions
 
-- **Commit generated output**: generated files are committed to the repo (not .gitignored) so consumers can use the package without running codegen. CI verifies staleness via `regenerate && git diff --exit-code`
+- **Commit generated output by default**: generated files are committed (not .gitignored) so consumers can use the package without running codegen. CI verifies staleness via `regenerate && git diff --exit-code`. **The exception is output that only feeds the compiler**: a `cxx` bridge, protobuf bindings or translated shaders written to `OUT_DIR` at build time are not committed, because nothing outside the build reads them. Where checked-in bindings exist (steamlib, stardew-bot), the build script verifies them against the source of truth instead
 - **Justfile recipe for regeneration**: expose codegen as a `just` recipe (e.g., `just generate`, `just mocks`) so the command is discoverable and consistent
 
 ## Language-Specific
@@ -36,6 +36,10 @@ Treat codegen as a build step. Generated files are build artifacts, not source c
 ### Rust
 
 - **build.rs for compile-time codegen**: generate static data structures (PHF maps from JSON atlases, embedded asset tables) at compile time. Output to `$OUT_DIR` and `include!` in source
+- **`cxx-gen` from a path build-dependency when `macro_rules!` cannot author a `#[cxx::bridge]`** (idakit). A declarative spec (`Domain`, `FnSpec`, `BodyKind`) feeds the Rust bridge declaration, the C++ header and the shim glue; bodies stay hand-written in per-domain translation units, with trivial ones templated. `cxx_build::bridge()` parses bridge source textually with `syn`, so a macro can never author one. See [ffi-facade-and-unsafe-containment](../architecture/ffi-facade-and-unsafe-containment.md)
+- **One shader source generates everything else**: `build.rs` joins WGSL parts, validates with naga, translates to HLSL, MSL and GLSL ES, and emits Rust consts for the uniform layout, bindings and backend register numbers. Snapshot tests pin the translated binding interfaces. See [gpu-shader-pipeline](../architecture/gpu-shader-pipeline.md)
+- **Vendor third-party C without committing it** (ferrite-uefi): a pinned release (tag, URL, sha256 in `vendor.toml`) is fetched, configured and snapshotted by a tool subcommand into a gitignored directory. Verify the configure result with `expect_set` and `expect_unset` lists, because kconfig drops an option with unmet dependencies without a word. `build.rs` passes every compiler flag explicitly, and a check mode reports drift in tracked generated stubs. Make the vendor step a prerequisite of check, lint and test
+- **Vendor `protoc`** (or the equivalent) rather than depending on PATH, and check a build-time metadata table for stale and unused rows
 - **sqlx offline mode**: `cargo sqlx prepare` generates `.sqlx/` query metadata for offline compilation. Commit the `.sqlx/` directory; `SQLX_OFFLINE=true` in Docker builds avoids requiring a live database
 
 ### Go

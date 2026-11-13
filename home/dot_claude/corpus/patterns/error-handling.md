@@ -1,7 +1,7 @@
 ---
 name: error-handling
 category: patterns
-last_audited: 2026-04-10
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/banner
     path: src/banner/errors.rs
@@ -55,13 +55,18 @@ enum JobError {
 
 ### Rust
 
-- `thiserror` for typed error enums at module boundaries, `anyhow` for opaque upstream errors in application code
-- `#[source]` attaches cause to struct variants, `#[from]` for transparent conversion
-- Callers use `downcast_ref::<SpecificError>()` for variant-specific handling
+- snafu for typed error enums at module boundaries, in libraries and binaries alike. One enum per module, struct variants carrying what the operation was doing, a `source` where there is a cause. Callers `match` on variants. The details live in [rust](../languages/rust.md); older code in the fleet still uses `thiserror` and `anyhow` with `downcast_ref`
+- **Partial failure is a value.** When a tool can finish with some problems, each layer has an enum implementing a shared `Problem` trait with a severity, collected into a de-duplicated `Problems`; a strictness setting lets an interactive viewer stay lenient while a CLI can fail with `--strict`
 - **Extension traits for common error mappings**: `OptionNotFoundExt` with `.or_not_found(entity, id)` takes entity name + `impl Display` ID for uniform `"<Entity> '<id>' not found"` messages. `SqlxResultExt` with `.conflict_on_unique(msg)` matches PG error code `23505` via `db_err.code().as_deref()`. Both attach to any `Option<T>` or `Result<T, sqlx::Error>` generically
+
+- **Expected stop conditions are returned as data.** A union such as `{ next } | { stop }` or `Stop | null` from a gate, not a thrown error; throw only for bugs and malformed input
+- **Structured validation errors**: the `Validation` variant carries `fields: BTreeMap<field, msg>` (camelCase JSON names) plus an optional `general` message, and the response body adds `fieldErrors` alongside `error` and `code`. Handlers use `AppError::field("name", msg)` for a field problem and `AppError::validation(msg)` for a general one. This is the concrete form of a `details` slot in the typed error response
+- **Keep permanent verdicts, transient failures and bugs apart.** `Refused` (a permanent verdict, recorded) is distinct from a transient failure (retried) and from `Internal` (a bug). Only transient failures retry
+- **Name every swallowed rejection** with a `tolerate(site, fallback)` helper that records the firing into a scope and warns. A strict env switch makes it rethrow so tests fail on any tolerated error, and an explicit `tolerating(...)` scope opts out. This is the sanctioned form of the swallowed-error anti-pattern
 
 ### TypeScript
 
+- **A client API that never throws**: one `clientApiFetch<T>` returns `Result<T, ApiError>`, and a network failure is an `ApiError.network(e)` case. `ApiError.fromResponse` parses the server's `error` and `fieldErrors`. A 404 on a lookup maps to `ok(null)`, so "absent" is a value and not an error. A toast wrapper makes errors persist until dismissed while confirmations auto-dismiss
 - Named sentinel error class (e.g., `AbortError`) for user-triggered abort paths in CLIs/hooks. Catch only at runner boundary and convert to exit code. Re-throw everything else
 - **Error subclasses with context fields**: use `class NotFoundError extends Error { constructor(message: string, public url: string) }` as typed sentinels with extra context (URL, status code). `instanceof` narrowing replaces `match`/`downcast_ref`. Combine with `true-myth` Result to avoid try/catch for expected failures at API boundaries
 - **Centralized telemetry classification**: when classifying errors for telemetry from third-party APIs without error codes, isolate string matching in a single `classifyError(err): ErrorCategory` function. The string patterns are maintained in one place with explicit fallback to "unknown"

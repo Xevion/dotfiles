@@ -1,14 +1,14 @@
 ---
 name: minecraft-mod-architecture
 category: architecture
-last_audited: 2026-04-03
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/glint
     path: mod/common/src/ + mod/fabric/ + mod/neoforge/
     note: "Architectury multi-loader, reflection-based Iris/Sodium integration, device code auth, framebuffer capture"
   - repo: local/maestro
     path: common/src/ + codegen/
-    note: "Tick-driven pathfinding state machines, KSP config codegen, in-game integration tests, programmatic Log4j2"
+    note: "Search on a worker pool with a sealed pilot Phase (Idle, Planning, Running, Stalled) read by every consumer, KSP config codegen, in-game integration tests, programmatic Log4j2"
 ---
 
 # Minecraft Mod Architecture
@@ -27,7 +27,7 @@ Architectury for cross-loader abstraction. All game logic in the common module; 
 
 - **Tick-driven state machines for async work**: when the game thread cannot suspend, use a `State` enum with typed `CompletableFuture` or `Deferred` polling in `tick()`. Check `future.isDone` / `isCompleted` and advance state only when the off-thread work completes. See [kotlin-jvm](../languages/kotlin-jvm.md) for the full sealed PendingOp pattern
 
-- **Off-thread pathfinding with coroutine scope**: dedicate a single-threaded `CoroutineScope` + `SupervisorJob` (named daemon thread, e.g., `"Maestro-Pathfinding"`) for CPU-intensive search. Expose live progress via `@Volatile` fields for cross-thread reads without locking. Use `CompletableDeferred<PathResult>` and poll `getCompleted()` on the game thread — never block the tick
+- **Off-thread search with a phase the game thread reads**: run CPU-intensive search off the game thread (maestro moved from a single-threaded `CoroutineScope` to a `WorkerPool` of parallel workers, splitting even one field's rollouts across them). Expose a sealed `Phase` (Idle, Planning, Running, Stalled) that every consumer reads, plus live progress through `@Volatile` fields, and poll on the game thread: never block the tick. The earlier form was a single named daemon thread with `CompletableDeferred<PathResult>` polled via `getCompleted()`
 
 - **KSP annotation processing for config codegen**: use KSP + KotlinPoet in a dedicated `codegen/` Gradle subproject to generate typed snapshot data classes, `snapshot()` extension functions, and TOML-compatible `@TomlComments` annotations from `@PropertyDoc`. Eliminates handwritten serialization glue. See [build-time-codegen](../dx/build-time-codegen.md) for the Kotlin section
 

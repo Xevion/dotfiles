@@ -345,6 +345,8 @@ Audit run 2026-09-16 across ~100 projects, 8,189 recorded sessions, and 85 proje
 - [x] Linear label Phase 2 — 17 of 18 retirements (`Debugger` deliberately kept: a precise, distinct idakit subsystem on an active project, and the analysis contradicted itself by listing it as both promote and retire)
 - [x] Linear label Phase 0 — 27 description rewrites so cross-project-usable labels stop reading as one project's vocabulary. Zero issues touched, fully reversible
 - [x] File guard defects found by analysis: XEV-1675 through XEV-1683
+- [x] Design corpus maintenance pass: 22 projects profiled plus targeted re-audits, 14 new topics, snafu/lint-stack/tempo/dependency-automation shifts written in, three stubs filled (`headless-gpu-rendering`, `asset-pipeline-atlas`, `documentation-naming`)
+- [ ] Design corpus follow-ups: a pass to flag over-specific existing claims, verify tempo exemplars against the task-graph model, populate the `shell` stub, profile the other recently active projects not yet audited
 - [x] Remove `xargs` and `env` from the general-CLI bare allow list — both take a command as their argument, so prefix matching made `Bash(xargs:*)` cover `xargs rm -rf build` and `Bash(env:*)` cover `env FOO=1 rm -rf build`, overriding every other rule in the table
 
 **Open:**

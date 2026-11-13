@@ -1,7 +1,7 @@
 ---
 name: docker-multi-service
 category: dx
-last_audited: 2026-04-10
+last_audited: 2026-11-12
 exemplars:
   - repo: Xevion/doujin-ocr-summary
     path: Dockerfile + docker-compose.yml
@@ -17,16 +17,16 @@ exemplars:
     note: "Bun-orchestrated co-hosting with health-gated startup, Go+SvelteKit in one container"
   - repo: Xevion/xevion.dev
     path: Dockerfile
-    note: "6-stage build with placeholder frontend for Rust dep cache, SQLX_OFFLINE=true"
+    note: "5-stage build (chef, planner, frontend, final-builder, runtime), binary copied out of a cache-mounted target dir, Railway cache-key ids, SQLX_OFFLINE=true"
+  - repo: Xevion/banner
+    path: Dockerfile runtime stage + SsrService
+    note: "Compiled Rust binary as PID 1 owning a Node SSR child (optional through SSR_COMMAND), node-slim runtime base, Bun only in build stages"
   - repo: Xevion/Pac-Man
     path: pacman-server/Dockerfile
     note: "9-stage dual-target (WASM + native) with emsdk base, artifact size verification"
   - repo: Xevion/dynamic-preauth
     path: Dockerfile
     note: "cargo-chef dual-target (Linux + Windows x64) demo build, non-root runtime user, stripped binaries"
-  - repo: local/Applyhelm
-    path: Dockerfile + entrypoint.ts
-    note: "5-stage chef/planner/builder/frontend/runtime, Bun entrypoint with 15s health-gate poll + Promise.race supervisor + 3-layer LOG_JSON env propagation"
 ---
 
 # Docker & Multi-Service Orchestration
@@ -54,7 +54,8 @@ Docker for reproducible deploys and local dev parity. Compose for multi-service 
 - **Co-located services with shared runtime base**: when running a Rust binary alongside a Node/Bun frontend in one container, use the frontend runtime image (e.g., `oven/bun:1-slim`) as the final stage. Copy the compiled Rust binary in. A single entrypoint script orchestrates both processes
 - **Console-logger preload**: inject a preload script that captures stray `console.*` calls from SSR code and reformats them to match the structured logging format
 - **Bun-orchestrated co-hosting entrypoint**: a TypeScript entrypoint that health-gates SSR before starting the backend binary, propagates shared env vars (`LOG_JSON`, `LOG_LEVEL`) to both processes, and monitors with `Promise.race` for first-to-exit shutdown. Canonical shape: (1) spawn the Rust binary first, (2) poll the backend health endpoint every 500ms with a 15s ceiling before starting the SvelteKit server, (3) propagate `LOG_JSON`, `LOG_LEVEL`, `BACKEND_URL` to the Bun process env, (4) `Promise.race([monitor(rustProc), monitor(bunProc)])` where `monitor` resolves when the child exits, (5) on resolution, kill the surviving process (ideally with SIGTERM + timeout before SIGKILL — see [graceful-shutdown](../patterns/graceful-shutdown.md)). Use `--smol` on the Bun process for memory-constrained SSR
-- **6-stage Dockerfile with placeholder frontend**: planner → builder (placeholder assets for dep cache) → frontend builder → final-builder (real assets + `SQLX_OFFLINE=true`) → runtime. The placeholder stage allows Rust dependency caching to work even though the final binary embeds frontend assets
+- **A compiled backend as PID 1 can own the SSR child process** instead of a TypeScript entrypoint supervising both. The runtime base is then the Node image (or whatever runs the SSR output), not a generic Alpine and not Bun when Bun is only a build tool. Make SSR optional through an env var (`SSR_COMMAND`, empty in dev). See [concurrency-async](../architecture/concurrency-async.md) for the supervisor `Service`
+- **Final-builder stage with the real frontend assets and `SQLX_OFFLINE=true`**: chef → planner → frontend → final-builder → runtime. Copy the binary out of the cache-mounted target directory (`cp target/release/app /build/app`), because `target/` never lands in a layer. Railway cache mounts take the service id as a literal in the cache key; the `${RAILWAY_SERVICE_ID}` form is rejected. An earlier form used a placeholder-asset stage purely to make Rust dependency caching work while the binary embeds frontend assets
 - **WASM dual-target build**: for projects targeting both native and WASM, use a separate `emscripten/emsdk` base image as a parallel cargo-chef stage. Include build-artifact size verification (`test -f ./static/pacman.wasm && [ $(stat -c%s ...) -gt ... ]`) before proceeding — zero-byte WASM artifacts are a common silent failure mode
 
 ## Build Optimization Micro-Patterns
