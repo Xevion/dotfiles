@@ -243,6 +243,8 @@ tool("git", {
     "stash show",
     "switch",
     "clone",
+    // One commit pushed as a fast-forward to an explicit branch, as push-backlog does.
+    "push origin *:refs/heads/*",
   ],
   ask: [
     // `checkout -- <path>` and `checkout .` destroy uncommitted work with no
@@ -251,11 +253,22 @@ tool("git", {
     "revert",
     "pull",
     "merge",
-    "push",
     "stash",
+    // A plain fast-forward push is left to the default mode; anything that can rewrite or delete
+    // remote history asks, wherever the flag sits. A leading + on a refspec is a force push.
     "push --force",
     "push -f",
     "push --force-with-lease",
+    "push * --force",
+    "push * -f",
+    "push *+",
+    "push --mirror",
+    "push * --mirror",
+    "push --prune",
+    "push * --prune",
+    "push -d",
+    "push * -d",
+    "push * --delete",
     "reset --hard",
     "branch -D",
     "clean -fd",
@@ -824,8 +837,13 @@ function formatClaude(): object {
     defaultMode: "default",
   };
 
+  // ":*" is prefix shorthand only in a pattern with no other "*", so a
+  // pattern that already has wildcards gets a plain trailing "*" instead.
   for (const e of entries) {
-    result[e.level as "allow" | "ask" | "deny"].push(`Bash(${e.pattern}:*)`);
+    const rule = !e.pattern.includes("*")
+      ? `${e.pattern}:*`
+      : e.pattern.endsWith("*") ? e.pattern : `${e.pattern}*`;
+    result[e.level as "allow" | "ask" | "deny"].push(`Bash(${rule})`);
   }
 
   return result;
