@@ -75,17 +75,18 @@ func usage() error {
 }
 
 func pick(text string, mode tui.Mode, width, windowID int) error {
-	env := probe.Fast()
-	r := resolve.New(env)
-	s := newSession(text, width, windowID, r)
+	s := newSession(text, width, windowID)
 	m := tui.New(tui.Config{
 		Mode:    mode,
 		Screen:  text,
-		Matches: detect.ScanWidth(text, r, width),
+		Matches: s.Textual(),
+		Quick:   s.Quick,
 		Backend: s,
-		Home:    env.Home,
+		Home:    s.home,
 	})
-	_, err := tea.NewProgram(m).Run()
+	// The renderer flushes on a timer, 120 per second at most; its first tick
+	// is the earliest the first frame can appear.
+	_, err := tea.NewProgram(m, tea.WithFPS(120)).Run()
 	return err
 }
 

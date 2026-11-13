@@ -56,6 +56,10 @@ type Config struct {
 	Mode    Mode
 	Screen  string
 	Matches []detect.Match
+	// Quick, when set, means Matches came from text alone and paths are not
+	// yet checked against the disk: it rescans with direct disk checks and
+	// runs beside Backend.Refine.
+	Quick   func(ctx context.Context) []detect.Match
 	Backend Backend
 	// Home shortens displayed paths to ~.
 	Home string
@@ -65,6 +69,11 @@ type Model struct {
 	backend Backend
 	ctx     context.Context
 	cancel  context.CancelFunc
+
+	quick func(ctx context.Context) []detect.Match
+	// unchecked holds until a rescan has looked paths up on disk, so a path
+	// is not drawn as missing merely because nothing has asked yet.
+	unchecked bool
 
 	home    string
 	screen  *grid
@@ -103,14 +112,16 @@ type Model struct {
 func New(cfg Config) *Model {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &Model{
-		backend:  cfg.Backend,
-		ctx:      ctx,
-		cancel:   cancel,
-		home:     cfg.Home,
-		screen:   newGrid(cfg.Screen),
-		mode:     cfg.Mode,
-		origin:   cfg.Mode,
-		previews: map[string]preview.Preview{},
+		backend:   cfg.Backend,
+		ctx:       ctx,
+		cancel:    cancel,
+		home:      cfg.Home,
+		quick:     cfg.Quick,
+		unchecked: cfg.Quick != nil,
+		screen:    newGrid(cfg.Screen),
+		mode:      cfg.Mode,
+		origin:    cfg.Mode,
+		previews:  map[string]preview.Preview{},
 	}
 	m.setMatches(cfg.Matches)
 	return m
@@ -118,6 +129,7 @@ func New(cfg Config) *Model {
 
 type (
 	refinedMsg struct{ matches []detect.Match }
+	quickMsg   struct{ matches []detect.Match }
 	resultMsg  struct {
 		r  lookup.Result
 		ch <-chan lookup.Result
@@ -129,8 +141,14 @@ type (
 	}
 )
 
+// Init starts both rescans side by side: the quick one lands first and
+// colours paths by existence, the full one follows with every base directory.
 func (m *Model) Init() tea.Cmd {
-	return func() tea.Msg { return refinedMsg{m.backend.Refine(m.ctx)} }
+	refine := func() tea.Msg { return refinedMsg{m.backend.Refine(m.ctx)} }
+	if m.quick == nil {
+		return refine
+	}
+	return tea.Batch(func() tea.Msg { return quickMsg{m.quick(m.ctx)} }, refine)
 }
 
 func (m *Model) setMatches(ms []detect.Match) {
@@ -160,7 +178,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		clear(m.previews)
+	case quickMsg:
+		// A full rescan that got here first already says more.
+		if m.unchecked {
+			m.unchecked = false
+			m.applyRefined(msg.matches)
+		}
 	case refinedMsg:
+		m.unchecked = false
 		m.applyRefined(msg.matches)
 		return m, m.stream(m.backend.Index(m.ctx, m.matches))
 	case resultMsg:

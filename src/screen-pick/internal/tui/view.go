@@ -110,6 +110,15 @@ func legend() string {
 	return styleDim.Render(strings.Join(parts, "  "))
 }
 
+// icon is the package icon, except that a path nothing has looked up yet is
+// drawn neutral rather than missing.
+func (m *Model) icon(mt detect.Match) (string, lipgloss.Style) {
+	if m.unchecked && mt.Kind == detect.KindPath && !mt.Exists {
+		return iconFile, stylePlain
+	}
+	return icon(mt)
+}
+
 func (m *Model) size() (w, h int) {
 	w, h = m.width, m.height
 	if w <= 0 {
@@ -209,13 +218,21 @@ func (m *Model) hintsLines(h int) (lines []string, first int) {
 		first bool
 	}
 	byRow := make([][]mark, len(m.screen.rows))
+	if len(m.screen.rows) > h {
+		first = len(m.screen.rows) - h
+	}
+	// Matches wholly above the first row drawn never reach the screen.
+	visible := 0
+	if first > 0 {
+		visible = m.screen.rows[first].start
+	}
 	for i, mt := range m.matches {
+		if mt.End <= visible {
+			continue
+		}
 		for j, p := range m.screen.pieces(mt.Start, mt.End) {
 			byRow[p.row] = append(byRow[p.row], mark{p, i, j == 0})
 		}
-	}
-	if len(m.screen.rows) > h {
-		first = len(m.screen.rows) - h
 	}
 	for r := first; r < len(m.screen.rows); r++ {
 		var b strings.Builder
@@ -232,7 +249,7 @@ func (m *Model) hintsLines(h int) (lines []string, first int) {
 					b.WriteString(styleTyped.Render(m.typed) + styleLabel.Render(label[len(m.typed):]))
 					text = ansi.TruncateLeft(text, len(label), "")
 				}
-				_, st := icon(m.matches[mk.match])
+				_, st := m.icon(m.matches[mk.match])
 				b.WriteString(st.Render(text))
 			}
 			pos = mk.end
@@ -387,6 +404,8 @@ func (m *Model) place(mt detect.Match) string {
 	switch {
 	case mt.Path == "":
 		return "cannot be placed here"
+	case m.unchecked && !mt.Exists:
+		return "checking"
 	case !mt.Exists:
 		return "not found"
 	}
@@ -419,11 +438,11 @@ func (m *Model) listRow(i, w int, c columns, sel bool) string {
 		}
 		return st.Render(s)
 	}
-	ic, ist := icon(mt)
+	ic, ist := m.icon(mt)
 	row := seg(ist, ic+" ") + seg(stylePlain, padRight(shortenMiddle(mt.Text+location(mt), c.text), c.text))
 	if c.place > 0 {
 		pst := styleDim
-		if mt.Kind == detect.KindPath && !mt.Exists {
+		if mt.Kind == detect.KindPath && !mt.Exists && !m.unchecked {
 			pst = styleMissing.Faint(true)
 		}
 		row += seg(stylePlain, "  ") + seg(pst, padRight(shortenMiddle(m.place(mt), c.place), c.place))
@@ -496,7 +515,7 @@ func (m *Model) blockLines(mt detect.Match, w, h int, focused bool) []string {
 // infoLines names the target and says where it is, how big, how old and how
 // it was found: the one place its full path is shown.
 func (m *Model) infoLines(mt detect.Match, w int) []string {
-	ic, ist := icon(mt)
+	ic, ist := m.icon(mt)
 	more := ""
 	if n := len(m.matches[m.sel].Alternatives); n > 0 && (m.mode == menu || m.mode == alts) {
 		more = fmt.Sprintf("  +%d other copies", n)
@@ -515,6 +534,8 @@ func (m *Model) infoLines(mt detect.Match, w int) []string {
 		facts = append(facts, "commit")
 	case mt.Path == "":
 		facts = append(facts, styleMissing.Render("cannot be placed on this machine"))
+	case m.unchecked && !mt.Exists:
+		facts = append(facts, "checking the disk")
 	case !mt.Exists:
 		facts = append(facts, styleMissing.Render("not found"))
 		where = "looked for " + tilde(mt.Path, m.home)

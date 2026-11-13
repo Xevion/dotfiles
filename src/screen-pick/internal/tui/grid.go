@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/x/ansi"
@@ -57,9 +58,10 @@ type piece struct {
 // pieces splits [start,end) at row boundaries.
 func (g *grid) pieces(start, end int) []piece {
 	var out []piece
-	for i, rw := range g.rows {
-		a, b := max(start, rw.start), min(end, rw.end)
-		if a < b {
+	i := sort.Search(len(g.rows), func(i int) bool { return g.rows[i].end > start })
+	for ; i < len(g.rows) && g.rows[i].start < end; i++ {
+		rw := g.rows[i]
+		if a, b := max(start, rw.start), min(end, rw.end); a < b {
 			out = append(out, piece{i, a, b})
 		}
 	}
