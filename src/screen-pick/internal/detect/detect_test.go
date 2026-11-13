@@ -157,7 +157,7 @@ var scanCases = []scanCase{
 	{"go vet", "./main.go:12:3: undefined: x", []string{"path:./main.go@12:3"}},
 	{"tsc parens", "src/app.ts(12,5): error TS2322", []string{"path:src/app.ts@12:5"}},
 	{"msvc parens", "foo.c(12): error C2065", []string{"path:foo.c@12"}},
-	{"python traceback", `File "/usr/lib/python3.12/os.py", line 10, in <module>`, []string{"path:/usr/lib/python3.12/os.py"}},
+	{"python traceback", `File "/usr/lib/python3.12/os.py", line 10, in <module>`, []string{"path:/usr/lib/python3.12/os.py@10"}},
 	{"pytest node id", "tests/test_x.py::test_foo PASSED", []string{"path:tests/test_x.py"}},
 	{"pytest failure", "tests/test_x.py:42: AssertionError", []string{"path:tests/test_x.py@42"}},
 	{"node stack frame", "at Object.<anonymous> (/app/index.js:5:3)", []string{"path:/app/index.js@5:3"}},
@@ -179,7 +179,7 @@ var scanCases = []scanCase{
 	{"missing known extension", "README.md", []string{"path:README.md"}},
 
 	// Things that are not targets.
-	{"bare domain", "visit example.com today", nil},
+	{"bare domain", "visit example.com today", []string{"host:example.com"}},
 	{"latin abbreviations", "e.g. this, i.e. that, etc.", nil},
 	{"dotted identifier", "a.b.c.d", nil},
 	{"rust path", "std::io::Result", nil},

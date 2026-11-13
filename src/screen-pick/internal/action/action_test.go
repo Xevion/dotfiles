@@ -157,6 +157,25 @@ func TestFor(t *testing.T) {
 			"h copy localhost",
 		}},
 		{"bare ip", detect.Match{Kind: detect.KindHost, Text: "10.0.0.1"}, []string{"y copy 10.0.0.1"}},
+		{"bare domain opens over https", detect.Match{Kind: detect.KindHost, Text: "example.com"}, []string{
+			"o open https://example.com",
+			"y copy example.com",
+		}},
+		{"bare local name opens over http", detect.Match{Kind: detect.KindHost, Text: "nas.lan"}, []string{
+			"o open http://nas.lan",
+			"y copy nas.lan",
+		}},
+		{"schemeless url gets a scheme to open", detect.Match{Kind: detect.KindURL, Text: "docs.rs/serde"}, []string{
+			"o open https://docs.rs/serde",
+			"y copy docs.rs/serde",
+		}},
+		{"custom scheme opens as written", detect.Match{Kind: detect.KindURL, Text: "steam://run/1"}, []string{
+			"o open steam://run/1",
+			"y copy steam://run/1",
+		}},
+		{"scp remote can only be copied", detect.Match{Kind: detect.KindURL, Text: "git@github.com:org/repo.git"}, []string{
+			"y copy git@github.com:org/repo.git",
+		}},
 		{"sha runs git where the commit is", detect.Match{Kind: detect.KindSHA, Text: "3f2a9c1"}, []string{
 			"g git 3f2a9c1 [show 3f2a9c1 in /home/u/proj]",
 			"R tab /home/u/proj",

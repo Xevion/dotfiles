@@ -2,8 +2,6 @@ package detect
 
 import (
 	"cmp"
-	"net"
-	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
@@ -115,7 +113,7 @@ func (sc *scanner) findDirs(spans []span) {
 	for _, sp := range spans {
 		t := sc.s[sp.start:sp.end]
 		d := decode.Decode(t)[0]
-		if !strings.HasPrefix(d, "/") && !strings.HasPrefix(d, "~") && !strings.HasPrefix(d, "$") {
+		if sp.pre >= 0 || !strings.HasPrefix(d, "/") && !strings.HasPrefix(d, "~") && !strings.HasPrefix(d, "$") {
 			continue
 		}
 		if res := sc.r.Resolve(t, nil); res.Exists && res.IsDir {
@@ -143,6 +141,9 @@ func (sc *scanner) pathCand(sp span) (cand, bool) {
 	if !strings.ContainsFunc(d, unicode.IsLetter) {
 		return cand{}, false
 	}
+	if sp.pre >= 0 && !sc.interiorPlausible(sp, d) {
+		return cand{}, false
+	}
 	res := sc.resolve(t, sp.start)
 	if res.Exists {
 		// A bare word naming a directory is too often just a word.
@@ -157,6 +158,28 @@ func (sc *scanner) pathCand(sp span) (cand, bool) {
 	return cand{KindPath, sp.start, sp.end, tierPathShape, res}, true
 }
 
+// interiorPlausible vets a reading that starts at a root inside a word, where
+// the text before it might be a real directory rather than junk: a lone
+// directory name (/etc in foo/etc) is too often just a word, and a prefix that
+// is itself a directory means the whole word was the relative path.
+func (sc *scanner) interiorPlausible(sp span, d string) bool {
+	comps := strings.FieldsFunc(d, func(c rune) bool { return c == '/' || c == '\\' })
+	if len(comps) == 0 || len(comps) < 2 && ext(comps[len(comps)-1]) == "" {
+		return false
+	}
+	prefix := sc.s[sp.pre:sp.start]
+	if res := sc.resolve(prefix, sp.pre); res.Exists && res.IsDir {
+		return false
+	}
+	// A prefix of plain directory names in front of a path-shaped word is that
+	// word's relative path, which a coincidental absolute match must not hijack.
+	if strings.Trim(prefix, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-/") == "" &&
+		looksLikePath(sc.s[sp.pre:sp.end]) {
+		return false
+	}
+	return true
+}
+
 // isCall spots a dotted name used as a function, like console.log(x).
 func isCall(s string, sp span, t string) bool {
 	if sp.end >= len(s) || s[sp.end] != '(' || strings.ContainsAny(t, `/\`) {
@@ -167,10 +190,12 @@ func isCall(s string, sp span, t string) bool {
 }
 
 var (
-	pathRoot     = regexp.MustCompile(`^(?:/|~/|\./|\.\./|\$(?:\{\w+\}|[A-Za-z_]\w*)/)`)
-	windowsVar   = regexp.MustCompile(`^%\w+%[\\/].`)
-	extPattern   = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]{0,8}$`)
-	locationRe   = regexp.MustCompile(`^(?::(\d+)(?::(\d+))?|\((\d+)(?:,\s*(\d+))?\))`)
+	pathRoot   = regexp.MustCompile(`^(?:/|~[+-]?/|\./|\.\./|\$(?:\{\w+\}|[A-Za-z_]\w*)/)`)
+	windowsVar = regexp.MustCompile(`^%\w+%[\\/].`)
+	extPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]{0,8}$`)
+	// Forms after a path: :12:4, (12,4), #L12C4, `", line 12`, ` on line 12`,
+	// and the -12- of a grep context line.
+	locationRe   = regexp.MustCompile(`^(?::(\d+)(?::(\d+))?|\((\d+)(?:,\s*(\d+))?\)|#L(\d+)(?:C(\d+))?|["']?(?:,\s*| on\s+|:)line\s+(\d+)|-(\d+)-(?:\D|$)|\|(\d+)(?: col (\d+))?\|)`)
 	knownExtList = strings.Fields(`
 		rs go py pyi js mjs cjs ts tsx jsx mts cts json jsonc json5 yaml yml toml ini cfg conf
 		md mdx txt log csv tsv xml html htm css scss sass less svg png jpg jpeg gif webp ico bmp
@@ -180,7 +205,7 @@ var (
 		mm vue svelte astro dart ex exs erl hs ml clj zig nim tf hcl proto graphql gql ipynb rst
 		adoc tex bib el vim nix mk cmake properties plist reg lnk dmp pak sav dat cache pem crt
 		key pub asc gpg age kdl ron jar war apk deb rpm msi appimage img vhd vhdx qcow2 iml
-		sln csproj vcxproj pdb map snap
+		sln csproj vcxproj pdb map snap bak orig rej swp tmp
 	`)
 	knownExt = func() map[string]bool {
 		m := make(map[string]bool, len(knownExtList))
@@ -222,6 +247,10 @@ func looksLikePath(raw string) bool {
 		return false
 	}
 	last := comps[len(comps)-1]
+	if userRoot.MatchString(d) {
+		// ~user/proj could be prose in a way ~/proj could not.
+		return ext(last) != "" || len(comps) >= 3
+	}
 	if root := pathRoot.FindString(d); root != "" {
 		// Every root but / counts as a component: ~/proj reads as a path,
 		// /proj could be prose.
@@ -237,6 +266,7 @@ func looksLikePath(raw string) bool {
 // (a dotfile), or mixes case the way an identifier does (exec.Cmd, os.File):
 // real extensions are lower or upper case throughout.
 func ext(name string) string {
+	name = strings.TrimSuffix(name, "~")
 	i := strings.LastIndexByte(name, '.')
 	if i <= 0 || strings.Trim(name[:i], ".") == "" {
 		return ""
@@ -253,7 +283,7 @@ func location(rest string) (int, int) {
 	if m == nil {
 		return 0, 0
 	}
-	line, col := cmp.Or(m[1], m[3]), cmp.Or(m[2], m[4])
+	line, col := cmp.Or(m[1], m[3], m[5], m[7], m[8], m[9]), cmp.Or(m[2], m[4], m[6], m[10])
 	l, _ := strconv.Atoi(line)
 	c, _ := strconv.Atoi(col)
 	return l, c
@@ -268,180 +298,4 @@ func (sc *scanner) linkCand(l link) cand {
 		return cand{KindPath, l.start, l.end, tierLink, sc.resolve(p, l.start)}
 	}
 	return cand{KindURL, l.start, l.end, tierLink, resolve.Resolution{}}
-}
-
-var (
-	urlRe = regexp.MustCompile("(?i)\\b(?:https?|ftp|ssh|git|wss?|file)://[^\\s<>\"'`]+")
-	scpRe = regexp.MustCompile(`\b[A-Za-z0-9._-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}:[A-Za-z0-9._~-][A-Za-z0-9._~/-]*`)
-)
-
-func (sc *scanner) urlCands() []cand {
-	s := sc.s
-	var out []cand
-	for _, m := range urlRe.FindAllStringIndex(s, -1) {
-		a, b := m[0], cutAtSymbol(s, m[0], m[1])
-		b = trimURL(s, a, b)
-		u := s[a:b]
-		if strings.HasSuffix(u, "://") {
-			continue
-		}
-		if p, ok := fileURLPath(u); ok {
-			out = append(out, cand{KindPath, a, b, tierURL, sc.resolve(p, a)})
-			continue
-		}
-		out = append(out, cand{KindURL, a, b, tierURL, resolve.Resolution{}})
-	}
-	for _, m := range scpRe.FindAllStringIndex(s, -1) {
-		a, b := m[0], trimURL(s, m[0], m[1])
-		if a > 0 && strings.IndexByte("/:@", s[a-1]) >= 0 {
-			continue
-		}
-		_, repo, _ := strings.Cut(s[a:b], ":")
-		if strings.Contains(repo, "/") || strings.HasSuffix(repo, ".git") {
-			out = append(out, cand{KindURL, a, b, tierURL, resolve.Resolution{}})
-		}
-	}
-	return out
-}
-
-// fileURLPath returns the decoded local path of a file:// URL.
-func fileURLPath(u string) (string, bool) {
-	if len(u) < 7 || !strings.EqualFold(u[:7], "file://") {
-		return "", false
-	}
-	rest := u[7:]
-	if !strings.HasPrefix(rest, "/") {
-		i := strings.IndexByte(rest, '/')
-		if i < 0 {
-			return "", false
-		}
-		rest = rest[i:]
-	}
-	if p, err := url.PathUnescape(rest); err == nil {
-		return p, true
-	}
-	return rest, true
-}
-
-// cutAtSymbol ends a span at the first non-ASCII rune that is not a letter,
-// digit or mark.
-func cutAtSymbol(s string, a, b int) int {
-	for i, r := range s[a:b] {
-		if r >= utf8.RuneSelf && !isWordRune(r) {
-			return a + i
-		}
-	}
-	return b
-}
-
-// trimURL drops trailing punctuation and closing brackets the URL never opened.
-func trimURL(s string, a, b int) int {
-	for b > a {
-		u := s[a:b]
-		switch c := u[len(u)-1]; {
-		case strings.IndexByte(".,;:!?'\"*", c) >= 0:
-			b--
-		case c == ')' && strings.Count(u, "(") < strings.Count(u, ")"):
-			b--
-		case c == ']' && strings.Count(u, "[") < strings.Count(u, "]"):
-			b--
-		default:
-			return b
-		}
-	}
-	return b
-}
-
-var (
-	ipv4Re     = regexp.MustCompile(`\d{1,3}(?:\.\d{1,3}){3}(?::\d{1,5}|/\d{1,2})?`)
-	ipv6Br     = regexp.MustCompile(`\[([0-9A-Fa-f:.]+)\](?::\d{1,5})?`)
-	ipv6Re     = regexp.MustCompile(`[0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){2,7}`)
-	hostPortRe = regexp.MustCompile(`(?i)\b(localhost|(?:[a-z0-9-]+\.)+[a-z]{2,}):(\d{1,5})`)
-	// Abbreviated hashes run 7 to 16 digits; 32 is an MD5 or a machine ID.
-	shaRe = regexp.MustCompile(`\b(?:[0-9a-f]{40}|[0-9a-f]{7,16})\b`)
-)
-
-func hostCands(s string) []cand {
-	var out []cand
-	add := func(a, b int) { out = append(out, cand{KindHost, a, b, tierHost, resolve.Resolution{}}) }
-
-	for _, m := range ipv4Re.FindAllStringIndex(s, -1) {
-		a, b := m[0], m[1]
-		if a > 0 && (isWordByte(s[a-1]) || s[a-1] == '.') || !hostEnds(s, b) {
-			continue
-		}
-		addr, _, _ := strings.Cut(s[a:b], "/")
-		ip, port, _ := strings.Cut(addr, ":")
-		if net.ParseIP(ip) != nil && validPort(port) {
-			add(a, b)
-		}
-	}
-	for _, m := range ipv6Br.FindAllStringSubmatchIndex(s, -1) {
-		_, port, _ := strings.Cut(s[m[3]:m[1]], "]:")
-		if net.ParseIP(s[m[2]:m[3]]) != nil && validPort(port) && !(m[1] < len(s) && isAlnum(s[m[1]])) {
-			add(m[0], m[1])
-		}
-	}
-	for _, m := range ipv6Re.FindAllStringIndex(s, -1) {
-		a, b := m[0], m[1]
-		t := s[a:b]
-		if a > 0 && (isWordByte(s[a-1]) || s[a-1] == ':' || s[a-1] == '.') ||
-			b < len(s) && (isWordByte(s[b]) || s[b] == ':') {
-			continue
-		}
-		if (strings.Contains(t, "::") || strings.Count(t, ":") == 7) &&
-			strings.ContainsFunc(t, unicode.IsDigit) && net.ParseIP(t) != nil {
-			add(a, b)
-		}
-	}
-	for _, m := range hostPortRe.FindAllStringSubmatchIndex(s, -1) {
-		a, b := m[0], m[1]
-		host := s[m[2]:m[3]]
-		if a > 0 && strings.IndexByte("@/.-", s[a-1]) >= 0 || b < len(s) && isAlnum(s[b]) {
-			continue
-		}
-		if !strings.EqualFold(host, "localhost") && knownExt[strings.ToLower(host[strings.LastIndexByte(host, '.')+1:])] {
-			continue
-		}
-		if validPort(s[m[4]:m[5]]) {
-			add(a, b)
-		}
-	}
-	return out
-}
-
-// hostEnds allows a sentence-ending period after an address but not another
-// dotted component.
-func hostEnds(s string, b int) bool {
-	if b >= len(s) {
-		return true
-	}
-	if isWordByte(s[b]) {
-		return false
-	}
-	return s[b] != '.' || b+1 >= len(s) || !isAlnum(s[b+1])
-}
-
-func validPort(p string) bool {
-	if p == "" {
-		return true
-	}
-	n, err := strconv.Atoi(p)
-	return err == nil && n > 0 && n <= 65535
-}
-
-func shaCands(s string) []cand {
-	var out []cand
-	for _, m := range shaRe.FindAllStringIndex(s, -1) {
-		a, b := m[0], m[1]
-		t := s[a:b]
-		if !strings.ContainsAny(t, "0123456789") || !strings.ContainsAny(t, "abcdef") {
-			continue
-		}
-		if a > 0 && (s[a-1] == '-' || s[a-1] == ':') || b < len(s) && s[b] == '-' {
-			continue
-		}
-		out = append(out, cand{KindSHA, a, b, tierSHA, resolve.Resolution{}})
-	}
-	return out
 }

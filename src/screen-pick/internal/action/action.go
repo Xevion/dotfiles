@@ -98,12 +98,14 @@ func For(m detect.Match, ctx Context) []Action {
 	case detect.KindPath:
 		forPath(&b, m, ctx)
 	case detect.KindURL:
-		b.add("o", "open in browser", GroupOpen, Open, m.Text)
+		if u, ok := detect.WebURL(m); ok {
+			b.add("o", "open in browser", GroupOpen, Open, u)
+		}
 		b.add("y", "copy", GroupCopy, Copy, m.Text)
 	case detect.KindHost:
 		host, port := splitHostPort(m.Text)
-		if port != "" {
-			b.add("o", "open in browser", GroupOpen, Open, "http://"+m.Text)
+		if u, ok := detect.WebURL(m); ok {
+			b.add("o", "open in browser", GroupOpen, Open, u)
 		}
 		b.add("y", "copy", GroupCopy, Copy, m.Text)
 		if port != "" {

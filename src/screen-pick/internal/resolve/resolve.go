@@ -302,6 +302,19 @@ func (r *Resolver) locate(v string, bases []Base) []Candidate {
 			return nil
 		}
 		return []Candidate{{path.Join(r.env.Home, v[1:]), SourceHome}}
+	case strings.HasPrefix(v, "~") && strings.Contains(v, "/"):
+		// ~user/x: another user's home, assumed to sit beside ours. ~+ and ~-
+		// name a directory only the shell knows.
+		name, rest, _ := strings.Cut(v[1:], "/")
+		switch {
+		case name == "" || name == "+" || name == "-":
+			return nil
+		case name == "root":
+			return []Candidate{{path.Join("/root", rest), SourceAbsolute}}
+		case r.env.Home == "":
+			return nil
+		}
+		return []Candidate{{path.Join(path.Dir(r.env.Home), name, rest), SourceAbsolute}}
 	case envVarRoot.MatchString(v):
 		missing := false
 		p := os.Expand(v, func(k string) string {
