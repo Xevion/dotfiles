@@ -794,6 +794,14 @@ const claudeExtras = {
     "mcp__linear__create_attachment",
     "mcp__linear__create_document",
     "mcp__linear__update_document",
+    // claude.ai Docs: create, read and edit docs; delete stays in ask
+    "mcp__claude_ai_Claude_Docs__batch",
+    "mcp__claude_ai_Claude_Docs__guide",
+    "mcp__claude_ai_Claude_Docs__update",
+    "mcp__claude_ai_Claude_Docs__create",
+    "mcp__claude_ai_Claude_Docs__read",
+    "mcp__claude_ai_Claude_Docs__query",
+    "mcp__claude_ai_Claude_Docs__export",
   ],
   deny: [
     "Task(Explore)",
@@ -804,6 +812,7 @@ const claudeExtras = {
     "mcp__linear__save_milestone",
     "mcp__linear__delete_comment",
     "mcp__linear__delete_attachment",
+    "mcp__claude_ai_Claude_Docs__delete",
   ] as string[],
 };
 
