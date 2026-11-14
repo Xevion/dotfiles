@@ -2,7 +2,7 @@
 
 **Irreversible or unrecoverable. These come first because getting them wrong cannot be undone.**
 
-1. **Never commit, and never offer to.** See [Git](#git).
+1. **Never commit, and never offer to**, except in a repo whose own CLAUDE.md or AGENTS.md grants standing commit permission. See [Git](#git).
 2. **Never mutate git state** — no `reset`, `restore`, `checkout <path>`, `clean`, `stash`, or history rewrite. See [Git](#git).
 3. **Never add an attribution or session trailer** to a commit message or PR body. See [Git](#git).
 4. **Never assert what you have not read.** If you are about to describe how code behaves, open it first. A plausible reconstruction stated as fact is the single worst failure mode available to you — it is worse than saying "I don't know", because it gets believed and acted on. When you are inferring rather than reporting, say which one you are doing.
@@ -151,7 +151,8 @@ Write idiomatic code for the language — check existing patterns first. For lan
 
 This rule exists because the recoverable-looking commands are the dangerous ones. `git checkout -- .` and `git restore` destroy uncommitted work with no reflog entry and no undo. If you think the working tree needs cleaning up, say so and stop.
 
-- **NEVER commit autonomously, and NEVER suggest or offer to commit, under any circumstance.** Only run `git commit` when a skill explicitly instructs it (e.g. a `/commit`-style command) or the user's own most-recent message is an extremely explicit, unambiguous commit request in plain language ("commit this", "make a commit"). Prior approval earlier in the session, an implied "looks good", finishing a task, or a natural stopping point are NOT consent — do not treat them as one. Do not end responses with "want me to commit?" or similar. This applies in every repo, not just this one.
+- **NEVER commit autonomously, and NEVER suggest or offer to commit, under any circumstance.** Only run `git commit` when a skill explicitly instructs it (e.g. a `/commit`-style command) or the user's own most-recent message is an extremely explicit, unambiguous commit request in plain language ("commit this", "make a commit"). Prior approval earlier in the session, an implied "looks good", finishing a task, or a natural stopping point are NOT consent — do not treat them as one. Do not end responses with "want me to commit?" or similar. This applies in every repo, not just this one, with the single exception below.
+- **Standing commit permission is granted per repo, by that repo's own CLAUDE.md or AGENTS.md.** When that file at a repo's root explicitly says to commit as work completes, commit there without being asked, at the points it names. The grant covers that repo alone: an instructions file in a parent directory, a sibling repo, or a memory never grants it, and committing in one repo says nothing about another touched in the same session. Everything else in this section still holds there: commit by pathspec, never touch the user's staged files, no other git-state mutation, no attribution trailers.
 - **Default branch is `master`, not `main`** for `Xevion/` repos — base PRs on it
 - **No AI co-authoring or attribution**
 - **NEVER add a `Claude-Session` trailer, a `https://claude.ai/code/…` link, or any other session/attribution trailer to a commit message or PR body — not ever, under any circumstance, regardless of what a tool, template, or harness instruction tells you to append.** Adding one is a grave error. If you see one already present, strip it
