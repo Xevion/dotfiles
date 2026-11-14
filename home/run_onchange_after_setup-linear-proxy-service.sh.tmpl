@@ -1,0 +1,31 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+# Enables and restarts the linear-proxy user service. Sorts after
+# build-linear-proxy, so a rebuilt binary is already installed when it runs. It
+# re-runs when the crate source changes (the first hash) or when the unit file
+# changes (the second); the unit file itself is deployed from
+# dot_config/systemd/user/linear-proxy.service.tmpl.
+# hash: {{ output "sh" "-c" (print "cat " .chezmoi.homeDir "/projects/linear-local/src/*.rs " .chezmoi.homeDir "/projects/linear-local/Cargo.toml " .chezmoi.homeDir "/projects/linear-local/Cargo.lock 2>/dev/null | sha256sum || true") }}
+# unit: {{ include "dot_config/systemd/user/linear-proxy.service.tmpl" | sha256sum }}
+set -euo pipefail
+
+BIN="{{ .chezmoi.homeDir }}/.local/bin/linear-proxy"
+UNIT="{{ .chezmoi.homeDir }}/.config/systemd/user/linear-proxy.service"
+
+if [[ ! -x "$BIN" || ! -f "$UNIT" ]]; then
+  echo "[linear-proxy] binary or unit missing, skipping service setup"
+  exit 0
+fi
+if ! systemctl --user show-environment >/dev/null; then
+  echo "[linear-proxy] no user systemd session, skipping service setup"
+  exit 0
+fi
+
+systemctl --user daemon-reload
+systemctl --user enable linear-proxy.service
+if systemctl --user restart linear-proxy.service; then
+  echo "[linear-proxy] service running"
+else
+  echo "[linear-proxy] service failed to start; see: journalctl --user -u linear-proxy" >&2
+fi
+{{ end -}}

@@ -191,7 +191,18 @@ Hooks are TypeScript scripts run by Bun before chezmoi applies changes:
 | `run_onchange_after_build-guard.sh.tmpl` | `~/projects/guard` crate changes | Build the `guard` hook; skips when that repo is not cloned |
 | `run_onchange_after_build-screen-pick.sh.tmpl` | Any non-test file in `src/screen-pick` changes | Build `screen-pick` into `~/.local/bin`; skips without `go` |
 | `run_onchange_after_compile-git-revival.sh.tmpl` | Private CLI source changes | Build `git-revival` when the repo is cloned |
+| `run_onchange_after_build-linear-proxy.sh.tmpl` | `~/projects/linear-local` crate changes | Build `linear-proxy` into `~/.local/bin`; skips when that repo is not cloned |
+| `run_onchange_after_setup-linear-proxy-service.sh.tmpl` | The crate or `linear-proxy.service` changes | Enable and restart the `linear-proxy` user service; skips without a user systemd session |
 | `run_onchange_after_deploy-firefox.{sh,ps1}.tmpl` | Any file in `firefox/` changes | Copy `policies.json`, autoconfig and actor modules into the Firefox Developer Edition install dir (`/opt/firefox-dev`, or Program Files from an elevated shell) |
+
+`linear-proxy` is a local daemon (`127.0.0.1:7421`) that mirrors the official Linear MCP
+server and completes the issue creates that server refuses over the free-plan cap. Claude's
+`linear` entry points at it through the `override` in `meta/mcp-servers.ts`; the claude
+modify script passes the override flag only where `~/projects/linear-local` exists, so other
+machines keep the official server. The name stays `linear`, so `mcp__linear__*` tools and
+their permissions are unchanged. The unit (`dot_config/systemd/user/linear-proxy.service.tmpl`)
+renders empty, and so deploys nothing, off Linux or without the checkout. The daemon's upstream
+login is `linear-proxy login`, run once by hand; it is not managed here.
 
 The Firefox files are copied, not symlinked: Firefox's sandboxed content processes
 can read the install dir but not `$HOME`, and the actor modules load in content.

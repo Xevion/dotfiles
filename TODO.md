@@ -33,6 +33,14 @@ Permissions, rules and Linear conventions (audit of 2026-09-16 and after).
 - [ ] Linear housekeeping: Game Hacking has 18 issues In Progress, 12 stale since May-June 2026; Figsaw (0 issues, Cancelled), WebSAM (0 issues, marked Completed) and Pac-Man (1 issue) carry rules governing almost nothing
 - [ ] Audit existing AI tool configs (`.claude/`, API keys, prompts); add Claude Desktop and Gemini configuration if applicable; move API keys into Doppler; document per-project vs global configuration and project-specific `CLAUDE.md` templates
 
+## linear-proxy
+
+Local MCP proxy built from `~/projects/linear-local` (see its `docs/proxy-plan.md`).
+
+- [ ] Replace the borrowed Firefox session cookie (`src/cookies.rs`) with something long-lived: stored login credentials, or better, the account's passkey, which signs in instantly with no second factor. The cookie expires or rotates and only works while Firefox is signed in
+- [ ] Drop the `claude-code-cache` token source once `linear-proxy login` has been exercised through a token refresh
+- [ ] Decide whether opencode and Codex should also use the proxy; `override` in `meta/mcp-servers.ts` is per-format, so it is one line each
+
 ## Bootstrap and documentation
 
 - [ ] Installation guide covering fresh Linux, WSL and Windows (including the Bun requirement), with a pre-flight checklist of required tools (Bun, age, chezmoi; `ONBOARDING.md` lists the apps that are not installed automatically)

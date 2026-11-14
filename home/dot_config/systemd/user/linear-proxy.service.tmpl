@@ -1,0 +1,17 @@
+{{ if and (eq .chezmoi.os "linux") (stat (joinPath .chezmoi.homeDir "projects/linear-local/Cargo.toml")) -}}
+[Unit]
+Description=Linear MCP proxy (completes the issue creates the official server refuses)
+Documentation=file://{{ .chezmoi.homeDir }}/projects/linear-local/docs/proxy-plan.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=%h/.local/bin/linear-proxy serve
+Restart=on-failure
+RestartSec=5
+MemoryMax=64M
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target
+{{ end -}}

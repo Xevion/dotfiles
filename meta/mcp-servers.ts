@@ -2,15 +2,18 @@
 
 // MCP server definitions — single source of truth for Claude, OpenCode, Codex.
 // Called by chezmoi templates:
-//   {{ output "bun" "meta/mcp-servers.ts" "<format>" <context7_key> <exa_key> }}
+//   {{ output "bun" "meta/mcp-servers.ts" "<format>" <context7_key> <exa_key> [<linear_proxy>] }}
 // Secrets are passed as argv so Doppler values only cross process boundary once.
+// <linear_proxy> is any non-empty string; the claude template passes it only on
+// machines where the linear-proxy checkout exists.
 
 type Format = "opencode" | "claude" | "codex";
 
-const [, , format, context7Key = "", exaKey = ""] = process.argv as [
+const [, , format, context7Key = "", exaKey = "", linearProxy = ""] = process.argv as [
   string,
   string,
   Format,
+  string?,
   string?,
   string?,
 ];
@@ -26,6 +29,8 @@ type Server = {
   oauth?: boolean;
   only?: Format[];
   tools?: Record<string, Record<string, string>>;
+  // Per-format replacement for url/headers/oauth; the server keeps its name.
+  override?: Partial<Record<Format, Pick<Server, "url" | "headers" | "oauth">>>;
 };
 
 const allServers: Record<string, Server> = {
@@ -49,13 +54,20 @@ const allServers: Record<string, Server> = {
       save_project: { approval_mode: "approve" },
       save_comment: { approval_mode: "approve" },
     },
+    // Claude talks to the local linear-proxy (~/projects/linear-local) instead: it
+    // mirrors the official server and completes the issue creates that server
+    // refuses over the free-plan cap. The name stays `linear`, so the
+    // mcp__linear__* tools and their permissions are unchanged.
+    override: linearProxy
+      ? { claude: { url: "http://127.0.0.1:7421/mcp" } }
+      : undefined,
   },
 };
 
 const servers: Record<string, Server> = Object.fromEntries(
-  Object.entries(allServers).filter(
-    ([, s]) => !s.only || s.only.includes(format),
-  ),
+  Object.entries(allServers)
+    .filter(([, s]) => !s.only || s.only.includes(format))
+    .map(([name, s]) => [name, { ...s, ...s.override?.[format] }]),
 );
 
 function formatOpenCode(): unknown {

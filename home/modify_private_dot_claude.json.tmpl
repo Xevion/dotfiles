@@ -1,4 +1,8 @@
 {{ if eq .chezmoi.os "linux" -}}
+{{- $linearProxy := "" -}}
+{{- if stat (joinPath .chezmoi.homeDir "projects/linear-local/Cargo.toml") -}}
+{{-   $linearProxy = "1" -}}
+{{- end -}}
 #!/bin/bash
 # Ensures required MCP servers exist in ~/.claude.json
 # Preserves all other keys (stats, cached configs, etc.)
@@ -29,7 +33,7 @@ interface ClaudeConfig {
 const { required: REQUIRED_SERVERS, managed: MANAGED_NAMES }: {
   required: Record<string, McpServer>;
   managed: string[];
-} = {{ output "bun" (joinPath .chezmoi.sourceDir "../meta/mcp-servers.ts") "claude" dopplerProjectJson.CONTEXT7_API_KEY dopplerProjectJson.EXA_API_KEY }};
+} = {{ output "bun" (joinPath .chezmoi.sourceDir "../meta/mcp-servers.ts") "claude" dopplerProjectJson.CONTEXT7_API_KEY dopplerProjectJson.EXA_API_KEY $linearProxy }};
 
 // Deep sort object keys for deterministic hashing
 function sortDeep(obj: unknown): unknown {
