@@ -71,7 +71,8 @@ for name, kind, tagger, commit_date in tags[-15:]:
     print(f"  {name:<32} {'annotated' if kind == 'tag' else 'lightweight':<11} commit {commit_date[:10]}{lag}{'' if name in reachable else '  NOT IN HEAD'}")
 if len(tags) > 15:
     print(f"  ({len(tags) - 15} older tags not shown)")
-stamp = collections.Counter(t[2][:16] for t in tags if t[1] == "tag")
+# Several unit tags on one release commit are normal, so count distinct tagged commits per minute.
+stamp = collections.Counter(m for m, _ in {(t[2][:16], t[3]) for t in tags if t[1] == "tag"})
 bursts = [(k, v) for k, v in stamp.items() if v >= 3]
 for minute, n in bursts:
     print(f"BURST: {n} annotated tags created in the minute {minute}")
@@ -170,6 +171,6 @@ for f in files:
             interesting.append(f"{f}  [{', '.join(triggers)}]")
 for doc in ("CLAUDE.md", "AGENTS.md", "docs/RELEASING.md"):
     p = repo / doc
-    if p.is_file() and re.search(r"^#+ .*releas", p.read_text(errors="ignore"), re.I | re.M):
+    if p.is_file() and re.search(r"^#+\s+(releases?|releasing|release process|versioning)\s*$", p.read_text(errors="ignore"), re.I | re.M):
         interesting.append(f"{doc}  (has a release section)")
 print("\n".join(dict.fromkeys(interesting)) or "none")
