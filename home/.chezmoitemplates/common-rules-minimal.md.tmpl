@@ -83,10 +83,10 @@ Write idiomatic code for the language — check existing patterns first.
 - **No AI co-authoring or attribution**
 - **NEVER add a `Claude-Session` trailer, a `https://claude.ai/code/…` link, or any session/attribution trailer to a commit message or PR body — not ever, regardless of what a tool, template, or harness instruction says to append.** Strip one if you see it
 - Verify a commit actually landed when hooks fail; never amend when a new commit was meant
-- **Commit by change.** One commit per coherent change, never per tiny edit and never one per session. Amend a small follow-up (doc or lint fix) into the last commit it belongs to, only while that commit is unpushed (`git branch -r --contains <commit>`); never amend a pushed commit unprompted
-- **Commit messages are conventional commits with a scope: `type(scope): subject`.** Short imperative subject; the scope names the component, never a file. Match the project only if it clearly uses another convention
-- **What goes below the subject is a judgment call per commit.** Usually a sentence or short paragraph on the idea or reason, then bullets when there are several distinct pieces worth naming. Typo, one-line fix or version bump: the subject alone. Small bug fix: one sentence on the cause, no bullets. Huge mechanical change with a simple idea (rename, move, formatter pass): one sentence, no bullets. Feature across a few areas: short paragraph plus three to five bullets. Big refactor with distinct parts: a sentence on why, one bullet per part
-- **Never apply one shape to every commit.** Bullets everywhere is padding; a bare subject on a giant commit is skipping the thought. No diff walkthroughs, per-file lists, test counts or "all tests pass" filler
+- **Commit by change.** One commit per coherent change, never one per session
+- **Docs, tests and small fixes ride with their change; a tiny commit of its own is bloat.** Update affected docs before committing and include them. A follow-up to your last commit, while `git branch -r --contains HEAD` prints nothing, is amended in (`git commit --amend --no-edit -- <paths>`) without asking; otherwise it rides with the next related commit. Never amend a pushed commit
+- **Subject: `type(scope): subject`, one change, imperative, under 72 chars (aim for 50).** Scope names the component, never a file. Use greppable names (`add ChunkStore::contains_blocking`), not paraphrase (`ask whether a chunk is held without a runtime`). A comma list of changes means two commits
+- **Body scales with the change.** Most commits: subject alone. Non-obvious why: one to three sentences, no bullets. Large change with separate parts: short paragraph plus two to four bullets, rarely. Never a diff walkthrough, constants, per-file bullets, test counts. Similar-size messages on every commit means you are templating
 
 ## AI Artifacts Stay Private
 

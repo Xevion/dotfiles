@@ -3,7 +3,7 @@
 **Irreversible or unrecoverable. These come first because getting them wrong cannot be undone.**
 
 1. **Never commit, and never offer to**, except in a repo whose own CLAUDE.md or AGENTS.md grants standing commit permission. See [Git](#git).
-2. **Never mutate git state** — no `reset`, `restore`, `checkout <path>`, `clean`, `stash`, or history rewrite. See [Git](#git).
+2. **Never mutate git state** — no `reset`, `restore`, `checkout <path>`, `clean`, `stash`, or history rewrite. The one exception is amending a follow-up into your own unpushed commit. See [Git](#git).
 3. **Never add an attribution or session trailer** to a commit message or PR body. See [Git](#git).
 4. **Never assert what you have not read.** If you are about to describe how code behaves, open it first. A plausible reconstruction stated as fact is the single worst failure mode available to you — it is worse than saying "I don't know", because it gets believed and acted on. When you are inferring rather than reporting, say which one you are doing.
 5. **Never volunteer identity or telemetry to an external service.** No model name, client name, user agent, email or contact detail, ever, even when a tool or API asks for it. See [External Services](#external-services).
@@ -92,12 +92,18 @@ Respond directly — no affirmations, no compliments, no "great question". Chall
 
 The failure looks like: run a command, pipe it through `head`, decide you need a bigger window, run the whole command again. For anything slow or effectful that is wasteful; for anything with side effects it is dangerous. Get the command right once.
 
+**Never redirect a long-running command's output to a file.** The tool panel is the user's only live view of a running command, and background tasks stream to it too. A redirect hides the whole run from them, and afterwards they have to scroll back to find which file you used and open it by hand. This applies to foreground and `run_in_background` commands alike, profiling and benchmark runs included.
+- Run it bare and let the output stream. Filter in the pipe (`2>&1 | rg ...`) only if the unfiltered stream is truly unreadable, and otherwise not at all.
+- Don't redirect so you can re-filter without re-running. The tool already saves large output to a file and tells you the path, so read that file.
+- A command that finishes instantly is the only case where a redirect costs the user little. Even then, prefer plain output.
+- Files a tool writes on purpose (`-o profile.json.gz`, a generated config) are not logs and are fine.
+
 **Never:**
 - Add `| head -N`/`| tail -N`, or re-run with a bigger N, to peek at output you were already given
-- **Redirect output to a file and then read that file back.** `cmd > out.txt` followed by reading `out.txt` is pure waste. Redirect *only* when the file itself is the deliverable: generating a config, capturing a build artifact, or feeding a command that genuinely needs a file argument
 - `cd path && command` — `cd` inside a compound command can trigger a permission prompt. The Bash tool's working directory persists between calls; use absolute paths
 - Chain 4+ commands with `&&`
 - **Assign or expand shell variables** (`SP=/tmp/…; cmd "$SP"`) — the permission matcher can't analyze expansions and blocks the call with a manual "Contains simple_expansion" prompt. Write the literal path every time, however long and repetitive
+- Use `paste`: the interactive shell abbreviates it to `xsel -b`, so it prints the clipboard instead of joining lines. Use `tr`, `jq -s`, `git log --format` or a short `bun -e` instead
 - Suppress errors/output (`2>/dev/null`, `|| echo "not found"`, `--quiet`/`-q` during diagnosis) — stderr often holds the answer, and suppression triggers manual permission prompts
 
 **Acceptable**: simple pipe (`cmd | jq`), coupled pair (`mkdir -p d && touch d/f`), redirect *when the file is the goal* (`cmd > config.generated.json`), env prefix (`VAR=x cmd`), and inline scripts (`bun -e`, `python3 -c`) where a shell pipeline would be worse — reach for `jq` on JSON first, and a real file once the script stops being a one-liner.
@@ -147,7 +153,7 @@ Write idiomatic code for the language — check existing patterns first. For lan
 
 ## Git
 
-**The whole of git is off-limits, not just committing.** Never run a command that changes the index, the working tree, HEAD, or history unless the user asked for that specific command in their most recent message. That means no `reset`, no `restore`, no `checkout <path>`, no `clean`, no `stash`, no `rebase`, no `revert`, no `branch -D`, no force-push, no amend. Reading is always fine: `status`, `log`, `diff`, `show`, `blame`, `ls-files`.
+**The whole of git is off-limits, not just committing.** Never run a command that changes the index, the working tree, HEAD, or history unless the user asked for that specific command in their most recent message. That means no `reset`, no `restore`, no `checkout <path>`, no `clean`, no `stash`, no `rebase`, no `revert`, no `branch -D`, no force-push, no amend (except folding a follow-up into your own unpushed commit, below). Reading is always fine: `status`, `log`, `diff`, `show`, `blame`, `ls-files`.
 
 This rule exists because the recoverable-looking commands are the dangerous ones. `git checkout -- .` and `git restore` destroy uncommitted work with no reflog entry and no undo. If you think the working tree needs cleaning up, say so and stop.
 
@@ -159,16 +165,30 @@ This rule exists because the recoverable-looking commands are the dangerous ones
 - **Don't** use `git -C <path>` — you're already in the right directory
 - **Unexpected git state is not yours to fix.** If the index, HEAD, or working tree changed in a way you did not cause, assume it was deliberate. Mention it in one line only if it affects what you are doing, then continue. Do not investigate who did it, do not unstage, revert, amend, or reset, and do not ask whether it was intended
 - **Commit history is delicate**: don't rewrite history unless asked; verify a commit actually landed when hooks fail; never accidentally amend when a new commit was meant
-- **Commit by change, not by edit or by session.** When committing as work lands, give each coherent change (a fix, a feature) its own commit: never a commit for a one-line doc or lint fix, never the whole session squashed into one. A small follow-up that belongs to work already committed (a doc example, a lint fix, a reworded comment) is amended into that commit instead, usually the last one, with `git commit --amend --no-edit -- <paths>`. This is the one standing exception to the no-amend rule, and it holds only while the commit is unpushed: check `git branch -r --contains <commit>` first, and never amend a pushed commit unprompted. Folding into an older commit needs a rebase, so do that only when asked; otherwise ride the follow-up along with the next related commit
-- **Commit messages are conventional commits with a scope: `type(scope): subject`.** The subject is short, imperative and says what the change does or why it exists. The scope names the component (`screen-pick`, `kitty`, `permissions`, `fish`), never a file path. Match the project's own convention only when it clearly uses a different one.
-- **What goes below the subject is a judgment call per commit, not a template.** Size it to how much a future reader needs, and decide each time. The usual shape is a sentence or a short paragraph on the idea or the reason, then bullets when there are several distinct things worth naming. Examples:
-  - Typo, one-line fix, version bump, obvious config tweak: the subject alone, or the subject plus one sentence if the cause is not obvious.
-  - Small bug fix: a sentence on what was wrong and why the fix works. No bullets.
-  - Large mechanical change with a simple idea (a rename across hundreds of files, a directory move, a formatter pass): a sentence saying what moved and that behavior is unchanged. Size alone does not earn bullets.
-  - Feature touching a few areas: a short paragraph on the idea, then three to five bullets naming the pieces a reader would look for.
-  - Big refactor or rewrite with distinct parts: a sentence on why, then one bullet per part, each saying what changed and why it matters.
-  - Fix with a non-obvious cause: a short paragraph on the cause, because the cause is the part worth keeping.
-- **Never apply one shape to every commit.** Bullets on every commit is padding, and a bare subject on a giant commit is skipping the thought. Bullets list distinct pieces, never restate the subject, and never itemize every file. Leave out walkthroughs of the diff, per-sub-change rationale, test counts and "all tests pass" filler. A single headline number is fine when it is the point of the change (a 10x speedup).
+- **Commit by change, not by edit or by session.** Each coherent change (a fix, a feature) gets its own commit; never the whole session squashed into one.
+- **Docs, tests and small fixes ride with the change they belong to. A tiny commit of its own is bloat.** Update the README, roadmap, CLAUDE.md, changelog and doc comments a change affects *before* committing it, and put them in the same commit. A doc, test, lint, build or reworded-comment follow-up to a neighboring commit never gets its own commit:
+  - It belongs to your last commit and `git branch -r --contains HEAD` prints nothing: amend it in with `git commit --amend --no-edit -- <paths>`. This is the standing exception to the no-amend rule; do it without asking.
+  - It belongs to an older or pushed commit: hold it and commit it with the next related change. Folding into an older commit needs a rebase, so only when asked.
+  - A standalone `docs:` or `test:` commit is only for work that is the whole change (a new guide, a test suite for untested code).
+  - Bad, from real history: `feat(wifi): WPA2-PSK connect over nl80211 ...` and one minute later `docs(wifi): seer joins a real WPA2-PSK network` (5 lines). That doc line belonged in the feature commit.
+- **Subject: `type(scope): subject`, one change, imperative verb first, under 72 characters (aim for 50).** The scope names the component (`screen-pick`, `kitty`, `permissions`), never a file path; match the project only when it clearly uses another convention. Use the words a grep would find (the type, function, flag or command), not an abstract paraphrase. A comma or "and" listing changes means the commit is two commits, or the extra items are body detail.
+  - `fix(ui): name a missing NIC plainly, log it over the link, one queued quit, no empty shapes` -> `fix(ui): clean up the no-NIC status display`
+  - `feat(cache): ask whether a chunk is held without a runtime` -> `feat(cache): add ChunkStore::contains_blocking`
+  - `feat(grp): every payload range of a directory in one pass` -> `perf(grp): compute all payload ranges in one pass`
+  - `fix(models): let a pack opened into the viewer answer for its models first` -> `fix(models): prefer packs opened in the viewer over the catalog`
+- **Body: scale it to the change, and expect wide variance.** If consecutive commits carry messages of similar size, you are filling a template. Rough scale:
+  - Small change, or anything the subject fully explains (most commits, including a large mechanical rename or move): subject alone.
+  - A change whose reason or cause is not obvious from the diff: one to three plain sentences on the why. No bullets.
+  - A large change with genuinely separate parts a reader would look for: a short paragraph, then two to four short bullets. This is rare, not the default shape of a `feat`.
+- **The body never contains** a walkthrough of the diff, "X now does Y" restatements of the code, constants, thresholds and timings, one bullet per file or module, test counts, or benchmark tables. One headline number is fine when it is the point (a 10x speedup). Plain ASCII, wrapped at 72 columns.
+  - Bad (3,800-line commit): a three-sentence paragraph plus seven dense bullets of timings, file names, API routes and config keys.
+  - Good, same commit:
+    ```
+    feat(eta): estimate progress by time instead of words touched
+
+    Bit fade takes a fifth of a pass but touches almost no words, so the
+    word-based ETA sat at 99% for its whole eight minutes.
+    ```
 - **The user's staging area is their review, so commit by pathspec.** They stage files as work lands, including while you are still editing; staged files are theirs, so never flag them, unstage them or sweep them into your commit. Run a full `git status` and read it first, never commit "whatever is staged", and commit your own paths with `git commit -F - -- <paths>`. A pathspec commit skips untracked files, so mark each new file with `git add -N <file>` first. Pass the message through `-F -` with a heredoc so the blank line and bullets survive, then confirm with `git log -1 --format=%B`
 
 ## Versioning
@@ -206,6 +226,8 @@ The AI writes code in my stead, and AI-assisted markers are hidden from the publ
 **File-content invalidation**: after any command that rewrites files (formatters, `--fix`, `cargo fmt`…), re-read every file you intend to edit before using Edit — your in-context copy is stale and `oldString` won't match.
 
 **Debugging**:  Before proposing a fix, read the relevant source (not just the error), reproduce/confirm the failure, and identify the root cause with evidence. **2-strike rule**: after two failed fixes with the same strategy, switch entirely — add logging, read deeper (callers/deps/config), check docs, or ask. Never a third guess with the same approach. **Before calling an approach dead or impossible**, measure it across the whole population (one census query, not the two examples that failed); state the claim as a hypothesis and report the split with numbers.
+
+**Profiling: always `samply`, never `perf`, `cargo flamegraph` or hand-rolled timers.** "Profile it" means `samply record` against a release build carrying debug info (`CARGO_PROFILE_RELEASE_DEBUG=true`, in a scratch `CARGO_TARGET_DIR`). For reading the profile yourself, record with `--save-only --unstable-presymbolicate -o <scratch>/profile.json.gz` and aggregate self and inclusive time per function from the saved file; for the user, `samply load` on that file. Timing log lines are not a profile.
 
 **Exploring**: Read/Glob/Grep and plain shell (`cat`, `grep`, `find`) are both fine — lean on the dedicated tools when you want line numbers or a partial read, and on the shell when you want a quick check. What to avoid either way is an elaborate `sed`/`awk` pipeline standing in for reading the file. Check for existing libraries and patterns before building new ones. **Never guess file paths** — Glob to verify before reading unfamiliar files (projects often use `src/db/mod.rs`, not `src/db.rs`). Entering an unfamiliar project: scan `docs/` guides, `just --list`, detect the package manager, consult the design corpus.
 

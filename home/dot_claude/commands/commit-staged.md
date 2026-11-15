@@ -46,28 +46,29 @@ names *where* the change lives, not what kind of change it is or which file got 
 - Bad: `feat(guard.rs): add rm safety policy` — a filename isn't a scope; use the module/feature it
   belongs to (`guard`), not the file that happens to hold it
 
-**Subject line:** short (under 72 chars), imperative, says what the change does or why it exists.
+**Copy the project's type/scope convention, not its message length or prose style.** If recent
+commits have long subjects or bullet-heavy bodies, do not imitate them.
 
-**What goes below the subject is a judgment call for this diff, not a template.** Decide each time
-how much a future reader needs. The usual shape is a sentence or short paragraph on the idea or
-reason, then bullets when there are several distinct pieces worth naming. Examples:
+**Subject line:** one change, imperative verb first, under 72 chars (aim for 50). Use the names a
+grep would find (the type, function, flag or command), not an abstract paraphrase. A comma or "and"
+listing changes means the extras belong in the body or nowhere.
 
-- Typo, one-line fix, version bump, obvious config tweak: the subject alone, or plus one sentence
-  if the cause is not obvious.
-- Small bug fix: one sentence on what was wrong and why the fix works. No bullets.
-- Large mechanical change with a simple idea (rename across hundreds of files, directory move,
-  formatter pass): one sentence on what moved and that behavior is unchanged. Size alone does not
-  earn bullets.
-- Feature touching a few areas: a short paragraph on the idea, then three to five bullets naming
-  the pieces a reader would look for.
-- Big refactor or rewrite with distinct parts: a sentence on why, then one bullet per part saying
-  what changed and why it matters.
-- Fix with a non-obvious cause: a short paragraph on the cause, since the cause is what is worth
-  keeping.
+- Bad: `fix(ui): name a missing NIC plainly, log it over the link, one queued quit, no empty shapes`
+- Good: `fix(ui): clean up the no-NIC status display`
+- Bad: `feat(cache): ask whether a chunk is held without a runtime`
+- Good: `feat(cache): add ChunkStore::contains_blocking`
 
-**Never apply one shape to every commit.** Bullets on everything is padding, and a bare subject on
-a giant commit is skipping the thought. Bullets list distinct pieces; they never restate the
-subject or itemize files.
+**Body: scale it to the change.** Messages should vary widely in size across commits.
+
+- Small change, or one the subject fully explains (most commits, including big mechanical renames
+  or moves): subject alone.
+- Reason or cause not obvious from the diff: one to three plain sentences on the why. No bullets.
+- Large change with genuinely separate parts: a short paragraph, then two to four short bullets.
+  Rare, not the default for a `feat`.
+
+Never in the body: a diff walkthrough, "X now does Y" restatements, constants, thresholds or
+timings, one bullet per file or module. One headline number is fine when it is the point. Plain
+ASCII, wrapped at 72 columns.
 
 - **NEVER mention:**
   - Test results, coverage percentages, or "all tests pass"

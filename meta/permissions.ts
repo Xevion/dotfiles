@@ -693,6 +693,9 @@ ask("rmdir /s", "rd /s", "Remove-Item -Recurse -Force", "del /s"); // recursive 
 // (ported `grep -rn` silently rewrites matches instead of printing line numbers)
 deny("rg -r", "rg --replace");
 
+// The interactive shell abbreviates `paste` to `xsel -b`, so it prints the clipboard instead of joining lines
+deny("paste");
+
 // OUTPUT FORMATTING
 
 type Format = "opencode" | "claude";
