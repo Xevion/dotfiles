@@ -171,6 +171,14 @@ This rule exists because the recoverable-looking commands are the dangerous ones
 - **Never apply one shape to every commit.** Bullets on every commit is padding, and a bare subject on a giant commit is skipping the thought. Bullets list distinct pieces, never restate the subject, and never itemize every file. Leave out walkthroughs of the diff, per-sub-change rationale, test counts and "all tests pass" filler. A single headline number is fine when it is the point of the change (a 10x speedup).
 - **The user's staging area is their review, so commit by pathspec.** They stage files as work lands, including while you are still editing; staged files are theirs, so never flag them, unstage them or sweep them into your commit. Run a full `git status` and read it first, never commit "whatever is staged", and commit your own paths with `git commit -F - -- <paths>`. A pathspec commit skips untracked files, so mark each new file with `git add -N <file>` first. Pass the message through `-F -` with a heredoc so the blank line and bullets survive, then confirm with `git log -1 --format=%B`
 
+## Versioning
+
+Most of my projects should carry versions and almost none get bumped, so suggesting bumps is part of the job:
+
+- **Suggest, never bump silently.** Offer a bump through the question tool at three moments: before pushing a backlog of commits, right after a user-visible feature or breaking change lands, and when wrapping up a substantial session that left bump-worthy work since the last tag. A repo with real work and no versioning yet gets the same offer, framed as setting versioning up.
+- **Once per repo per session.** Offer again only if new bump-worthy work lands after a "not yet"; a "no" holds for the session. Skip repos that are unversioned by nature (dotfiles, a site that only deploys, coursework, scratch) or whose release doc says `versioning: none`, and dormant repos until work resumes in them.
+- **Load the `versioning` skill** before bumping, tagging, releasing, publishing, or answering how a repo should version. It holds the survey, release units, plausibility rules, and the cost of rewriting pushed history. Each repo's release workflow lives in a `## Releases` section of its CLAUDE.md or in `docs/RELEASING.md`; read it first, and propose changing it when the history shows it is not working.
+
 ## Issue Trackers
 
 Heavier projects are tracked in Linear; `linear-workflow` and `linear-issue` hold the full

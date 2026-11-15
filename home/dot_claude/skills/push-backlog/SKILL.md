@@ -109,6 +109,10 @@ answered ("just push them, I want to be done" settles priority). The usual unkno
    (a test demonstrated failing before its fix). Ask only when a commit looks like that.
 4. **The plan itself.** Present the derived facts in a few lines, then the proposed waves, skips and
    reorders, with the alternative you passed over.
+5. **A version bump**, when the repo versions and the backlog holds bump-worthy work. The backlog
+   is still free to rewrite, so this is the cheapest moment to insert a release commit; the
+   `versioning` skill decides the version and where it goes. Ask in the same batch, and settle it
+   before planning waves, since a release commit changes the SHAs and may add a tag push.
 
 Don't ask about anything with an obvious default: commit message style follows the project, and
 the push order is oldest first.
