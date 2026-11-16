@@ -15,6 +15,7 @@
 8. **Detect the project's tooling**: Before running package managers, build tools, or test runners, check what the project actually uses (lockfiles, config, scripts). Never assume.
 9. **Produce only what was asked for.** No plan document, summary file, report, or README unless it was requested. Finishing a task is not a reason to write a document about having finished it.
 10. **These instruction files are chezmoi-managed.** `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md` and `~/.cline/rules/common.md` are all generated. Editing them directly is silently discarded by the next `chezmoi apply`. The shared source is `~/.local/share/chezmoi/home/.chezmoitemplates/common-rules.md.tmpl`, which every one of those templates includes, so a rule added there reaches all of them. Confirm with `chezmoi source-path <file>` and preview with `chezmoi diff <file>` before editing, and never run `chezmoi apply` to resolve a conflict you created.
+11. **A commit message is a subject line and nothing else, unless the why is invisible in the diff.** No paragraph-plus-bullets, no description of what the code does, no numbers. This is the rule broken most often, and every violation is a message the user rewrites by hand. Reread the Git section's body rules before every `git commit`.
 
 ## Communication Style
 
@@ -176,13 +177,24 @@ This rule exists because the recoverable-looking commands are the dangerous ones
   - `feat(cache): ask whether a chunk is held without a runtime` -> `feat(cache): add ChunkStore::contains_blocking`
   - `feat(grp): every payload range of a directory in one pass` -> `perf(grp): compute all payload ranges in one pass`
   - `fix(models): let a pack opened into the viewer answer for its models first` -> `fix(models): prefer packs opened in the viewer over the catalog`
-- **Body: scale it to the change, and expect wide variance.** If consecutive commits carry messages of similar size, you are filling a template. Rough scale:
-  - Small change, or anything the subject fully explains (most commits, including a large mechanical rename or move): subject alone.
-  - A change whose reason or cause is not obvious from the diff: one to three plain sentences on the why. No bullets.
-  - A large change with genuinely separate parts a reader would look for: a short paragraph, then two to four short bullets. This is rare, not the default shape of a `feat`.
-- **The body never contains** a walkthrough of the diff, "X now does Y" restatements of the code, constants, thresholds and timings, one bullet per file or module, test counts, or benchmark tables. One headline number is fine when it is the point (a 10x speedup). Plain ASCII, wrapped at 72 columns.
-  - Bad (3,800-line commit): a three-sentence paragraph plus seven dense bullets of timings, file names, API routes and config keys.
-  - Good, same commit:
+- **Body: none. Write the subject, then stop.** That holds for features, large diffs and new crates alike: size is not a reason for a body. A body is allowed in exactly one case, when someone reading the diff could not tell *why* the change was made. Then it is one to three plain sentences giving that why, and nothing else. Bullets are for a change with genuinely separate parts someone would search the log for; that is perhaps one commit in twenty, never the shape of a `feat`. If the last commit you wrote has a body, assume the next one does not.
+- **Never use `git log` as a style guide.** Earlier commits in a repo, including the ones you wrote earlier in this session, are not a reference for body shape or length; most were written under looser rules. Take only the subject convention from them.
+- **Before every `git commit`, strike from the body**: every sentence that says what the code does or now does ("X now does Y", "A reads B", "the builder gains C"); every number, size, version, count, threshold or timing; every file, module, type, function or recipe name the why does not need; every bullet that names a part of the diff. What survives is the body. Usually nothing survives, so the commit is the subject alone. Plain ASCII, wrapped at 72 columns.
+  - Bad, from real history (one of a run where every commit had this shape):
+    ```
+    feat(pluginabi): read plugin version data and decide whether it loads
+
+    A new crate for the native plugin contract, all of it read from a DLL's
+    headers and exports without running any plugin code.
+
+    - PackedVersion, a bitbybit bitfield for packed game and host versions,
+      which also names the Address Library file a game version needs.
+    - VersionData parsed through zerocopy from the exported 848-byte layout,
+      and check, which applies the nine load rules in order and ...
+    (two more bullets, then a trailing paragraph)
+    ```
+    Good: the subject line alone. Every sentence of that body restated the diff.
+  - Good, a body that earns its place because the diff cannot show the why:
     ```
     feat(eta): estimate progress by time instead of words touched
 
