@@ -34,6 +34,7 @@ mold = "latest"
 golangci-lint = "v2.10.1"
 npm = "latest"
 "go:mvdan.cc/sh/v3/cmd/shfmt" = "latest"
+"go:github.com/google/pprof" = "latest"
 btop = "latest"
 tmux = "latest"
 ruby = "latest"
@@ -126,6 +127,8 @@ resvg = "latest"
 "pipx:ya-frida-mcp" = "latest"
 "pipx:yt-dlp" = { version = "latest", extras = ["default", "secretstorage"] }
 "npm:@xevion/tempo" = "latest"
+# Mozilla's profiler CLI (repo firefox-devtools/profiler); ~150 weekly downloads trips aube's 1000 floor.
+"npm:@firefox-devtools/profiler-cli" = { version = "latest", allow_low_downloads = true }
 gitleaks = "latest"
 trufflehog = "latest"
 kubectl = "latest"
